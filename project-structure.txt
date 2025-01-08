@@ -1,16 +1,18 @@
 nft-scavenger-hunt/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── utils/
-│   ├── contracts/
-│   └── App.tsx
+├── app/
+│   ├── game/
+│   │   └── page.js
+│   ├── leaderboard/
+│   │   └── page.js
+│   ├── layout.js
+│   └── page.js
+├── components/
 ├── public/
-├── tests/
-├── scripts/
+├── lib/
+├── contracts/
 ├── .gitignore
 ├── package.json
-├── tsconfig.json
+├── next.config.js
 ├── README.md
 └── protostar.toml
 
