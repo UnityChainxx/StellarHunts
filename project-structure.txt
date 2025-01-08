@@ -1,0 +1,16 @@
+nft-scavenger-hunt/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── utils/
+│   ├── contracts/
+│   └── App.tsx
+├── public/
+├── tests/
+├── scripts/
+├── .gitignore
+├── package.json
+├── tsconfig.json
+├── README.md
+└── protostar.toml
+
