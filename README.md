@@ -1,10 +1,10 @@
-# NFT Scavenger Hunt Game 🎯
+# NFT Scavenger Hunt Game
 
 **The NFT Scavenger Hunt Game** is a blockchain-powered, gamified dApp built on the StarkNet ecosystem. It challenges players to solve puzzles, follow clues, and earn exclusive NFTs as rewards, while seamlessly introducing them to the StarkNet blockchain and its ecosystem.
 
 ---
 
-## 📌 Features
+## Features
 
 - **Interactive Gameplay**: Solve puzzles and follow blockchain-related clues to earn NFT rewards.
 - **Transparent Progress**: Game progress is recorded on-chain for transparency.
@@ -14,7 +14,7 @@
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -28,3 +28,34 @@ Ensure you have the following installed:
    ```bash
    git clone https://github.com/your-username/nft-scavenger-hunt.git
    cd nft-scavenger-hunt
+
+   ## Installation and Setup
+
+Follow the steps below to get started with the project:
+
+### Install Dependencies
+
+Run the following command to install all necessary dependencies:
+
+   ```bash
+   npm install
+
+Start the Development Server
+To start the development server, execute:
+
+bash
+Copy code
+npm start
+Smart Contract Deployment
+Compile Contracts
+Use Protostar to compile the smart contracts:
+
+bash
+Copy code
+protostar build
+Deploy to StarkNet
+Deploy the compiled contracts to the StarkNet network with the command:
+
+bash
+Copy code
+protostar deploy ./build/main.json
