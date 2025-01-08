@@ -42,20 +42,3 @@ Run the following command to install all necessary dependencies:
 
 Start the Development Server
 To start the development server, execute:
-
-bash
-Copy code
-npm start
-Smart Contract Deployment
-Compile Contracts
-Use Protostar to compile the smart contracts:
-
-bash
-Copy code
-protostar build
-Deploy to StarkNet
-Deploy the compiled contracts to the StarkNet network with the command:
-
-bash
-Copy code
-protostar deploy ./build/main.json
