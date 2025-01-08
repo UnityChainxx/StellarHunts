@@ -1,48 +1,30 @@
-NFT Scavenger Hunt Game
+# NFT Scavenger Hunt Game 🎯
 
-Introduction
+**The NFT Scavenger Hunt Game** is a blockchain-powered, gamified dApp built on the StarkNet ecosystem. It challenges players to solve puzzles, follow clues, and earn exclusive NFTs as rewards, while seamlessly introducing them to the StarkNet blockchain and its ecosystem.
 
-The NFT Scavenger Hunt Game is a decentralized application (dApp) on StarkNet that combines gaming, education, and rewards. Players solve puzzles and follow clues to earn unique NFTs while learning about StarkNet’s ecosystem.
+---
 
-Features
+## 📌 Features
 
-Solve on-chain clues to progress.
+- **Interactive Gameplay**: Solve puzzles and follow blockchain-related clues to earn NFT rewards.
+- **Transparent Progress**: Game progress is recorded on-chain for transparency.
+- **Customizable Hunts**: Ecosystem projects can create and embed their own challenges.
+- **Educational Content**: Learn StarkNet features through engaging gameplay.
+- **Dynamic Leaderboard**: Track player achievements in real-time.
 
-Earn NFTs as rewards for completing challenges.
+---
 
-Compete on a real-time leaderboard.
+## 🚀 Getting Started
 
-Learn about StarkNet through embedded educational content.
+### Prerequisites
 
-Installation
+Ensure you have the following installed:
+- **Node.js** and **npm**
+- A **StarkNet-compatible wallet** (e.g., Argent, Braavos)
 
-Clone the repository:
+### Installation
 
-git clone https://github.com/your-repo/nft-scavenger-hunt.git
-cd nft-scavenger-hunt
-
-Install dependencies:
-
-npm install
-
-Start the development server:
-
-npm start
-
-Smart Contract Deployment
-
-Compile contracts using Protostar:
-
-protostar build
-
-Deploy to StarkNet:
-
-protostar deploy ./build/main.json
-
-Contributing
-
-We welcome contributions! Please fork the repository, create a branch, and submit a pull request.
-
-License
-
-This project is licensed under the MIT License.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/nft-scavenger-hunt.git
+   cd nft-scavenger-hunt
