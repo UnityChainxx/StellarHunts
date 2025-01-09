@@ -43,6 +43,10 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "components/components/ui/table.jsx",
+    "components/components/ui/input.jsx",
+    "components/components/ui/card.jsx",
+    "components/components/ui/button.jsx",
     ".next/types/**/*.ts"
   ],
   "exclude": [
