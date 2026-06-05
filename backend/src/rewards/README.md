@@ -1,15 +1,15 @@
-# RewardModule
+# Reward Module
 
-A standalone module for handling reward distribution to users who complete specific challenges in StellarHunt.
+A standalone NestJS module for managing reward distribution to users who complete challenges in StellarHunt. Supports NFT, token, badge, and points-based rewards with duplicate claim prevention and claim limits.
 
 ## Features
 
-- ✅ **Reward Management**: Create, update, and manage rewards with metadata
-- ✅ **Claim Tracking**: Prevent duplicate claims and track user reward history
-- ✅ **Challenge Association**: Link rewards to specific challenges
-- ✅ **Claim Limits**: Set maximum claim limits for rewards
-- ✅ **Statistics**: Get detailed statistics for rewards
-- ✅ **Soft Delete**: Safely deactivate rewards without losing data
+- **Reward Management** — Create, update, and manage rewards with flexible metadata
+- **Claim Tracking** — Prevent duplicate claims and maintain full user reward history
+- **Challenge Association** — Link rewards directly to specific challenges
+- **Claim Limits** — Configure maximum claims per reward with automatic enforcement
+- **Statistics** — Per-reward claim counts, availability status, and usage metrics
+- **Soft Delete** — Deactivate rewards safely without data loss
 
 ## Database Schema
 
@@ -17,17 +17,17 @@ A standalone module for handling reward distribution to users who complete speci
 
 ```typescript
 {
-  id: string; // Unique identifier
-  name: string; // Reward name
-  description: string; // Reward description
-  type: RewardType; // NFT, TOKEN, BADGE, POINTS
-  metadata: Record<string, any>; // Flexible metadata storage
-  challengeId: string; // Associated challenge
-  isActive: boolean; // Whether reward is available
-  maxClaims: number | null; // Maximum claims allowed
-  currentClaims: number; // Current claim count
-  createdAt: Date; // Creation timestamp
-  updatedAt: Date; // Last update timestamp
+  id: string;                    // Unique identifier
+  name: string;                  // Reward display name
+  description: string;           // Reward description
+  type: RewardType;              // NFT, TOKEN, BADGE, POINTS
+  metadata: Record<string, any>; // Flexible metadata (imageUrl, rarity, contractAddress)
+  challengeId: string;           // Associated challenge
+  isActive: boolean;             // Whether reward is available
+  maxClaims: number | null;      // Maximum claims allowed (null = unlimited)
+  currentClaims: number;         // Current claim count
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -35,13 +35,13 @@ A standalone module for handling reward distribution to users who complete speci
 
 ```typescript
 {
-  id: string; // Unique identifier
-  userId: string; // User who claimed
-  rewardId: string; // Associated reward
-  challengeId: string; // Associated challenge
-  claimDate: Date; // When claimed
-  transactionHash: string; // Blockchain transaction (optional)
-  status: string; // Claim status
+  id: string;              // Unique identifier
+  userId: string;          // User who claimed
+  rewardId: string;        // Associated reward
+  challengeId: string;     // Associated challenge
+  claimDate: Date;         // When claimed
+  transactionHash: string; // Blockchain transaction hash (optional)
+  status: string;          // Claim status (claimed, pending, failed)
 }
 ```
 
@@ -67,25 +67,17 @@ Content-Type: application/json
 }
 ```
 
-### Get All Rewards
+### Read Endpoints
 
-```http
-GET /rewards
+```
+GET /rewards                          # List all rewards
+GET /rewards/:id                      # Get reward by ID
+GET /rewards/challenge/:challengeId   # Get rewards for a challenge
+GET /rewards/claims/:id               # Get claim by ID
+GET /rewards/user/:userId/claims      # Get all claims for a user
 ```
 
-### Get Reward by ID
-
-```http
-GET /rewards/:id
-```
-
-### Get Reward by Challenge ID
-
-```http
-GET /rewards/challenge/:challengeId
-```
-
-### Claim Reward ⭐
+### Claim Reward
 
 ```http
 POST /rewards/claim
@@ -97,8 +89,7 @@ Content-Type: application/json
 }
 ```
 
-**Response (201 Created):**
-
+**Success (201):**
 ```json
 {
   "id": "claim-001",
@@ -111,8 +102,7 @@ Content-Type: application/json
 }
 ```
 
-**Error Response (409 Conflict):**
-
+**Conflict (409):**
 ```json
 {
   "message": "Reward already claimed",
@@ -121,31 +111,16 @@ Content-Type: application/json
 }
 ```
 
-### Get User Claims
+### Reward Statistics
 
-```http
-GET /rewards/user/:userId/claims
 ```
-
-### Get Claim by ID
-
-```http
-GET /rewards/claims/:id
-```
-
-### Get Reward Statistics
-
-```http
 GET /rewards/:id/stats
 ```
 
 **Response:**
-
 ```json
 {
-  "reward": {
-    /* reward object */
-  },
+  "reward": { /* reward object */ },
   "totalClaims": 25,
   "availableClaims": 75,
   "isAvailable": true
@@ -154,16 +129,15 @@ GET /rewards/:id/stats
 
 ### Delete Reward
 
-```http
+```
 DELETE /rewards/:id
 ```
 
 ## Usage Examples
 
-### 1. Setting up a new reward for a challenge
+### Creating a Reward
 
 ```typescript
-// Create a new NFT reward
 const newReward = await rewardsService.createReward({
   name: 'StarkNet Master NFT',
   description: 'Exclusive NFT for completing Master level',
@@ -178,44 +152,32 @@ const newReward = await rewardsService.createReward({
 });
 ```
 
-### 2. Claiming a reward
+### Claiming a Reward
 
 ```typescript
-// User completes a challenge and claims reward
 const claim = await rewardsService.claimReward({
   userId: 'user-456',
   challengeId: 'challenge-easy-001',
 });
 
-// Check if claim was successful
 if (claim) {
-  console.log(`Reward claimed successfully! Claim ID: ${claim.id}`);
+  console.log(`Reward claimed. Claim ID: ${claim.id}`);
 }
 ```
 
-### 3. Checking if user already claimed
+### Checking Claim Status
 
 ```typescript
-// Check if user has already claimed this reward
 const hasClaimed = await rewardsService.hasUserClaimedReward(
   'user-456',
   'challenge-easy-001',
 );
-
-if (hasClaimed) {
-  console.log('User has already claimed this reward');
-} else {
-  console.log('User can claim this reward');
-}
 ```
 
-### 4. Getting user's reward history
+### Retrieving User Reward History
 
 ```typescript
-// Get all claims for a user
 const userClaims = await rewardsService.getUserClaims('user-456');
-
-console.log(`User has claimed ${userClaims.length} rewards:`);
 userClaims.forEach((claim) => {
   console.log(`- ${claim.reward.name} (${claim.claimDate})`);
 });
@@ -223,80 +185,54 @@ userClaims.forEach((claim) => {
 
 ## Error Handling
 
-The module provides comprehensive error handling:
-
-- **400 Bad Request**: Invalid input data or reward limit reached
-- **404 Not Found**: Reward or claim not found
-- **409 Conflict**: Reward already claimed by user
-- **500 Internal Server Error**: Database or system errors
+| Status | Scenario |
+|--------|----------|
+| 400 | Invalid input or reward limit reached |
+| 404 | Reward or claim not found |
+| 409 | Reward already claimed by user |
+| 500 | Database or system error |
 
 ## Testing
 
-### Unit Tests
-
 ```bash
+# Unit tests
 npm run test rewards.service.spec.ts
 npm run test rewards.controller.spec.ts
-```
 
-### E2E Tests
-
-```bash
+# E2E tests
 npm run test:e2e rewards.e2e-spec.ts
 ```
 
 ## Database Migrations
 
-The module uses TypeORM with automatic schema synchronization. For production, consider creating proper migrations:
+The module uses TypeORM with automatic schema synchronization. For production environments, create explicit migrations:
 
 ```bash
-# Generate migration
 npm run typeorm:generate-migration -- -n CreateRewardsTables
-
-# Run migrations
 npm run typeorm:run-migrations
 ```
 
 ## Security Considerations
 
-1. **Input Validation**: All inputs are validated using class-validator
-2. **Duplicate Prevention**: Unique constraints prevent duplicate claims
-3. **Soft Delete**: Rewards are deactivated rather than deleted
-4. **Transaction Safety**: Database operations are atomic
-5. **Rate Limiting**: Consider implementing rate limiting for claim endpoints
+1. **Input Validation** — All inputs validated via class-validator
+2. **Duplicate Prevention** — Unique constraints prevent duplicate claims
+3. **Soft Delete** — Rewards are deactivated rather than permanently removed
+4. **Transaction Safety** — Claim operations are atomic database transactions
+5. **Rate Limiting** — Consider applying rate limits to claim endpoints in production
 
-## Integration with Frontend
+## Frontend Integration
 
 ```typescript
-// Frontend example using axios
+import axios from 'axios';
+
 const claimReward = async (userId: string, challengeId: string) => {
   try {
-    const response = await axios.post('/rewards/claim', {
-      userId,
-      challengeId,
-    });
-
-    if (response.status === 201) {
-      // Reward claimed successfully
-      return response.data;
-    }
+    const response = await axios.post('/rewards/claim', { userId, challengeId });
+    return response.data;
   } catch (error) {
     if (error.response?.status === 409) {
-      // Reward already claimed
-      console.log('You have already claimed this reward');
-    } else {
-      // Other error
-      console.error('Failed to claim reward:', error.message);
+      console.log('Reward already claimed');
     }
   }
 };
 ```
-
-## Future Enhancements
-
-- [ ] **Batch Claims**: Allow claiming multiple rewards at once
-- [ ] **Claim Expiration**: Add expiration dates for claims
-- [ ] **Reward Tiers**: Implement reward tiers and progression
-- [ ] **Analytics**: Add detailed analytics and reporting
-- [ ] **Webhooks**: Notify external systems of successful claims
-- [ ] **Caching**: Implement Redis caching for frequently accessed data
