@@ -5,9 +5,9 @@
  -----------------------------------------------------------------------------------------
 
 
-            ## NFT-SCAVENGER-HUNT-GAME - FRONTEND 🎯🧩
+            ## STELLARHUNT - FRONTEND 🎯🧩
 
-**NFT Scavenger Hunt Game** is a gamified blockchain application built on the StarkNet ecosystem that engages users in solving puzzles and completing challenges to earn unique NFT rewards. The project aims to promote user adoption of StarkNet, educate users on blockchain concepts, and spotlight ecosystem projects through interactive scavenger hunts.
+**StellarHunt** is a gamified blockchain application built on the StarkNet ecosystem that engages users in solving puzzles and completing challenges to earn unique NFT rewards. The project aims to promote user adoption of StarkNet, educate users on blockchain concepts, and spotlight ecosystem projects through interactive challenges.
 
 ## Features ✨✨
 
@@ -23,7 +23,7 @@
 
 ## Getting Started 🏃‍♂️🏃‍♀️
 
-To get started with the NFT Scavenger Hunt Game, follow the instructions below: 👇👇
+To get started with StellarHunt, follow the instructions below: 👇👇
 
 1. **Fork the repository**: ©©
    Click the "Fork" button at the top right of the repository page to create a copy of the repository in your GitHub account.
@@ -32,14 +32,14 @@ To get started with the NFT Scavenger Hunt Game, follow the instructions below: 
    Clone the forked repository to your local machine using the following command:
 
     ```bash
-    git clone https://github.com/your-username/NFT-Scavenger-Hunt-Game.git
+    git clone https://github.com/your-username/StellarHunt.git
     ```
 
 3.  **Navigate to the project directory**:
     Change into the project directory
 
     ```bash
-    cd NFT-Scavenger-Hunt-Game
+    cd StellarHunt
     ```
 
 4.  **Install dependencies**:
@@ -156,7 +156,7 @@ tailwind.config.js 🎨: Configuration file for Tailwind CSS, defining theme cus
 
 ## Tech Stack 🛠️
 
-The NFT Scavenger Hunt Game is built using the following technologies:
+StellarHunt is built using the following technologies:
 
 ### Frontend 🌐
 

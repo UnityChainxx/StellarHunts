@@ -1,6 +1,6 @@
 # Puzzle Category Module
 
-A standalone NestJS module for organizing puzzles into logical categories for the NFT Scavenger Hunt Game. This module provides a complete solution for managing puzzle categories and their relationships with puzzles.
+A standalone NestJS module for organizing puzzles into logical categories for StellarHunt. This module provides a complete solution for managing puzzle categories and their relationships with puzzles.
 
 ## Features
 
@@ -9,7 +9,7 @@ A standalone NestJS module for organizing puzzles into logical categories for th
 - ✅ **Many-to-Many Relationships**: Categories can have multiple puzzles, puzzles can belong to multiple categories
 - ✅ **Public API Endpoint**: `GET /puzzles-by-category` returns puzzles grouped by categories
 - ✅ **Search & Filter**: Search puzzles by title/description, filter by difficulty
-- ✅ **Initial Data Seeding**: Pre-configured categories for NFT Scavenger Hunt
+- ✅ **Initial Data Seeding**: Pre-configured categories for StellarHunt
 - ✅ **Complete Validation**: Input validation using class-validator
 - ✅ **Swagger Documentation**: Full API documentation
 - ✅ **Unit & E2E Tests**: Comprehensive test coverage
@@ -119,7 +119,7 @@ POST   /puzzle-categories/seed-categories         # Seed initial categories
 
 ## Initial Categories
 
-The module includes 5 pre-configured categories for the NFT Scavenger Hunt:
+The module includes 5 pre-configured categories for StellarHunt:
 
 1. **Blockchain Basics** 🔗
    - Learn blockchain fundamentals, decentralization, consensus mechanisms
@@ -220,7 +220,7 @@ DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
-DATABASE_NAME=nft_scavenger_hunt
+DATABASE_NAME=stellarshunt
 DATABASE_SYNC=true
 DATABASE_LOAD=true
 ```

@@ -21,7 +21,7 @@ export class UserReportCardController {
   @Get(':id/report-card')
   @ApiOperation({ 
     summary: 'Get user report card',
-    description: 'Retrieves the report card for a specific user, showing their progress in the NFT scavenger hunt'
+    description: 'Retrieves the report card for a specific user, showing their progress in StellarHunt'
   })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ 
@@ -39,7 +39,7 @@ export class UserReportCardController {
     } catch (error) {
       if (error.message.includes('not found')) {
         throw new HttpException(
-          `Report card for user ${userId} not found. This user may not have started the scavenger hunt yet.`,
+          `Report card for user ${userId} not found. This user may not have started playing yet.`,
           HttpStatus.NOT_FOUND,
         );
       }

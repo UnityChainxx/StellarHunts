@@ -1,6 +1,6 @@
 # RewardModule
 
-A standalone module for handling reward distribution to users who complete specific challenges in the NFT Scavenger Hunt Game.
+A standalone module for handling reward distribution to users who complete specific challenges in StellarHunt.
 
 ## Features
 

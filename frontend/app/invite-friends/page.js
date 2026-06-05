@@ -64,7 +64,7 @@ export default function InviteFriendsPage() {
             Invite Friends
           </h1>
           <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-            Share the adventure! Invite friends to join the NFT scavenger hunt and earn exclusive rewards together.
+            Share the adventure! Invite friends to join StellarHunt and earn exclusive rewards together.
           </p>
         </div>
 
@@ -150,7 +150,7 @@ export default function InviteFriendsPage() {
               Ready to Share the Adventure?
             </h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Invite your friends to join the NFT scavenger hunt and unlock exclusive rewards together. 
+              Invite your friends to join StellarHunt and unlock exclusive rewards together. 
               The more friends you invite, the more rewards you'll earn!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

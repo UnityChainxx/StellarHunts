@@ -118,9 +118,9 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 - Website - [https://nestjs.com](https://nestjs.com/)
 - Twitter - [@nestframework](https://twitter.com/nestframework)
 
-## NFT Scavenger Hunt Backend
+## StellarHunt Backend
 
-This repository contains the backend for the **NFT Scavenger Hunt** application, built with [NestJS](https://nestjs.com/). The backend is responsible for handling authentication, API endpoints, database interactions, and other server-side functionality required for the NFT Scavenger Hunt experience.
+This repository contains the backend for **StellarHunt**, built with [NestJS](https://nestjs.com/). The backend is responsible for handling authentication, API endpoints, database interactions, and other server-side functionality required for the StellarHunt experience.
 
 ---
 
@@ -141,7 +141,7 @@ This repository contains the backend for the **NFT Scavenger Hunt** application,
 
 ## Project Overview
 
-The **NFT Scavenger Hunt** backend provides the server-side logic for managing users, NFTs, hunts, and rewards. It is built using NestJS for its modular architecture and TypeScript for type safety and maintainability.
+The **StellarHunt** backend provides the server-side logic for managing users, NFTs, hunts, and rewards. It is built using NestJS for its modular architecture and TypeScript for type safety and maintainability.
 
 The primary objectives include:
 
@@ -168,8 +168,8 @@ Ensure the following are installed on your system:
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/your-username/NFT-scavenger-hunt.git
-   cd NFT-scavenger-hunt
+   git clone https://github.com/your-username/StellarHunt.git
+   cd StellarHunt
    ```
 
 2. **Navigate into the backend folder:**
@@ -210,7 +210,7 @@ DATABASE_HOST=localhost                 # Database host
 DATABASE_PORT=5432                      # Database port
 DATABASE_USER=your_database_user        # Database username
 DATABASE_PASSWORD=your_database_password # Database password
-DATABASE_NAME=nft_scavenger_hunt        # Database name
+DATABASE_NAME=stellarshunt        # Database name
 DATABASE_SYNC=true                      # Enable auto-sync for entities (use with caution in production)
 DATABASE_LOAD=true                      # Enable autoload of entities (true/false)
 
@@ -263,7 +263,7 @@ This provides detailed information about all available endpoints, request/respon
 
 ## Contribution Guidelines
 
-We welcome contributions to the NFT Scavenger Hunt backend! To contribute:
+We welcome contributions to the StellarHunt backend! To contribute:
 
 1. Fork the repository.
 2. Create a new branch for your feature or bug fix:
@@ -291,7 +291,7 @@ This project is licensed under the [MIT License](LICENSE).
 - **Achievements**: Manage player achievements and badges.
 - **Content**: Handle educational articles and videos.
 - **In-App Notifications**: Manage notifications within the application.
-- **Puzzle**: Core puzzle management for the scavenger hunt.
+- **Puzzle**: Core puzzle management for StellarHunt.
 - **Puzzle Category**: Categorization of puzzles.
 - **Puzzle Dependency**: Manage dependencies and eligibility for puzzles.
 - **Puzzle Submission**: Handle player submissions for puzzles.

@@ -21,8 +21,8 @@ const ReferralLink = ({ referralLink }) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join NFT Scavenger Hunt!",
-          text: "I'm playing this amazing NFT scavenger hunt game. Join me and earn exclusive rewards!",
+          title: "Join StellarHunt!",
+          text: "I'm playing this amazing StellarHunt game. Join me and earn exclusive rewards!",
           url: referralLink
         });
       } catch (err) {

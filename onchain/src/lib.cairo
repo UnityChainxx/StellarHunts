@@ -1,4 +1,4 @@
-// NFT Scavenger Hunt on-chain contracts and shared utilities.
+// StellarHunt on-chain contracts and shared utilities.
 pub mod interface;
 pub mod utils;
 

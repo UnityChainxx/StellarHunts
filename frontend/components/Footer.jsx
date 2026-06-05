@@ -113,7 +113,7 @@ const Footer = () => {
         {/* Copyright */}
         <div className="mt-8 pt-4 border-t border-white/10 text-center text-gray-400 text-sm">
           <p>
-            © {new Date().getFullYear()} NFT Scavenger Hunt. All rights
+            © {new Date().getFullYear()} StellarHunt. All rights
             reserved.
           </p>
         </div>

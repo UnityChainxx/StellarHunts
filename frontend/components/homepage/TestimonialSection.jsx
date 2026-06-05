@@ -91,7 +91,7 @@ const TestimonialsSection = () => {
       handle: "cryptoalex",
       avatar: "/nftTestimonial.jpg",
       content:
-        "Absolutely loving the NFT Scavenger Hunt! The puzzles are challenging but rewarding, and the NFT rewards are genuinely unique. Best web3 gaming experience I've had! 🎮✨",
+        "Absolutely loving StellarHunt! The puzzles are challenging but rewarding, and the NFT rewards are genuinely unique. Best web3 gaming experience I've had! 🎮✨",
       platform: "Twitter",
       date: "2 days ago",
     },

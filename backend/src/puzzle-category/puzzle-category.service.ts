@@ -231,7 +231,7 @@ export class PuzzleCategoryService {
   }
 
   /**
-   * Seed initial categories for the NFT Scavenger Hunt game
+   * Seed initial categories for StellarHunt
    */
   async seedInitialCategories(): Promise<void> {
     const existingCategories = await this.categoryRepository.count()

@@ -1,4 +1,4 @@
-# NFT Scavenger Hunt Game
+# StellarHunt
 
 A gamified blockchain application that combines educational puzzles with NFT rewards. Players can solve riddles and blockchain-related challenges to earn unique NFTs.
 

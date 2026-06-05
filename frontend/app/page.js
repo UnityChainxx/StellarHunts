@@ -35,7 +35,7 @@ export default function Home() {
           />
 
           <h1 className="text-3xl sm:text-5xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
-            NFT Scavenger Hunt
+            StellarHunt
           </h1>
 
           <p className="text-lg sm:text-xl mb-8 text-gray-300 max-w-xl mx-auto">
