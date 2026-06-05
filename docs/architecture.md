@@ -39,7 +39,7 @@ StellarHunt is a three-tier gamified blockchain application. The system consists
 ┌─────────────────────────────────────────────────────────────┐
 │                   StarkNet (L2)                              │
 │  ┌──────────────────────┐  ┌──────────────────────────────┐ │
-│  │  ScavengerHunt       │  │  ScavengerHuntNFT           │ │
+│  │  StellarHunt         │  │  StellarHuntNFT            │ │
 │  │  - Questions/Levels  │  │  - ERC-1155 Badges          │ │
 │  │  - Answer Validation │  │  - Level-Based Minting      │ │
 │  │  - Progress Tracking │  │  - Metadata Management      │ │
@@ -246,7 +246,7 @@ DATABASE_LOAD=true        # Auto-load entities
 
 ### Contracts
 
-**ScavengerHunt** (`scavenger_hunt.cairo`)
+**StellarHunt** (`stellar_hunt.cairo`)
 The core game contract managing:
 - Question lifecycle (add, get, update)
 - Answer submission with Poseidon-hashed validation
@@ -281,10 +281,10 @@ struct LevelProgress {
 }
 ```
 
-**ScavengerHuntNFT** (`scavenger_hunt_nft.cairo`)
+**StellarHuntNFT** (`stellar_hunt_nft.cairo`)
 ERC-1155 implementation for level-based badge NFTs:
 - Four token IDs mapped to levels (1=Easy, 2=Medium, 3=Hard, 4=Master)
-- Role-based access control for minting (only ScavengerHunt contract)
+- Role-based access control for minting (only StellarHunt contract)
 - Metadata URI management
 - Level badge query functions
 
@@ -293,7 +293,7 @@ Test helper contract implementing the ERC-1155 receiver interface for safe trans
 
 ### Interfaces
 
-The `IScavengerHunt` interface defines the public API surface for the main contract, including question management, answer submission, player progress queries, and NFT claiming.
+The `IStellarHunt` interface defines the public API surface for the main contract, including question management, answer submission, player progress queries, and NFT claiming.
 
 ### Utility Functions
 
@@ -302,9 +302,9 @@ The `IScavengerHunt` interface defines the public API surface for the main contr
 ### Data Flow (Minting)
 
 ```
-1. Player submits correct answer → ScavengerHunt.submit_answer()
+1. Player submits correct answer → StellarHunt.submit_answer()
 2. Contract validates hash, updates LevelProgress
-3. If level complete → ScavengerHuntNFT.mint_level_badge() called
+3. If level complete → StellarHuntNFT.mint_level_badge() called
 4. Player receives ERC-1155 token with level-specific ID
 5. NFT metadata reflects difficulty tier and completion stats
 ```
