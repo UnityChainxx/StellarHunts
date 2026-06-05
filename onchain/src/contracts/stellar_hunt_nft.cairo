@@ -2,7 +2,7 @@ use onchain::interface::Levels;
 use starknet::ContractAddress;
 
 #[starknet::interface]
-pub trait IScavengerHuntNFT<TContractState> {
+pub trait IStellarHuntNFT<TContractState> {
     fn mint_level_badge(ref self: TContractState, recipient: ContractAddress, level: Levels);
     fn has_level_badge(self: @TContractState, owner: ContractAddress, level: Levels) -> bool;
 
@@ -13,7 +13,7 @@ pub trait IScavengerHuntNFT<TContractState> {
 }
 
 #[starknet::contract]
-pub mod ScavengerHuntNFT {
+pub mod StellarHuntNFT {
     use AccessControlComponent::InternalTrait;
     use core::felt252;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
@@ -53,7 +53,7 @@ pub mod ScavengerHuntNFT {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState, token_uri: ByteArray, scavenger_hunt_contract: ContractAddress,
+        ref self: ContractState, token_uri: ByteArray, stellar_hunt_contract: ContractAddress,
     ) {
         // Initialize ERC-1155 with metadata URI
         self.erc1155.initializer(token_uri);
@@ -67,11 +67,11 @@ pub mod ScavengerHuntNFT {
         // Grant default admin role to deployer
         self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, deployer);
 
-        // Grant minter role to the Scavenger Hunt contract
-        self.accesscontrol._grant_role(MINTER_ROLE, scavenger_hunt_contract);
+        // Grant minter role to the main game contract
+        self.accesscontrol._grant_role(MINTER_ROLE, stellar_hunt_contract);
 
-        // Also grant default admin role to the Scavenger Hunt contract for testing purposes
-        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, scavenger_hunt_contract);
+        // Also grant default admin role to the main game contract for testing purposes
+        self.accesscontrol._grant_role(DEFAULT_ADMIN_ROLE, stellar_hunt_contract);
     }
 
     // AccessControl implementation
@@ -86,7 +86,7 @@ pub mod ScavengerHuntNFT {
     impl ERC1155InternalImpl = ERC1155Component::InternalImpl<ContractState>;
 
     #[abi(embed_v0)]
-    impl ScavengerHuntNFTImpl of super::IScavengerHuntNFT<ContractState> {
+    impl StellarHuntNFTImpl of super::IStellarHuntNFT<ContractState> {
         // Mint a level badge (exactly one token)
         fn mint_level_badge(ref self: ContractState, recipient: ContractAddress, level: Levels) {
             // Check that caller has minter role

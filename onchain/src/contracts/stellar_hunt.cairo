@@ -1,9 +1,9 @@
 #[starknet::contract]
-pub mod ScavengerHunt {
+pub mod StellarHunt {
     use AccessControlComponent::InternalTrait;
     use core::array::ArrayTrait;
     use core::felt252;
-    use onchain::interface::{IScavengerHunt, LevelProgress, Levels, PlayerProgress, Question};
+    use onchain::interface::{IStellarHunt, LevelProgress, Levels, PlayerProgress, Question};
     use onchain::utils::hash_byte_array;
     use openzeppelin::access::accesscontrol::AccessControlComponent;
     use openzeppelin::introspection::src5::SRC5Component;
@@ -13,8 +13,8 @@ pub mod ScavengerHunt {
         StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address};
-    use onchain::contracts::scavenger_hunt_nft::{
-        IScavengerHuntNFTDispatcher, IScavengerHuntNFTDispatcherTrait
+    use onchain::contracts::stellar_hunt_nft::{
+        IStellarHuntNFTDispatcher, IStellarHuntNFTDispatcherTrait
     };
 
     const ADMIN_ROLE: felt252 = selector!("ADMIN_ROLE");
@@ -127,7 +127,7 @@ pub mod ScavengerHunt {
     }
 
     #[abi(embed_v0)]
-    impl ScavengerHuntImpl of IScavengerHunt<ContractState> {
+    impl StellarHuntImpl of IStellarHunt<ContractState> {
         // Add a new question to the contract
         fn add_question(
             ref self: ContractState,
@@ -432,7 +432,7 @@ pub mod ScavengerHunt {
             let nft_contract = self.nft_contract_address.read();
 
             // Call the NFT contract to mint the badge
-            IScavengerHuntNFTDispatcher { contract_address: nft_contract }
+            IStellarHuntNFTDispatcher { contract_address: nft_contract }
                 .mint_level_badge(player, level);
 
             // Update the player's level progress to mark the NFT as minted

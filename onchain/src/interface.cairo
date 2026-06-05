@@ -1,7 +1,7 @@
 use starknet::ContractAddress;
 
 #[starknet::interface]
-pub trait IScavengerHunt<TContractState> {
+pub trait IStellarHunt<TContractState> {
     fn add_question(
         ref self: TContractState,
         level: Levels,

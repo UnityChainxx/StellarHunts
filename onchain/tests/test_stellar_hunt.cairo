@@ -1,6 +1,6 @@
-use onchain::contracts::scavenger_hunt::ScavengerHunt;
+use onchain::contracts::stellar_hunt::StellarHunt;
 use onchain::interface::{
-    IScavengerHuntDispatcher, IScavengerHuntDispatcherTrait, Levels, Question,
+    IStellarHuntDispatcher, IStellarHuntDispatcherTrait, Levels, Question,
 };
 use onchain::utils::hash_byte_array;
 use snforge_std::{
@@ -10,12 +10,12 @@ use snforge_std::{
 use core::serde::Serde;
 use starknet::{ContractAddress, contract_address_const};
 use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-use onchain::contracts::scavenger_hunt::ScavengerHunt::{InternalFunctionsTrait, LevelBadgeMinted};
-use onchain::contracts::scavenger_hunt::ScavengerHunt::{Event as ScavengerHuntEvent};
-use onchain::contracts::scavenger_hunt_nft::{
-    IScavengerHuntNFTDispatcher, IScavengerHuntNFTDispatcherTrait
+use onchain::contracts::stellar_hunt::StellarHunt::{InternalFunctionsTrait, LevelBadgeMinted};
+use onchain::contracts::stellar_hunt::StellarHunt::{Event as StellarHuntEvent};
+use onchain::contracts::stellar_hunt_nft::{
+    IStellarHuntNFTDispatcher, IStellarHuntNFTDispatcherTrait
 };
-use onchain::contracts::scavenger_hunt_nft::ScavengerHuntNFT;
+use onchain::contracts::stellar_hunt_nft::StellarHuntNFT;
 
 fn ADMIN() -> ContractAddress {
     contract_address_const::<'ADMIN'>()
@@ -32,50 +32,50 @@ fn DUMMY_NFT_ADDR() -> ContractAddress {
 }
 
 fn deploy_contract() -> ContractAddress {
-    let contract = declare("ScavengerHunt").unwrap().contract_class();
+    let contract = declare("StellarHunt").unwrap().contract_class();
     let mut constructor_calldata: Array<felt252> = array![];
     Serde::serialize(@ADMIN(), ref constructor_calldata);
     let (contract_address, _) = contract.deploy(@constructor_calldata).unwrap();
     contract_address
 }
-fn deploy_scavenger_hunt_nft(
-    token_uri: ByteArray, scavenger_hunt_address: ContractAddress
+fn deploy_stellar_hunt_nft(
+    token_uri: ByteArray, stellar_hunt_address: ContractAddress
 ) -> ContractAddress {
-    let declare_result = declare("ScavengerHuntNFT").unwrap();
+    let declare_result = declare("StellarHuntNFT").unwrap();
     let contract_class = declare_result.contract_class();
     let mut constructor_args: Array<felt252> = array![];
     // Serialize ByteArray for token_uri
     token_uri.serialize(ref constructor_args);
-    // Append scavenger_hunt_address
-    constructor_args.append(scavenger_hunt_address.into());
+    // Append stellar_hunt_address
+    constructor_args.append(stellar_hunt_address.into());
 
     let (address, _) = contract_class.deploy(@constructor_args).unwrap();
     address
 }
 // Setup helper deploying Hunt, NFT, and the Mock Receiver
 fn setup_all_contracts() -> (
-    IScavengerHuntDispatcher, IScavengerHuntNFTDispatcher, ContractAddress
+    IStellarHuntDispatcher, IStellarHuntNFTDispatcher, ContractAddress
 ) {
-    let hunt_contract_class = declare("ScavengerHunt").unwrap().contract_class();
+    let hunt_contract_class = declare("StellarHunt").unwrap().contract_class();
 
     let receiver_contract_class = declare("MockERC1155Receiver").unwrap().contract_class();
 
-    // 2. Deploy ScavengerHunt
+    // 2. Deploy StellarHunt
     let mut hunt_calldata = array![ADMIN().into()];
     let (hunt_address, _) = hunt_contract_class.deploy(@hunt_calldata).unwrap();
-    let hunt_dispatcher = IScavengerHuntDispatcher { contract_address: hunt_address };
+    let hunt_dispatcher = IStellarHuntDispatcher { contract_address: hunt_address };
 
-    // 3. Deploy ScavengerHuntNFT
+    // 3. Deploy StellarHuntNFT
     let token_uri_bytes: ByteArray = "ipfs://placeholder_uri/";
-    let nft_address = deploy_scavenger_hunt_nft(token_uri_bytes, hunt_address);
-    let nft_dispatcher = IScavengerHuntNFTDispatcher { contract_address: nft_address };
+    let nft_address = deploy_stellar_hunt_nft(token_uri_bytes, hunt_address);
+    let nft_dispatcher = IStellarHuntNFTDispatcher { contract_address: nft_address };
 
     // 4. Deploy Mock Receiver
     let (receiver_address, _) = receiver_contract_class
         .deploy(@array![])
         .unwrap(); // Deploy receiver with its constructor
 
-    // 5. Configure ScavengerHunt: Set NFT contract address
+    // 5. Configure StellarHunt: Set NFT contract address
     start_cheat_caller_address(hunt_address, ADMIN());
     hunt_dispatcher.set_nft_contract_address(nft_address);
     stop_cheat_caller_address(hunt_address);
@@ -94,7 +94,7 @@ fn setup_all_contracts() -> (
 #[test]
 fn test_set_question_per_level() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     start_cheat_caller_address(contract_address, ADMIN());
     dispatcher.set_question_per_level(5);
@@ -108,7 +108,7 @@ fn test_set_question_per_level() {
 #[should_panic(expected: 'Caller is missing role')]
 fn test_set_question_per_level_should_panic_with_missing_role() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     dispatcher.set_question_per_level(5);
 
@@ -120,7 +120,7 @@ fn test_set_question_per_level_should_panic_with_missing_role() {
 fn test_add_and_get_question() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data
     let level = Levels::Easy;
@@ -171,7 +171,7 @@ fn test_add_and_get_question() {
 fn test_add_and_get_question_should_panic_with_missing_role() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data
     let level = Levels::Easy;
@@ -187,7 +187,7 @@ fn test_add_and_get_question_should_panic_with_missing_role() {
 fn test_request_hint() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     start_cheat_caller_address(contract_address, USER());
 
@@ -217,7 +217,7 @@ fn test_request_hint() {
 #[test]
 fn test_get_question_in_level() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     let level = Levels::Easy;
     let question = "What is the capital of France?";
@@ -243,7 +243,7 @@ fn test_get_question_in_level() {
 #[test]
 fn test_update_question() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define initial test data
     let level = Levels::Easy;
@@ -300,7 +300,7 @@ fn test_update_question() {
 #[should_panic(expected: 'Caller is missing role')]
 fn test_update_question_should_panic_with_missing_role() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define initial test data
     let level = Levels::Easy;
@@ -330,7 +330,7 @@ fn test_update_question_should_panic_with_missing_role() {
 #[should_panic(expected: "Question does not exist")]
 fn test_update_question_should_panic_if_question_does_not_exist() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data for updating a non-existent question
     let invalid_question_id = 1; // This question ID does not exist yet
@@ -348,7 +348,7 @@ fn test_update_question_should_panic_if_question_does_not_exist() {
 #[test]
 fn test_level_progression() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let player_address = USER();
 
     let level = Levels::Easy;
@@ -389,7 +389,7 @@ fn test_level_progression() {
 #[test]
 fn test_no_progression_on_partial_completion() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let player_address = USER();
 
     // Admin setup
@@ -421,7 +421,7 @@ fn test_no_progression_on_partial_completion() {
 #[test]
 fn test_incorrect_answer_does_not_progress() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let player_address = USER();
 
     start_cheat_caller_address(contract_address, ADMIN());
@@ -444,7 +444,7 @@ fn test_incorrect_answer_does_not_progress() {
 #[test]
 fn test_max_level_does_not_progress() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let player_address = USER();
 
     start_cheat_caller_address(contract_address, ADMIN());
@@ -472,7 +472,7 @@ fn test_max_level_does_not_progress() {
 #[test]
 fn test_multiple_level_progressions() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let player_address = USER();
 
     // Admin setup
@@ -544,7 +544,7 @@ fn test_multiple_level_progressions() {
 #[test]
 fn test_initialize_player_progress() {
     // Get contract state for testing
-    let mut state = ScavengerHunt::contract_state_for_testing();
+    let mut state = StellarHunt::contract_state_for_testing();
     let player_address = USER();
 
     // Call the internal function directly
@@ -569,7 +569,7 @@ fn test_initialize_player_progress() {
 
 fn test_set_nft_contract_address() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let new_nft_address = contract_address_const::<'NEW_NFT'>();
 
     start_cheat_caller_address(contract_address, ADMIN());
@@ -584,7 +584,7 @@ fn test_set_nft_contract_address() {
 #[should_panic(expected: 'Caller is missing role')]
 fn test_set_nft_contract_address_should_panic_with_missing_role() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
     let new_nft_address = contract_address_const::<'NEW_NFT'>();
 
     dispatcher.set_nft_contract_address(new_nft_address);
@@ -594,7 +594,7 @@ fn test_set_nft_contract_address_should_panic_with_missing_role() {
 fn test_add_question_empty_question() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data
     let level = Levels::Easy;
@@ -613,7 +613,7 @@ fn test_add_question_empty_question() {
 fn test_add_question_empty_answer() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data
     let level = Levels::Easy;
@@ -632,7 +632,7 @@ fn test_add_question_empty_answer() {
 fn test_add_question_empty_hint() {
     // Deploy the contract
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define test data
     let level = Levels::Easy;
@@ -650,7 +650,7 @@ fn test_add_question_empty_hint() {
 #[should_panic(expected: 'Question cannot be empty')]
 fn test_update_question_empty_question() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define initial test data
     let level = Levels::Easy;
@@ -679,7 +679,7 @@ fn test_update_question_empty_question() {
 #[should_panic(expected: 'Answer cannot be empty')]
 fn test_update_question_empty_answer() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define initial test data
     let level = Levels::Easy;
@@ -708,7 +708,7 @@ fn test_update_question_empty_answer() {
 #[should_panic(expected: 'Hint cannot be empty')]
 fn test_update_question_empty_hint() {
     let contract_address = deploy_contract();
-    let dispatcher = IScavengerHuntDispatcher { contract_address };
+    let dispatcher = IStellarHuntDispatcher { contract_address };
 
     // Define initial test data
     let level = Levels::Easy;
@@ -736,7 +736,7 @@ fn test_update_question_empty_hint() {
 #[test]
 #[should_panic(expected: "Level not completed")]
 fn test_mint_level_badge_not_completed() {
-    let mut state = ScavengerHunt::contract_state_for_testing();
+    let mut state = StellarHunt::contract_state_for_testing();
     let player = USER();
     let level = Levels::Easy;
 
@@ -750,7 +750,7 @@ fn test_mint_level_badge_not_completed() {
 #[test]
 #[should_panic(expected: "NFT already minted")]
 fn test_mint_level_badge_duplicate() {
-    let mut state = ScavengerHunt::contract_state_for_testing();
+    let mut state = StellarHunt::contract_state_for_testing();
     let player = USER();
     let level = Levels::Easy;
 
@@ -815,7 +815,7 @@ fn test_claim_level_completion_nft_integration() {
             @array![
                 (
                     hunt_address,
-                    ScavengerHuntEvent::LevelBadgeMinted(
+                    StellarHuntEvent::LevelBadgeMinted(
                         LevelBadgeMinted {
                             player: player, level: level_to_complete
                         } // Use receiver address here
