@@ -85,7 +85,7 @@ export default function ReferralLandingPage() {
               You've Been Invited!
             </h1>
             <p className="text-gray-300 text-lg max-w-2xl mx-auto">
-              <span className="text-purple-400 font-semibold">{referrer?.username}</span> invited you to join StellarHunt!
+              <span className="text-purple-400 font-semibold">{referrer?.username}</span> invited you to join StellarHunts!
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function ReferralLandingPage() {
               Ready to Start Your Adventure?
             </h3>
             <p className="text-gray-300 mb-6 max-w-xl mx-auto">
-              Join thousands of players in the ultimate StellarHunt challenge. 
+              Join thousands of players in the ultimate StellarHunts challenge. 
               Your friend's referral gives you exclusive bonuses to get started!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

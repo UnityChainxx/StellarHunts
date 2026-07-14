@@ -1,2 +1,4 @@
-target
-.snfoundry_cache/
+/target
+**/*.rs.bk
+Cargo.lock
+.cargo/

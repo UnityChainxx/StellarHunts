@@ -1,18 +1,34 @@
 {
-  "dependencies": {
-    "@nestjs/common": "^11.1.3",
-    "@nestjs/core": "^11.1.3",
-    "@nestjs/testing": "^11.1.3",
-    "@nestjs/typeorm": "^11.0.0",
-    "dotenv": "^16.4.7",
-    "nodemailer": "^6.10.0",
-    "pg": "^8.16.3",
-    "reflect-metadata": "^0.2.2",
-    "typeorm": "^0.3.25"
+  "name": "StellarHunts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StellarHunts — gamified blockchain puzzles with on-chain NFT rewards built on Stellar / Soroban",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run --workspace frontend dev",
+    "dev:backend": "npm run --workspace backend start:dev",
+    "build:onchain": "cargo build --manifest-path onchain/Cargo.toml --workspace --release",
+    "test:onchain": "cargo test --manifest-path onchain/Cargo.toml --workspace",
+    "fmt:onchain": "cargo fmt --manifest-path onchain/Cargo.toml --all -- --check"
   },
-  "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "jest": "^30.0.3",
-    "ts-jest": "^29.4.0"
+  "keywords": [
+    "stellar",
+    "soroban",
+    "blockchain",
+    "nft",
+    "puzzles",
+    "web3",
+    "rust"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UnityChainx/StellarHunts.git"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

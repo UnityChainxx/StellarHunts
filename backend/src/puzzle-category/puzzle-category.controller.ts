@@ -219,7 +219,7 @@ export class PuzzleCategoryController {
   @ApiOperation({
     summary: "Seed initial categories",
     description:
-      "Create initial categories for StellarHunt. This endpoint should only be called once during setup.",
+      "Create initial categories for StellarHunts. This endpoint should only be called once during setup.",
   })
   @ApiResponse({ status: 201, description: "Initial categories seeded successfully" })
   @HttpCode(HttpStatus.CREATED)

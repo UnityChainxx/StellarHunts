@@ -1,6 +1,6 @@
-# StellarHunt — Backend
+# StellarHunts — Backend
 
-The backend for StellarHunt, built with [NestJS](https://nestjs.com/). This API server handles authentication, puzzle and reward management, leaderboard rankings, user progression, and blockchain interaction orchestration.
+The backend for StellarHunts, built with [NestJS](https://nestjs.com/). This API server handles authentication, puzzle and reward management, leaderboard rankings, user progression, and blockchain interaction orchestration with the Stellar / Soroban ledger.
 
 ## Tech Stack
 
@@ -77,9 +77,16 @@ DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=your_password
-DATABASE_NAME=stellarshunt
+DATABASE_NAME=stellarshunts
 DATABASE_SYNC=true
 DATABASE_LOAD=true
+
+# Stellar / Soroban
+STELLAR_MODE=mock
+STELLAR_NETWORK=testnet
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+STELLAR_HUNTS_CONTRACT_ID=...
+STELLAR_HUNTS_NFT_CONTRACT_ID=...
 
 # API
 API_VERSION=v1
@@ -143,7 +150,7 @@ The backend is configured to accept requests from `http://localhost:3000` (front
 - **Referrals** — Invite tracking with tiered reward bonuses
 - **Analytics** — Event logging and usage statistics
 - **Notifications** — In-app notification delivery
-- **NFT Claim** — StarkNet smart contract interaction for on-chain minting
+- **NFT Claim** — Soroban smart contract interaction for on-chain badge minting (via `StellarHandlerService`)
 - **User Report Card** — Per-user performance summaries
 - **Multiplayer Queue** — Socket.IO-based matchmaking
 

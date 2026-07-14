@@ -6,12 +6,12 @@ import { Share2 } from "lucide-react";
 const ShareButton = () => {
   const handleShare = async () => {
     const shareMessage =
-      "Join me on StellarHunt - solve puzzles and earn exclusive NFTs! 🎮✨";
+      "Join me on StellarHunts - solve puzzles and earn exclusive NFTs! 🎮✨";
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "StellarHunt",
+          title: "StellarHunts",
           text: shareMessage,
           url: window.location.href,
         });

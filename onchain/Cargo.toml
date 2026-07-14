@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["contracts/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["StellarHunts Team"]
+license = "MIT"
+
+[workspace.dependencies]
+soroban-sdk = { version = "22.0.0" }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug-assertions = false
+strip = "symbols"
+panic = "abort"
+codegen-units = 1
+lto = true
+
+[profile.test]
+opt-level = 0
+debug = true

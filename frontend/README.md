@@ -1,6 +1,6 @@
-# StellarHunt — Frontend
+# StellarHunts — Frontend
 
-The frontend for StellarHunt, a gamified blockchain application built on StarkNet. This is a [Next.js](https://nextjs.org/) project that provides the user-facing interface for puzzle-solving, NFT rewards, leaderboards, and wallet interactions.
+The frontend for StellarHunts, a gamified blockchain application built on **Stellar / Soroban**. This is a [Next.js](https://nextjs.org/) project that provides the user-facing interface for puzzle-solving, NFT rewards, leaderboards, and wallet interactions.
 
 ## Tech Stack
 
@@ -11,7 +11,8 @@ The frontend for StellarHunt, a gamified blockchain application built on StarkNe
 | Tailwind CSS | Utility-first styling |
 | Zustand | Global state management |
 | TanStack Query | Server state and caching |
-| StarkNet.js / get-starknet | Blockchain wallet integration |
+| `@stellar/freighter-api` | Freighter browser-extension wallet integration |
+| `@stellar/stellar-sdk` | Stellar / Soroban transaction building |
 | NextAuth.js | Authentication (OAuth, wallet linking) |
 | Axios | HTTP client |
 | Lucide React | Icon library |
@@ -19,7 +20,7 @@ The frontend for StellarHunt, a gamified blockchain application built on StarkNe
 ## Features
 
 - **Puzzle interface** — Interactive cryptographic riddles with difficulty tiers (Beginner, Intermediate, Advanced, Expert)
-- **Wallet connectivity** — StarkNet wallet pairing via get-starknet for on-chain interactions
+- **Wallet connectivity** — Stellar wallet pairing via Freighter for on-chain interactions
 - **NFT showcase** — Minted rewards display with metadata and rarity indicators
 - **Leaderboard** — Global rankings with XP progression and achievement tracking
 - **Referral system** — Shareable invite links with multi-tier reward bonuses
@@ -32,6 +33,7 @@ The frontend for StellarHunt, a gamified blockchain application built on StarkNe
 
 - Node.js 18+
 - npm or yarn
+- The [Freighter](https://www.freighter.app/) browser extension installed in your browser
 
 ### Installation
 
@@ -95,10 +97,12 @@ frontend/
 - **Forms**: Formik with Yup validation
 - **UI Components**: Radix UI primitives, class-variance-authority, tailwind-merge
 - **Date Handling**: date-fns
-- **Blockchain**: starknet.js, get-starknet
+- **Blockchain**: `@stellar/stellar-sdk`, `@stellar/freighter-api`
 
 ## Related Resources
 
 - [Root project README](../README.md)
 - [Backend README](../backend/README.md)
 - [Next.js Documentation](https://nextjs.org/docs)
+- [Soroban Documentation](https://soroban.stellar.org/docs)
+- [Freighter Wallet](https://www.freighter.app/)

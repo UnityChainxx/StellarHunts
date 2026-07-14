@@ -1,4 +1,4 @@
-name: CONTRACT
+name: STELLARHUNTS
 
 on:
   workflow_dispatch:
@@ -14,28 +14,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: software-mansion/setup-scarb@v1
-        with:
-          scarb-version: "2.8.4"
+      - name: Install Soroban / Stellar CLI
+        run: |
+          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.0/stellar-cli-22.0.0-x86_64-unknown-linux-gnu.tar.xz \
+            | tar -xJ
+          sudo mv stellar /usr/local/bin/stellar
 
-      - run: scarb fmt --check
+      - name: Build contracts
         working-directory: onchain
+        run: cargo build --workspace --release
 
-      - run: scarb build
+      - name: Format check
         working-directory: onchain
+        run: cargo fmt --all -- --check
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: software-mansion/setup-scarb@v1
-        with:
-          scarb-version: "2.8.4"
+      - name: Install Soroban / Stellar CLI
+        run: |
+          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.0/stellar-cli-22.0.0-x86_64-unknown-linux-gnu.tar.xz \
+            | tar -xJ
+          sudo mv stellar /usr/local/bin/stellar
 
-      - uses: foundry-rs/setup-snfoundry@v3
-        with:
-          starknet-foundry-version: "0.30.0"
-
-      - run: snforge test
+      - name: Build contracts (test profile)
         working-directory: onchain
+        run: cargo build --workspace --tests
+
+      - name: Run unit tests
+        working-directory: onchain
+        run: cargo test --workspace

@@ -31,7 +31,7 @@ const LeaderboardSection = () => {
       streak: 7,
     },
     {
-      name: "StarkHunter",
+      name: "StellarHunter",
       score: 138900,
       level: 35,
       challenges: 128,
@@ -59,7 +59,7 @@ const LeaderboardSection = () => {
   const rankings = [
     {
       position: "1st Place",
-      reward: "5,000 STARK + Legendary NFT",
+      reward: "5,000 XLM + Legendary NFT",
       status: "Top Global Ranking",
       icon: <Crown className="w-8 h-8 text-yellow-400 mb-4" />,
       bgFrom: "from-yellow-500/10",
@@ -69,7 +69,7 @@ const LeaderboardSection = () => {
     },
     {
       position: "2nd Place",
-      reward: "3,000 STARK + Epic NFT",
+      reward: "3,000 XLM + Epic NFT",
       status: "Elite Hunter Status",
       icon: <Medal className="w-8 h-8 text-slate-400 mb-4" />,
       bgFrom: "from-slate-500/10",
@@ -79,7 +79,7 @@ const LeaderboardSection = () => {
     },
     {
       position: "3rd Place",
-      reward: "2,000 STARK + Rare NFT",
+      reward: "2,000 XLM + Rare NFT",
       status: "Master Hunter Badge",
       icon: <Medal className="w-8 h-8 text-amber-700 mb-4" />,
       bgFrom: "from-amber-900/10",
@@ -98,7 +98,7 @@ const LeaderboardSection = () => {
             Top Hunters
           </h2>
           <p className="text-gray-400">
-            The most skilled treasure hunters in the StarkNet realm
+            The most skilled treasure hunters in the Stellar universe
           </p>
         </div>
         <Button
@@ -128,7 +128,7 @@ const LeaderboardSection = () => {
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-600">
-              10,000 STARK
+              10,000 XLM
             </div>
             <div className="text-sm text-gray-400">≈ $5,000 USD</div>
           </div>
