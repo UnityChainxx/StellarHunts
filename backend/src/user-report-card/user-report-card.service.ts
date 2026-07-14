@@ -43,7 +43,7 @@ export class UserReportCardService {
       'First NFT Earned',
       'Speed Solver',
       '7-Day Streak',
-      'StarkNet Explorer',
+      'Stellar Explorer',
       'Puzzle Master',
       'Early Bird',
       'Night Owl',

@@ -24,7 +24,7 @@ const howItWorksSteps = [
     step: "3",
     title: "Earn NFTs",
     description:
-      "Win exclusive StarkNet-powered NFT rewards for your achievements!",
+      "Win exclusive Stellar / Soroban-powered NFT rewards for your achievements!",
     delay: 0.4,
   },
   {

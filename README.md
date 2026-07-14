@@ -1,14 +1,15 @@
-# StellarHunt
+# StellarHunts
 
-A gamified blockchain application built on StarkNet that combines educational puzzles with NFT rewards. Players solve cryptographic riddles and blockchain-related challenges to earn unique NFTs while learning about web3 technologies.
+A gamified blockchain application built on **Stellar / Soroban** that combines educational puzzles with NFT rewards. Players solve cryptographic riddles and blockchain-related challenges to earn unique on-chain NFTs while learning about web3 technologies.
 
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|-------|------------|
 | Frontend | Next.js 14, React 18, Tailwind CSS |
 | Backend | NestJS, TypeORM, PostgreSQL |
-| Smart Contracts | Cairo, StarkNet, OpenZeppelin |
+| Smart Contracts | Rust, Soroban SDK, Stellar |
+| Wallet | Freighter (`@stellar/freighter-api`), `@stellar/stellar-sdk` |
 | State Management | Zustand, Redux Toolkit |
 | Auth | NextAuth.js, Passport (JWT) |
 | Real-time | Socket.IO, Redis |
@@ -17,18 +18,18 @@ A gamified blockchain application built on StarkNet that combines educational pu
 
 This monorepo contains three primary components:
 
-- **`frontend/`** — Next.js application with server-side rendering, responsive UI components, and StarkNet wallet integration
+- **`frontend/`** — Next.js application with server-side rendering, responsive UI components, and Freighter wallet integration
 - **`backend/`** — NestJS API server handling authentication, puzzle management, rewards, leaderboards, and user progression
-- **`onchain/`** — Cairo smart contracts deployed on StarkNet for NFT minting, level badges, and scavenger hunt logic
+- **`onchain/`** — Soroban smart contracts deployed on the Stellar network for NFT badge minting, level progression, and game logic
 
 ## Features
 
-- **Puzzle-based gameplay** — Cryptographic riddles and challenges that test blockchain knowledge across multiple difficulty tiers
-- **NFT reward system** — Earn unique NFTs as achievement badges, with ERC-1155 contracts managing minting and ownership
-- **Progressive difficulty** — Puzzles organized into categories (Blockchain Basics, Smart Contracts, StarkNet, NFTs, DeFi) with increasing complexity
+- **Puzzle-based gameplay** — Cryptographic riddles that test blockchain knowledge across multiple difficulty tiers
+- **On-chain NFT reward system** — Earn unique NFTs as achievement badges via Soroban smart contracts
+- **Progressive difficulty** — Puzzles organized into categories (Blockchain Basics, Smart Contracts, Soroban, NFTs, DeFi) with increasing complexity
 - **Global leaderboard** — Competitive ranking system with XP tracking and milestone achievements
 - **Referral program** — Invite friends to earn bonus XP, rare NFTs, and exclusive badges
-- **Wallet integration** — Connect any StarkNet-compatible wallet to participate, claim rewards, and track on-chain assets
+- **Wallet integration** — Connect any Stellar-compatible wallet (Freighter, Lobstr, Albedo) to participate, claim rewards, and track on-chain assets
 - **Multiplayer support** — Queue-based matchmaking for collaborative puzzle-solving sessions
 
 ## Getting Started
@@ -37,14 +38,15 @@ This monorepo contains three primary components:
 
 - Node.js 18+
 - PostgreSQL 13+
-- StarkNet wallet (e.g., Argent X, Braavos)
+- Rust + Soroban / Stellar CLI
+- A Stellar wallet (Freighter recommended)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/UnityChainx/StellarHunt.git
-cd StellarHunt
+git clone https://github.com/UnityChainx/StellarHunts.git
+cd StellarHunts
 
 # Install frontend dependencies
 cd frontend && npm install
@@ -62,9 +64,16 @@ DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=your_password
-DATABASE_NAME=stellarshunt
+DATABASE_NAME=stellarshunts
 DATABASE_SYNC=true
 NODE_ENV=development
+
+# Stellar / Soroban
+STELLAR_MODE=mock
+STELLAR_NETWORK=testnet
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+STELLAR_HUNTS_CONTRACT_ID=...
+STELLAR_HUNTS_NFT_CONTRACT_ID=...
 ```
 
 ### Development
@@ -75,12 +84,15 @@ cd backend && npm run start:dev
 
 # Start the frontend (dev server on port 3000)
 cd frontend && npm run dev
+
+# Build & test onchain contracts
+cd onchain && cargo test --workspace
 ```
 
 ## Project Structure
 
 ```
-StellarHunt/
+StellarHunts/
 ├── frontend/                # Next.js web application
 │   ├── app/                 # App router pages and layouts
 │   ├── components/          # Reusable UI components
@@ -100,9 +112,12 @@ StellarHunt/
 │   │   ├── sessions/        # Session management
 │   │   └── analytics/       # Event tracking and metrics
 │   └── test/                # E2E tests
-└── onchain/                 # StarkNet smart contracts (Cairo)
-    ├── src/contracts/       # Contract implementations
-    └── tests/               # Contract tests
+└── onchain/                 # Soroban smart contracts (Rust)
+    ├── contracts/
+    │   ├── stellar_hunts/         # Game contract (Rust)
+    │   ├── stellar_hunts_nft/     # NFT badge contract (Rust)
+    │   └── stellar_hunts_receiver/# Test helper
+    └── Cargo.toml            # Workspace manifest
 ```
 
 ## Contributing

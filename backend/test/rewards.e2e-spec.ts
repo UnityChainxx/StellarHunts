@@ -63,7 +63,7 @@ describe('RewardsModule (e2e)', () => {
   describe('/rewards (POST)', () => {
     it('should create a new reward', () => {
       const createRewardDto = {
-        name: 'StarkNet Beginner Badge',
+        name: 'StellarHunts Beginner Badge',
         description: 'Awarded for completing the Easy level challenges',
         type: RewardType.BADGE,
         challengeId: 'challenge-easy-001',

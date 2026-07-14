@@ -231,7 +231,7 @@ export class PuzzleCategoryService {
   }
 
   /**
-   * Seed initial categories for StellarHunt
+   * Seed initial categories for StellarHunts
    */
   async seedInitialCategories(): Promise<void> {
     const existingCategories = await this.categoryRepository.count()
@@ -260,10 +260,10 @@ export class PuzzleCategoryService {
         sortOrder: 2,
       },
       {
-        name: "StarkNet Deep Dive",
+        name: "Soroban Deep Dive",
         description:
-          "Master StarkNet-specific concepts including Cairo programming, STARK proofs, L2 scaling, and StarkNet ecosystem tools.",
-        slug: "starknet-deep-dive",
+          "Master Stellar / Soroban specific concepts including Rust smart contract design, ledger primitives, transaction models, and the Stellar ecosystem toolkit.",
+        slug: "soroban-deep-dive",
         icon: "⚡",
         color: "#8B5CF6",
         sortOrder: 3,
