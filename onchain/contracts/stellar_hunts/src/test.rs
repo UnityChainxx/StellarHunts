@@ -1,9 +1,13 @@
 #![cfg(test)]
 
 use crate::{StellarHunts, StellarHuntsClient};
-use soroban_sdk::{Address, Bytes, Env, String};
+// Brings `Address::generate` into scope as an extension trait method.
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{Address, Bytes, Env};
 
-fn admin(env: &Env) -> Address {
+// Renamed to `new_admin` so it does not collide with the destructured
+// `admin` Address binding created by `init_with_admin`.
+fn new_admin(env: &Env) -> Address {
     Address::generate(env)
 }
 
@@ -16,7 +20,7 @@ fn b(env: &Env, s: &str) -> Bytes {
 }
 
 fn init_with_admin(env: &Env) -> (Address, StellarHuntsClient) {
-    let admin = admin(env);
+    let admin = new_admin(env);
     let contract_id = env.register_contract(None, StellarHunts);
     let client = StellarHuntsClient::new(env, &contract_id);
     client.init(&admin);
@@ -29,27 +33,13 @@ fn test_set_question_per_level_admin_only() {
     env.mock_all_auths();
     let (admin, client) = init_with_admin(&env);
 
-    client.set_question_per_level(&5u8);
+    client.set_question_per_level(&5u32);
     assert_eq!(client.get_question_per_level(), 5);
 
-    // Should panic on non-admin caller.
-    let env2 = Env::default();
-    env2.mock_all_auths();
-    let admin2 = admin(&env2);
-    let contract_id2 = env2.register_contract(None, StellarHunts);
-    let client2 = StellarHuntsClient::new(&env2, &contract_id2);
-    client2.init(&admin2);
-
-    let result = std::panic::catch_unwind(|| {
-        let _bad = admin2; // ensure admin binding
-        let _ = admin;
-        // simulate wrong caller re-init by using a fresh unauthorized addr
-        let _unauth = user(&env2);
-        client2.set_question_per_level(&5u8);
-    });
-    // With mock_all_auths(), the panic only fires if the contract logic itself
-    // panics. require_auth is satisfied for any caller under mock-all-auths.
-    let _ = result;
+    // A second admin-only path is not exercised here because `mock_all_auths`
+    // satisfies `require_auth` for every caller, so the negative branch
+    // cannot be observed. Kept here as a TODO if/when a real-auth test
+    // harness is introduced.
 }
 
 #[test]
@@ -58,7 +48,7 @@ fn test_add_and_get_question() {
     env.mock_all_auths();
     let (admin, client) = init_with_admin(&env);
 
-    client.set_question_per_level(&5u8);
+    client.set_question_per_level(&5u32);
     let level = crate::Levels::Easy;
     let question = b(&env, "What is the capital of France?");
     let answer = b(&env, "Paris");
@@ -77,7 +67,7 @@ fn test_submit_answer_correct_progresses() {
     let (_admin, client) = init_with_admin(&env);
     let player = user(&env);
 
-    client.set_question_per_level(&1u8);
+    client.set_question_per_level(&1u32);
     let level = crate::Levels::Easy;
     let question = b(&env, "What is 2+2?");
     let answer = b(&env, "4");
@@ -98,7 +88,7 @@ fn test_submit_answer_incorrect_does_not_progress() {
     let (_admin, client) = init_with_admin(&env);
     let player = user(&env);
 
-    client.set_question_per_level(&1u8);
+    client.set_question_per_level(&1u32);
     let level = crate::Levels::Easy;
     let question = b(&env, "What is 2+2?");
     let answer = b(&env, "4");
@@ -122,7 +112,7 @@ fn test_request_hint_after_initialize() {
 
     // Two questions per level — answering the first keeps the player on
     // Easy, so a hint request for question 1 remains valid.
-    client.set_question_per_level(&2u8);
+    client.set_question_per_level(&2u32);
     let level = crate::Levels::Easy;
     let q1 = b(&env, "Q1");
     let a1 = b(&env, "A1");
@@ -155,8 +145,20 @@ fn test_next_level_logic() {
     env.mock_all_auths();
     let (_admin, client) = init_with_admin(&env);
 
-    assert_eq!(client.next_level(&crate::Levels::Easy), crate::Levels::Medium);
-    assert_eq!(client.next_level(&crate::Levels::Medium), crate::Levels::Hard);
-    assert_eq!(client.next_level(&crate::Levels::Hard), crate::Levels::Master);
-    assert_eq!(client.next_level(&crate::Levels::Master), crate::Levels::Master);
+    assert_eq!(
+        client.next_level(&crate::Levels::Easy),
+        crate::Levels::Medium
+    );
+    assert_eq!(
+        client.next_level(&crate::Levels::Medium),
+        crate::Levels::Hard
+    );
+    assert_eq!(
+        client.next_level(&crate::Levels::Hard),
+        crate::Levels::Master
+    );
+    assert_eq!(
+        client.next_level(&crate::Levels::Master),
+        crate::Levels::Master
+    );
 }

@@ -1,8 +1,11 @@
-#![no_std]
+// Allow `std` access during `cargo test` so tests can use
+// `std::panic::catch_unwind` to assert panic behaviour. The contract itself
+// remains `no_std` for the WASM build.
+#![cfg_attr(not(test), no_std)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Bytes,
-    BytesN, Env, Symbol,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Bytes, BytesN,
+    Env, Symbol,
 };
 
 // Make the NFT crate's generated `Client` available for cross-contract calls.
@@ -36,7 +39,9 @@ pub struct PlayerProgress {
 pub struct LevelProgress {
     pub player: Address,
     pub level: Levels,
-    pub last_question_index: u8,
+    // u8 is not a valid Soroban Val in soroban-sdk 22 — the smallest
+    // native unsigned integer is `u32`.
+    pub last_question_index: u32,
     pub is_completed: bool,
     pub attempts: u32,
     pub nft_minted: bool,
@@ -54,7 +59,7 @@ pub enum DataKey {
     QuestionCount,
     QuestionPerLevel,
     Question(u64),
-    QuestionsByLevel(Levels, u8),
+    QuestionsByLevel(Levels, u32),
     QuestionPerLevelIndex(Levels),
     PlayerProgress(Address),
     PlayerLevelProgress(Address, Levels),
@@ -101,13 +106,7 @@ impl StellarHunts {
     // Admin actions
     // -----------------------------------------------------------------
 
-    pub fn add_question(
-        env: Env,
-        level: Levels,
-        question: Bytes,
-        answer: Bytes,
-        hint: Bytes,
-    ) {
+    pub fn add_question(env: Env, level: Levels, question: Bytes, answer: Bytes, hint: Bytes) {
         require_admin(&env);
 
         if question.is_empty() || answer.is_empty() || hint.is_empty() {
@@ -124,7 +123,7 @@ impl StellarHunts {
             .instance()
             .set(&DataKey::QuestionCount, &question_id);
 
-        let hashed: BytesN<32> = env.crypto().sha256(&answer);
+        let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
         let q = Question {
             question_id,
             question: question.clone(),
@@ -136,16 +135,16 @@ impl StellarHunts {
             .persistent()
             .set(&DataKey::Question(question_id), &q);
 
-        let per_level: u8 = env
+        let per_level: u32 = env
             .storage()
             .instance()
             .get(&DataKey::QuestionPerLevel)
-            .unwrap_or(0u8);
-        let idx: u8 = env
+            .unwrap_or(0u32);
+        let idx: u32 = env
             .storage()
             .persistent()
             .get(&DataKey::QuestionPerLevelIndex(level.clone()))
-            .unwrap_or(0u8);
+            .unwrap_or(0u32);
 
         if per_level == 0 || idx >= per_level {
             panic_with_error!(&env, Error::QuestionPerLevelLimit);
@@ -187,7 +186,7 @@ impl StellarHunts {
             .ok_or(Error::QuestionNotFound)
             .unwrap();
 
-        let hashed: BytesN<32> = env.crypto().sha256(&answer);
+        let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
         let updated = Question {
             question_id,
             question,
@@ -203,7 +202,7 @@ impl StellarHunts {
         );
     }
 
-    pub fn set_question_per_level(env: Env, amount: u8) {
+    pub fn set_question_per_level(env: Env, amount: u32) {
         require_admin(&env);
         if amount == 0 {
             panic_with_error!(&env, Error::EmptyField);
@@ -229,12 +228,7 @@ impl StellarHunts {
     // Player actions
     // -----------------------------------------------------------------
 
-    pub fn submit_answer(
-        env: Env,
-        caller: Address,
-        question_id: u64,
-        answer: Bytes,
-    ) -> bool {
+    pub fn submit_answer(env: Env, caller: Address, question_id: u64, answer: Bytes) -> bool {
         caller.require_auth();
 
         if !env
@@ -253,32 +247,31 @@ impl StellarHunts {
             .ok_or(Error::QuestionNotFound)
             .unwrap();
 
-        let lp_key =
-            DataKey::PlayerLevelProgress(caller.clone(), question.level.clone());
-        let mut lp: LevelProgress = env
-            .storage()
-            .persistent()
-            .get(&lp_key)
-            .unwrap_or(LevelProgress {
-                player: caller.clone(),
-                level: question.level.clone(),
-                last_question_index: 0,
-                is_completed: false,
-                attempts: 0,
-                nft_minted: false,
-            });
+        let lp_key = DataKey::PlayerLevelProgress(caller.clone(), question.level.clone());
+        let mut lp: LevelProgress =
+            env.storage()
+                .persistent()
+                .get(&lp_key)
+                .unwrap_or(LevelProgress {
+                    player: caller.clone(),
+                    level: question.level.clone(),
+                    last_question_index: 0,
+                    is_completed: false,
+                    attempts: 0,
+                    nft_minted: false,
+                });
         lp.attempts += 1;
 
-        let hashed: BytesN<32> = env.crypto().sha256(&answer);
+        let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
         let is_correct = hashed == question.hashed_answer;
 
         if is_correct {
             lp.last_question_index += 1;
-            let per_level: u8 = env
+            let per_level: u32 = env
                 .storage()
                 .instance()
                 .get(&DataKey::QuestionPerLevel)
-                .unwrap_or(0u8);
+                .unwrap_or(0u32);
             if per_level == 0 {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
@@ -305,7 +298,12 @@ impl StellarHunts {
 
         env.events().publish(
             (Symbol::new(&env, "answer_submitted"),),
-            (caller.clone(), question_id, question.level.clone(), is_correct),
+            (
+                caller.clone(),
+                question_id,
+                question.level.clone(),
+                is_correct,
+            ),
         );
         is_correct
     }
@@ -383,18 +381,22 @@ impl StellarHunts {
             .ok_or(Error::MissingNftContract)
             .unwrap();
 
-        // Cross-contract call to the NFT contract. The NFT contract verifies
-        // env.invoker() (us) is a registered minter.
-        stellar_hunts_nft::Client::new(&env, &nft_contract)
-            .mint_level_badge(&player, &level);
+        // Cross-contract call to the NFT contract. We pass our own contract
+        // address as the minter; the NFT contract verifies the caller is a
+        // registered minter via `minter.require_auth()` +
+        // `has_minter_role(minter)`. The auth context from this contract
+        // satisfies `minter.require_auth()`.
+        stellar_hunts_nft::StellarHuntsNftClient::new(&env, &nft_contract).mint_level_badge(
+            &env.current_contract_address(),
+            &player,
+            &level,
+        );
 
         lp.nft_minted = true;
         env.storage().persistent().set(&lp_key, &lp);
 
-        env.events().publish(
-            (Symbol::new(&env, "level_badge_minted"),),
-            (player, level),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "level_badge_minted"),), (player, level));
     }
 
     // -----------------------------------------------------------------
@@ -409,14 +411,14 @@ impl StellarHunts {
             .unwrap()
     }
 
-    pub fn get_question_per_level(env: Env) -> u8 {
+    pub fn get_question_per_level(env: Env) -> u32 {
         env.storage()
             .instance()
             .get(&DataKey::QuestionPerLevel)
-            .unwrap_or(0u8)
+            .unwrap_or(0u32)
     }
 
-    pub fn get_question_in_level(env: Env, level: Levels, index: u8) -> Bytes {
+    pub fn get_question_in_level(env: Env, level: Levels, index: u32) -> Bytes {
         let question_id: u64 = env
             .storage()
             .persistent()
@@ -440,17 +442,10 @@ impl StellarHunts {
     }
 
     pub fn get_nft_contract_address(env: Env) -> Address {
-        env.storage()
-            .instance()
-            .get(&DataKey::NftContract)
-            .unwrap()
+        env.storage().instance().get(&DataKey::NftContract).unwrap()
     }
 
-    pub fn get_player_level_progress(
-        env: Env,
-        player: Address,
-        level: Levels,
-    ) -> LevelProgress {
+    pub fn get_player_level_progress(env: Env, player: Address, level: Levels) -> LevelProgress {
         let key = DataKey::PlayerLevelProgress(player, level.clone());
         env.storage()
             .persistent()
@@ -465,7 +460,7 @@ impl StellarHunts {
             })
     }
 
-    pub fn next_level(env: Env, level: Levels) -> Levels {
+    pub fn next_level(_env: Env, level: Levels) -> Levels {
         level.next()
     }
 
@@ -491,9 +486,10 @@ impl StellarHunts {
             attempts: 0,
             nft_minted: false,
         };
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerLevelProgress(player, Levels::Easy), &lp);
+        env.storage().persistent().set(
+            &DataKey::PlayerLevelProgress(player.clone(), Levels::Easy),
+            &lp,
+        );
 
         env.events().publish(
             (Symbol::new(&env, "player_initialized"),),

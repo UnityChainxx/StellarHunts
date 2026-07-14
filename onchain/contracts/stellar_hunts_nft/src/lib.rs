@@ -1,4 +1,7 @@
-#![no_std]
+// Allow `std` access during `cargo test` so tests can use
+// `std::panic::catch_unwind` to assert panic behaviour. The contract itself
+// remains `no_std` for the WASM build.
+#![cfg_attr(not(test), no_std)]
 
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env, String,
@@ -65,7 +68,9 @@ impl StellarHuntsNft {
         env.storage()
             .instance()
             .set(&NftDataKey::Minters(game_contract.clone()), &true);
-        env.storage().instance().set(&NftDataKey::BaseUri, &base_uri);
+        env.storage()
+            .instance()
+            .set(&NftDataKey::BaseUri, &base_uri);
         env.storage().instance().set(&NftDataKey::Name, &name);
         env.storage().instance().set(&NftDataKey::Symbol, &symbol);
 
@@ -75,15 +80,17 @@ impl StellarHuntsNft {
         );
     }
 
-    /// Mint a single level badge for a recipient. The directly-invoking
-    /// contract must be a registered minter (set via `init` or
-    /// `grant_minter_role`). In normal operation the invoker is the
-    /// StellarHunts game contract.
-    pub fn mint_level_badge(env: Env, recipient: Address, level: Levels) {
-        let invoker = env
-            .invoker()
-            .expect("mint_level_badge must be called by a contract");
-        if !Self::has_minter_role(env.clone(), invoker.clone()) {
+    /// Mint a single level badge for a recipient.
+    ///
+    /// `minter` must be a registered minter (set via `init` or
+    /// `grant_minter_role`). We additionally require `minter.require_auth()`
+    /// so that the auth context — propagated from the calling contract —
+    /// authorises the mint. This is the v22 replacement for the previous
+    /// `env.invoker()`-based check: in normal operation the StellarHunts
+    /// game contract passes its own contract address as `minter`.
+    pub fn mint_level_badge(env: Env, minter: Address, recipient: Address, level: Levels) {
+        minter.require_auth();
+        if !Self::has_minter_role(env.clone(), minter.clone()) {
             panic_with_error!(&env, Error::NotAuthorized);
         }
 
@@ -95,7 +102,7 @@ impl StellarHuntsNft {
 
         env.events().publish(
             (Symbol::new(&env, "level_badge_minted"),),
-            (recipient, level, invoker),
+            (recipient, level, minter),
         );
     }
 

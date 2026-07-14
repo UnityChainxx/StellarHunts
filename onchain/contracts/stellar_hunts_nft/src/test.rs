@@ -1,6 +1,8 @@
 #![cfg(test)]
 
 use crate::{StellarHuntsNft, StellarHuntsNftClient};
+// Brings `Address::generate` into scope as an extension trait method.
+use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, Env, String};
 
 fn admin(env: &Env) -> Address {
@@ -108,12 +110,14 @@ fn test_random_cannot_mint() {
         &String::from_str(&env, "SHB"),
     );
 
-    // Calling mint_level_badge directly (top-level) — invoker is None → panic.
+    // Calling mint_level_badge directly — `attacker` is not a registered
+    // minter, so the contract logic panics with NotAuthorized. The first arg
+    // is what the NFT contract will treat as the candidate minter.
     let attacker = env.register_contract(None, FakeGameContract);
     let attacker_client = StellarHuntsNftClient::new(&env, &attacker);
     let r = recipient(&env);
     let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        attacker_client.mint_level_badge(&r, &crate::Levels::Easy);
+        attacker_client.mint_level_badge(&attacker, &r, &crate::Levels::Easy);
     }));
     assert!(should_panic.is_err());
 }
@@ -137,6 +141,12 @@ impl FakeGameContract {
         recipient: soroban_sdk::Address,
         level: crate::Levels,
     ) {
-        StellarHuntsNftClient::new(&env, &nft_contract).mint_level_badge(&recipient, &level);
+        // Pass our own contract address as the minter so the NFT contract's
+        // `minter.require_auth()` + `has_minter_role(minter)` check passes.
+        StellarHuntsNftClient::new(&env, &nft_contract).mint_level_badge(
+            &env.current_contract_address(),
+            &recipient,
+            &level,
+        );
     }
 }
