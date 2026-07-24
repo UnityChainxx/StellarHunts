@@ -5,6 +5,7 @@ import { TypeOrmModule } from "@nestjs/typeorm"
 import { ConfigModule, ConfigService } from "@nestjs/config"
 import { AuthModule } from "./auth/auth.module"
 import { UserInventoryModule } from "./user-inventory/user-inventory.module"
+import { CacheModule } from "./cache/cache.module"
 import appConfig from "config/app.config"
 import databaseConfig from "config/database.config"
 import { PuzzleCategoryModule } from "./puzzle-category/puzzle-category.module"
@@ -61,6 +62,9 @@ import { ApiKeyModule } from './api-key/api-key.module';
     ApiKeyModule,
     UserReactionModule,
     MultiplayerQueueModule,
+    // Redis-backed caching + single-flight for the read-heavy endpoints
+    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
+    CacheModule,
   ],
   controllers: [AppController],
   providers: [AppService],

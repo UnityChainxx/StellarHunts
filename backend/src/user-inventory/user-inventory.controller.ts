@@ -1,8 +1,22 @@
 
-import { Controller, Get, Post, Body, Param, ParseUUIDPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { UserInventoryService } from './user-inventory.service';
-import { UserInventoryResponseDto, InventoryItemDto } from './dto/inventory-response';
+import {
+  UserInventoryResponseDto,
+  InventoryItemDto,
+  PaginatedInventoryResponseDto,
+} from './dto/inventory-response';
 import { AddInventoryItemDto } from './dto/add-inventory-item';
 import { Auth } from '../auth/decorators/auth-decorator';
 import { AuthType } from '../auth/enums/auth-type.enum';
@@ -16,32 +30,44 @@ export class UserInventoryController {
   @Auth(AuthType.Bearer) // Assuming you have JWT auth
   @Get()
   @ApiOperation({ summary: 'Get user complete digital inventory' })
-  @ApiResponse({ status: 200, description: 'User inventory retrieved successfully', type: UserInventoryResponseDto })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, description: 'User inventory retrieved successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserInventory(
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<UserInventoryResponseDto> {
-    return this.userInventoryService.getUserInventory(userId);
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ): Promise<UserInventoryResponseDto | PaginatedInventoryResponseDto> {
+    return this.userInventoryService.getUserInventory(userId, page, limit);
   }
 
   @Auth(AuthType.Bearer)
   @Get('nfts')
   @ApiOperation({ summary: 'Get user NFTs only' })
-  @ApiResponse({ status: 200, description: 'User NFTs retrieved successfully', type: [InventoryItemDto] })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, description: 'User NFTs retrieved successfully' })
   async getUserNFTs(
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<InventoryItemDto[]> {
-    return this.userInventoryService.getUserNFTs(userId);
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ): Promise<InventoryItemDto[] | PaginatedInventoryResponseDto> {
+    return this.userInventoryService.getUserNFTs(userId, page, limit);
   }
 
   @Auth(AuthType.Bearer)
   @Get('badges')
   @ApiOperation({ summary: 'Get user badges only' })
-  @ApiResponse({ status: 200, description: 'User badges retrieved successfully', type: [InventoryItemDto] })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, description: 'User badges retrieved successfully' })
   async getUserBadges(
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<InventoryItemDto[]> {
-    return this.userInventoryService.getUserBadges(userId);
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+  ): Promise<InventoryItemDto[] | PaginatedInventoryResponseDto> {
+    return this.userInventoryService.getUserBadges(userId, page, limit);
   }
 
   @Auth(AuthType.Bearer)

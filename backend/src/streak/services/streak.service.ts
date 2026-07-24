@@ -5,21 +5,31 @@ import type { StreakActivity, ActivityType } from "../entities/streak-activity.e
 import type { StreakCalculationService, StreakCalculationConfig } from "./streak-calculation.service"
 import type { RecordActivityDto } from "../dto/record-activity.dto"
 import type { StreakStatsDto, StreakLeaderboardDto, StreakHistoryDto } from "../dto/streak-stats.dto"
+import { CacheService } from "../../cache/cache.service"
+
+// Leaderboards change slowly. 60s + 0-10s jitter prevents synchronized
+// expirations from stampeding the database at 1000 RPS (#107).
+const LEADERBOARD_TTL_SECONDS = 60
 
 @Injectable()
 export class StreakService {
   private readonly streakRepository: Repository<Streak>
   private readonly activityRepository: Repository<StreakActivity>
   private readonly calculationService: StreakCalculationService
+  // `undefined` to stay backwards-compatible with the existing manual DI shape
+  // used throughout this codebase (CI also constructs services for tests).
+  private readonly cacheService?: CacheService
 
   constructor(
     streakRepository: Repository<Streak>,
     activityRepository: Repository<StreakActivity>,
     calculationService: StreakCalculationService,
+    cacheService?: CacheService,
   ) {
     this.streakRepository = streakRepository
     this.activityRepository = activityRepository
     this.calculationService = calculationService
+    this.cacheService = cacheService
   }
 
   async recordActivity(
@@ -158,21 +168,35 @@ export class StreakService {
   }
 
   async getLeaderboard(limit = 10): Promise<StreakLeaderboardDto[]> {
-    const streaks = await this.streakRepository
-      .createQueryBuilder("streak")
-      .where("streak.isActive = :isActive", { isActive: true })
-      .orderBy("streak.currentStreak", "DESC")
-      .addOrderBy("streak.longestStreak", "DESC")
-      .limit(limit)
-      .getMany()
+    const compute = async (): Promise<StreakLeaderboardDto[]> => {
+      const streaks = await this.streakRepository
+        .createQueryBuilder("streak")
+        .where("streak.isActive = :isActive", { isActive: true })
+        .orderBy("streak.currentStreak", "DESC")
+        .addOrderBy("streak.longestStreak", "DESC")
+        .limit(limit)
+        .getMany()
 
-    return streaks.map((streak, index) => ({
-      userId: streak.userId,
-      currentStreak: streak.currentStreak,
-      longestStreak: streak.longestStreak,
-      rank: index + 1,
-      isActive: streak.isActive,
-    }))
+      return streaks.map((streak, index) => ({
+        userId: streak.userId,
+        currentStreak: streak.currentStreak,
+        longestStreak: streak.longestStreak,
+        rank: index + 1,
+        isActive: streak.isActive,
+      }))
+    }
+
+    // If CacheModule is wired (see main.ts / app.module.ts) route through Redis
+    // + single-flight. Otherwise fall back to the direct DB call that the
+    // codebase used before this PR (#107).
+    if (this.cacheService) {
+      return this.cacheService.getOrSet(
+        `streak:leaderboard:limit:${limit}`,
+        LEADERBOARD_TTL_SECONDS,
+        compute,
+      )
+    }
+    return compute()
   }
 
   async getStreakHistory(userId: string, days = 30): Promise<StreakHistoryDto[]> {
