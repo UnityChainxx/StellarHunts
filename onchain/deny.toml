@@ -1,0 +1,77 @@
+# cargo-deny configuration
+# See https://embarkstudios.github.io/cargo-deny/ for all options.
+
+[graph]
+# Only check dependencies that are actually used (reachable from workspace crates).
+# This excludes dev-dependencies and unused transitive deps.
+# We keep dev-dependencies because tests are an important part of the CI surface.
+exclude-dev = false
+
+[advisories]
+# The path to the advisory database from which to fetch advisories.
+db-path = "~/.cargo/advisory-db"
+# URL to the advisory database to fetch.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# How often to fetch the advisory database (in seconds).
+db-fetch-delay = 86400  # 24h
+# If this is true, only advisories that have been marked as "informational" are
+# allowed, all others will be denied.
+vulnerability = "deny"
+unmaintained = "warn"
+unsound = "deny"
+notice = "warn"
+# Ignore specific advisories by ID (use sparingly, document the reason).
+# Example: ignore = ["RUSTSEC-2023-0001"]
+ignore = []
+
+[licenses]
+# Deny any crate that does not have a license we explicitly allow.
+unlicensed = "deny"
+# Allow these licenses (SPDX identifiers).
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+# Confidence threshold for license detection (0.0 – 1.0).
+confidence-threshold = 0.8
+# Copyleft licenses are denied by default to keep the project MIT-friendly.
+copyleft = "deny"
+# If true, workspaces members are allowed to not have their licenses
+# explicitly specified in their Cargo.toml (inheriting from workspace is OK).
+allow-osi-fsf-free = "neither"
+# Show which crates have copyleft licenses.
+deny = []
+# Skip checking certain crates that we know have acceptable licensing but
+# the detector can't determine automatically.
+skip = []
+skip-tree = []
+
+[bans]
+# Multiple versions of the same crate are disallowed unless explicitly listed.
+multiple-versions = "deny"
+# Highlight crates that are specifically banned.
+deny = []
+# Specific crates that are allowed despite having multiple versions.
+skip-tree = []
+# Highlight crates with a specific git URL that should not be used.
+deny = []
+
+[sources]
+# Unknown registries, git repos, and local paths may be denied.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []
+# Only allow crates from the official crates.io registry.
+allowed-registries = ["https://github.com/rust-lang/crates.io-index"]
+
+[output]
+# If true, output is printed in a format that is easier to read in CI logs.
+feature-depth = 1
