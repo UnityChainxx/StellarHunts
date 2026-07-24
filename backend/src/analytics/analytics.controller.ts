@@ -7,8 +7,10 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Query,
 } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
+import type { PaginatedUserPuzzleHistory } from './analytics.service';
 
 class RecordSolveDto {
   userId: string;
@@ -52,14 +54,20 @@ export class AnalyticsController {
   }
 
   @Get('users/:userId/history')
-  getUserPuzzleHistory(@Param('userId') userId: string): Record<string, any> {
-    this.logger.log(`Handling request for user ${userId} puzzle history.`);
-    const userHistoryMap = this.analyticsService.getUserPuzzleStats(userId);
-
-    const userHistoryObject = {};
-    userHistoryMap.forEach((value, key) => {
-      userHistoryObject[key] = value;
-    });
-    return userHistoryObject;
+  getUserPuzzleHistory(
+    @Param('userId') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): PaginatedUserPuzzleHistory {
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    this.logger.log(
+      `Handling paginated request for user ${userId} puzzle history (page=${parsedPage}, limit=${parsedLimit}).`,
+    );
+    return this.analyticsService.getUserPuzzleStatsPage(
+      userId,
+      parsedPage > 0 ? parsedPage : 1,
+      parsedLimit > 0 ? parsedLimit : 20,
+    );
   }
 }

@@ -1,44 +1,38 @@
-/* eslint-disable prettier/prettier */
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import appConfig from 'config/app.config';
 import databaseConfig from 'config/database.config';
+
+import { User } from './auth/entities/user.entity';
+import { TimeTrial } from './time-trial/time-trial.entity';
+import { Puzzle } from './puzzle/puzzle.entity';
+import { Category } from './puzzle-category/entities/category.entity';
+
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+import { ActivityModule } from './activity/activity.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { ApiKeyModule } from './api-key/api-key.module';
+import { ContentModule } from './content/content.module';
+import { ContentRatingModule } from './content-rating/content-rating.module';
+import { InAppNotificationsModule } from './in-app-notifications/in-app-notifications.module';
+import { MultiplayerQueueModule } from './multiplayer-queue/multiplayer-queue.module';
+import { NFTClaimModule } from './nft-claim/nft-claim.module';
+import { ProgressModule } from './progress/progress.module';
+import { PuzzleDependencyModule } from './puzzle-dependency/puzzle-dependency.module';
 import { PuzzleModule } from './puzzle/puzzle.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
-import { TimeTrialModule } from './time-trial/time-trial.module';
-import { ActivityModule } from './activity/activity.module';
-import { Module } from "@nestjs/common"
-import { AppController } from "./app.controller"
-import { AppService } from "./app.service"
-import { TypeOrmModule } from "@nestjs/typeorm"
-import { ConfigModule, ConfigService } from "@nestjs/config"
-import { AuthModule } from "./auth/auth.module"
-import { UserInventoryModule } from "./user-inventory/user-inventory.module"
-import appConfig from "config/app.config"
-import databaseConfig from "config/database.config"
-import { PuzzleCategoryModule } from "./puzzle-category/puzzle-category.module"
-import { RewardsModule } from "./rewards/rewards.module"
-import { PuzzleModule } from "./puzzle/puzzle.module"
-import { PuzzleSubmissionModule } from "./puzzle-submission/puzzle-submission.module"
-import { ContentModule } from "./content/content.module"
-import { UserReportCardModule } from "./user-report-card/user-report-card.module"
-import { PuzzleDependencyModule } from "./puzzle-dependency/puzzle-dependency.module"
-import { TimeTrialModule } from "./time-trial/time-trial.module"
-import { InAppNotificationsModule } from "./in-app-notifications/in-app-notifications.module"
-import { User } from "./auth/entities/user.entity"
-import { TimeTrial } from "./time-trial/time-trial.entity"
-import { Puzzle } from "./puzzle/puzzle.entity"
-import { Category } from "./puzzle-category/entities/category.entity"
-import { AnalyticsModule } from './analytics/analytics.module';
+import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
+import { ReportsModule } from './reports/reports.module';
 import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { ApiKeyModule } from './api-key/api-key.module';
+import { TimeTrialModule } from './time-trial/time-trial.module';
+import { UserActivityLogModule } from './user-activity-log/user-activity-log.module';
 import { UserRankingModule } from './user-ranking/user-ranking.module';
-import { ProgressModule } from './progress/progress.module';
-import { ContentRatingModule } from './content-rating/content-rating.module';
-import { UserActivityLogModule } from "./user-activity-log/user-activity-log.module"
+import { UserReactionModule } from './user-reaction/user-reaction.module';
+import { UserReportCardModule } from './user-report-card/user-report-card.module';
 
 @Module({
   imports: [
@@ -63,26 +57,26 @@ import { UserActivityLogModule } from "./user-activity-log/user-activity-log.mod
         autoLoadEntities: configService.get('database.autoload'),
       }),
     }),
+    ActivityModule,
+    AnalyticsModule,
+    ApiKeyModule,
+    ContentModule,
+    ContentRatingModule,
+    InAppNotificationsModule,
+    MultiplayerQueueModule,
+    NFTClaimModule,
+    ProgressModule,
+    PuzzleDependencyModule,
     PuzzleModule,
     PuzzleSubmissionModule,
-    ContentModule,
-    UserReportCardModule,
-    PuzzleDependencyModule,
-    TimeTrialModule
-    ActivityModule,
-    InAppNotificationsModule,
-    ReportsModule,
     PuzzleTranslationModule,
-    NFTClaimModule,
-    AnalyticsModule,
+    ReportsModule,
     RewardShopModule,
-    ApiKeyModule,
-    UserReactionModule,
-    MultiplayerQueueModule,
-    UserRankingModule,
-    ProgressModule,           // <--- ProgressModule is kept
-    ContentRatingModule,
+    TimeTrialModule,
     UserActivityLogModule,
+    UserRankingModule,
+    UserReactionModule,
+    UserReportCardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
