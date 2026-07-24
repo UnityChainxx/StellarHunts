@@ -1,0 +1,141 @@
+# Dependabot configuration — automated dependency updates
+# See https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+# for all config options.
+
+version: 2
+updates:
+  # ── Root workspace ──────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels:
+      - "dependencies"
+      - "npm"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    groups:
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+        update-types:
+          - "minor"
+          - "patch"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── Frontend ────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore(deps/frontend)"
+      prefix-development: "chore(deps-dev/frontend)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    ignore:
+      # Next.js v15 is a breaking change; handle manually
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+    groups:
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - "minor"
+          - "patch"
+      stellar:
+        patterns:
+          - "@stellar/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── Backend ─────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore(deps/backend)"
+      prefix-development: "chore(deps-dev/backend)"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    groups:
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+        update-types:
+          - "minor"
+          - "patch"
+      typeorm:
+        patterns:
+          - "typeorm"
+          - "@nestjs/typeorm"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── Onchain (Cargo/Rust) ────────────────────────────────────────
+  - package-ecosystem: "cargo"
+    directory: "/onchain"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "chore(deps/onchain)"
+    labels:
+      - "dependencies"
+      - "onchain"
+      - "rust"
+    open-pull-requests-limit: 10
+    groups:
+      soroban:
+        patterns:
+          - "soroban-sdk"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ── GitHub Actions (self-update) ────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    commit-message:
+      prefix: "ci(deps)"
+    labels:
+      - "dependencies"
+      - "ci"
+    open-pull-requests-limit: 5
