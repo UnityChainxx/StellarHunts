@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "error-logs": "nest start --entryFile error-logs-cli"
+    "error-logs": "nest start --entryFile error-logs-cli",
+    "bench:mint": "ts-node scripts/bench-mint.ts",
+    "bench:mint:json": "BENCH_JSON=1 ts-node scripts/bench-mint.ts"
   },
   "dependencies": {
     "@nestjs-modules/ioredis": "^2.0.2",
