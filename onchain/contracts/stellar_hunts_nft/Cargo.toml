@@ -1,0 +1,21 @@
+[package]
+name = "stellar-hunts-nft"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+# `rlib` is required so the game contract can depend on this crate via
+# `path = "..."` and import its Rust items. `cdylib` produces the WASM.
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-hunts-types = { path = "../stellar_hunts_types" }
+
+[dev-dependencies]
+# `testutils` enables `mock_all_auths`, `register_contract`, and
+# `Address::generate` for host-side unit tests.
+soroban-sdk = { workspace = true, features = ["testutils"] }

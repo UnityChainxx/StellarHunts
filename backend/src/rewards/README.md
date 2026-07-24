@@ -1,6 +1,6 @@
 # Reward Module
 
-A standalone NestJS module for managing reward distribution to users who complete challenges in StellarHunt. Supports NFT, token, badge, and points-based rewards with duplicate claim prevention and claim limits.
+A standalone NestJS module for managing reward distribution to users who complete challenges in StellarHunts. Supports NFT, token, badge, and points-based rewards with duplicate claim prevention and claim limits.
 
 ## Features
 
@@ -54,7 +54,7 @@ POST /rewards
 Content-Type: application/json
 
 {
-  "name": "StarkNet Beginner Badge",
+  "name": "StellarHunts Beginner Badge",
   "description": "Awarded for completing Easy level challenges",
   "type": "badge",
   "challengeId": "challenge-easy-001",
@@ -139,7 +139,7 @@ DELETE /rewards/:id
 
 ```typescript
 const newReward = await rewardsService.createReward({
-  name: 'StarkNet Master NFT',
+  name: 'StellarHunts Master NFT',
   description: 'Exclusive NFT for completing Master level',
   type: RewardType.NFT,
   challengeId: 'challenge-master-001',

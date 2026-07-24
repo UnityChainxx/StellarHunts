@@ -13,7 +13,7 @@ import { RewardType } from '../entities/reward.entity';
 export class CreateRewardDto {
   @ApiProperty({
     description: 'Name of the reward',
-    example: 'StarkNet Beginner Badge',
+    example: 'StellarHunts Beginner Badge',
   })
   @IsString()
   @IsNotEmpty()

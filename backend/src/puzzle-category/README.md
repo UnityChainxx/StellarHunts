@@ -1,6 +1,6 @@
 # Puzzle Category Module
 
-A standalone NestJS module for organizing puzzles into logical categories in StellarHunt. Provides complete CRUD for categories and puzzles with many-to-many relationships, search, filtering, and initial data seeding.
+A standalone NestJS module for organizing puzzles into logical categories in StellarHunts. Provides complete CRUD for categories and puzzles with many-to-many relationships, search, filtering, and initial data seeding.
 
 ## Features
 
@@ -138,7 +138,7 @@ The module seeds five pre-configured categories:
 |----------|-------------|-------|
 | Blockchain Basics | Decentralization, consensus mechanisms, cryptography | `#3B82F6` |
 | Smart Contracts | Development, security, gas optimization | `#10B981` |
-| StarkNet Deep Dive | Cairo programming, STARK proofs, L2 scaling | `#8B5CF6` |
+| Soroban Deep Dive | Soroban / Rust smart contracts, Stellar primitives | `#8B5CF6` |
 | NFT Fundamentals | Standards, metadata, IPFS, minting lifecycle | `#F59E0B` |
 | DeFi Concepts | Liquidity pools, yield farming, AMMs, protocols | `#EF4444` |
 
@@ -168,7 +168,7 @@ const puzzleData = {
   difficulty: 'ADVANCED',
   points: 25,
   estimatedTime: 30,
-  categoryIds: [1, 3], // Blockchain Basics + StarkNet Deep Dive
+  categoryIds: [1, 3], // Blockchain Basics + Soroban Deep Dive
 };
 
 const puzzle = await puzzleCategoryService.createPuzzle(puzzleData);
@@ -218,7 +218,7 @@ DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=your_user
 DATABASE_PASSWORD=your_password
-DATABASE_NAME=stellarshunt
+DATABASE_NAME=stellarshunts
 DATABASE_SYNC=true
 DATABASE_LOAD=true
 ```

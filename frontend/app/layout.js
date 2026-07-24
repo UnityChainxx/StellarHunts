@@ -17,7 +17,7 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "StellarHunt",
+  title: "StellarHunts",
   description: "Solve puzzles and claim NFT rewards!",
 };
 

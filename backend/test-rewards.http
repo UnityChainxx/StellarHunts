@@ -5,7 +5,7 @@ POST http://localhost:4000/rewards
 Content-Type: application/json
 
 {
-  "name": "StarkNet Beginner Badge",
+  "name": "StellarHunts Beginner Badge",
   "description": "Awarded for completing the Easy level challenges",
   "type": "badge",
   "challengeId": "challenge-easy-001",
@@ -22,7 +22,7 @@ POST http://localhost:4000/rewards
 Content-Type: application/json
 
 {
-  "name": "StarkNet Master NFT",
+  "name": "StellarHunts Master NFT",
   "description": "Exclusive NFT for completing Master level challenges",
   "type": "nft",
   "challengeId": "challenge-master-001",

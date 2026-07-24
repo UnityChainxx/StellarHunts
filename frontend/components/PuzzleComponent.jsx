@@ -14,10 +14,10 @@ const puzzleData = {
   title: "Simple Math",
   puzzleNumber: 3,
   level: "Easy",
-  levelReward: "Starknet Beginner NFT",
+  levelReward: "StellarHunts Beginner NFT",
   puzzle:
-    "How many  confirmations are typically recommended for StarkNet transactions?",
-  hint: "StarkNet has faster finality than most L1s",
+    "How many confirmations are typically recommended for Stellar / Soroban transactions before considering them final?",
+  hint: "Soroban closes finalize within a few seconds on the Stellar network",
 };
 
 const PuzzleComponent = () => {

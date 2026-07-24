@@ -21,8 +21,8 @@ const ReferralLink = ({ referralLink }) => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join StellarHunt!",
-          text: "I'm playing this amazing StellarHunt game. Join me and earn exclusive rewards!",
+          title: "Join StellarHunts!",
+          text: "I'm playing this amazing StellarHunts game. Join me and earn exclusive rewards!",
           url: referralLink
         });
       } catch (err) {

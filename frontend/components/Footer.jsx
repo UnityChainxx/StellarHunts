@@ -83,12 +83,12 @@ const Footer = () => {
             <h3 className="text-white font-semibold mb-2">Powered By</h3>
             <div className="flex flex-wrap gap-4">
               <a
-                href="https://starknet.io"
+                href="https://stellar.org"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-gray-300 hover:text-white transition-colors"
               >
-                StarkNet <ExternalLink className="w-4 h-4" />
+                Stellar <ExternalLink className="w-4 h-4" />
               </a>
               <a
                 href="https://nextjs.org"
@@ -99,12 +99,12 @@ const Footer = () => {
                 Next.js <ExternalLink className="w-4 h-4" />
               </a>
               <a
-                href="https://cairo-lang.org"
+                href="https://soroban.stellar.org"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-gray-300 hover:text-white transition-colors"
               >
-                Cairo <ExternalLink className="w-4 h-4" />
+                Soroban <ExternalLink className="w-4 h-4" />
               </a>
             </div>
           </div>
@@ -113,7 +113,7 @@ const Footer = () => {
         {/* Copyright */}
         <div className="mt-8 pt-4 border-t border-white/10 text-center text-gray-400 text-sm">
           <p>
-            © {new Date().getFullYear()} StellarHunt. All rights
+            © {new Date().getFullYear()} StellarHunts. All rights
             reserved.
           </p>
         </div>

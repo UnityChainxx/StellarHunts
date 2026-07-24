@@ -100,13 +100,13 @@ const ChallengeCard = ({ challenge, isActive }) => {
       </div>{" "}
     </div>
   );
-};
+}
 const FeaturedChallenges = () => {
   const challenges = [
     {
       title: "The Cryptic Key",
       description:
-        "Decode the ancient StarkNet runes to unlock the hidden vault.",
+        "Decode the ancient Stellar / Soroban runes to unlock the hidden vault.",
       type: "riddle",
       difficulty: "Easy",
       timeLeft: "2 days left",

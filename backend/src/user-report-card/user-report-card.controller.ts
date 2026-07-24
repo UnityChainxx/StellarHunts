@@ -21,7 +21,7 @@ export class UserReportCardController {
   @Get(':id/report-card')
   @ApiOperation({ 
     summary: 'Get user report card',
-    description: 'Retrieves the report card for a specific user, showing their progress in StellarHunt'
+    description: 'Retrieves the report card for a specific user, showing their progress in StellarHunts'
   })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ 
