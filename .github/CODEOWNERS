@@ -1,0 +1,44 @@
+# CODEOWNERS
+# Lists the maintainers responsible for reviewing changes to StellarHunt.
+# The last matching rule takes precedence. See
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# for the full specification.
+
+# Default owners for everything in the repo. Replace the placeholder
+# handles below with the GitHub usernames that have write access to
+# this repository.
+*                                       @UnityChainxx @eulami
+
+# Frontend (Next.js / React)
+/frontend/                              @UnityChainxx @eulami
+/frontend/app/                          @UnityChainxx @eulami
+/frontend/components/                   @UnityChainxx @eulami
+/frontend/hooks/                        @UnityChainxx @eulami
+/frontend/services/                     @UnityChainxx @eulami
+/frontend/store/                        @UnityChainxx @eulami
+/frontend/lib/                          @UnityChainxx @eulami
+
+# Backend (NestJS / TypeScript)
+/backend/                               @UnityChainxx @eulami
+/backend/src/                           @UnityChainxx @eulami
+/backend/test/                          @UnityChainxx @eulami
+/backend/config/                        @UnityChainxx @eulami
+
+# Onchain (Cairo smart contracts)
+/onchain/                               @UnityChainxx @eulami
+/onchain/src/                           @UnityChainxx @eulami
+/onchain/src/contracts/                 @UnityChainxx @eulami
+/onchain/tests/                         @UnityChainxx @eulami
+
+# CI / CD and project-wide tooling
+/.github/                               @UnityChainxx @eulami
+/.github/workflows/                     @UnityChainxx @eulami
+/Makefile                               @UnityChainxx @eulami
+/package.json                           @UnityChainxx @eulami
+
+# Documentation
+/README.md                              @UnityChainxx @eulami
+/CONTRIBUTING.md                        @UnityChainxx @eulami
+/backend/README.md                      @UnityChainxx @eulami
+/frontend/README.md                     @UnityChainxx @eulami
+/docs/                                  @UnityChainxx @eulami
