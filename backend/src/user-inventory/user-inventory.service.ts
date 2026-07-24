@@ -1,12 +1,35 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindManyOptions } from 'typeorm';
 import { Inventory, AssetType } from './entities/inventory';
 import { User } from './entities/user';
 import { NFT } from './entities/nft';
 import { Badge } from './entities/badge';
-import { UserInventoryResponseDto, InventoryItemDto, AssetDetailDto } from './dto/inventory-response';
+import {
+  UserInventoryResponseDto,
+  InventoryItemDto,
+  AssetDetailDto,
+  PaginatedInventoryResponseDto,
+} from './dto/inventory-response';
 import { AddInventoryItemDto } from './dto/add-inventory-item';
+
+// Server-side pagination boundaries for the `/inventory` endpoints (#104).
+// Requests landing outside this range are clamped before touching the DB.
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_LIMIT = 20;
+const MAX_PAGE_LIMIT = 100;
+const MAX_PAGE = 10_000;
+
+const clampInt = (value: number, min: number, max: number, fallback: number) => {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+};
+
+const buildOffsetLimit = (page: number, limit: number) => {
+  const safePage = clampInt(page, 1, MAX_PAGE, DEFAULT_PAGE);
+  const safeLimit = clampInt(limit, 1, MAX_PAGE_LIMIT, DEFAULT_PAGE_LIMIT);
+  return { safePage, safeLimit, offset: (safePage - 1) * safeLimit };
+};
 
 @Injectable()
 export class UserInventoryService {
@@ -21,16 +44,24 @@ export class UserInventoryService {
     private badgeRepository: Repository<Badge>,
   ) {}
 
-  async getUserInventory(userId: string): Promise<UserInventoryResponseDto> {
+  async getUserInventory(
+    userId: string,
+    page: number = DEFAULT_PAGE,
+    limit: number = DEFAULT_PAGE_LIMIT,
+  ): Promise<PaginatedInventoryResponseDto | UserInventoryResponseDto> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const inventoryItems = await this.inventoryRepository.find({
+    const { safePage, safeLimit, offset } = buildOffsetLimit(page, limit);
+
+    const [inventoryItems, total] = await this.inventoryRepository.findAndCount({
       where: { userId },
       order: { acquiredAt: 'DESC' },
-    });
+      skip: offset,
+      take: safeLimit,
+    } as FindManyOptions<Inventory>);
 
     const enrichedInventory = await Promise.all(
       inventoryItems.map(async (item) => {
@@ -39,17 +70,36 @@ export class UserInventoryService {
       }),
     );
 
-    const nftCount = enrichedInventory.filter(item => item.assetType === AssetType.NFT).length;
-    const badgeCount = enrichedInventory.filter(item => item.assetType === AssetType.BADGE).length;
+    const nftCount = enrichedInventory.filter((item) => item.assetType === AssetType.NFT).length;
+    const badgeCount = enrichedInventory.filter((item) => item.assetType === AssetType.BADGE).length;
+
+    if (safePage === 1 && total <= safeLimit) {
+      // Backwards-compatible response for callers that expect the full payload
+      // when there is only a single page of data.
+      return {
+        userId: user.id,
+        username: user.username,
+        inventory: enrichedInventory,
+        totalItems: total,
+        nftCount: total === 0 ? 0 : await this.countByType(userId, AssetType.NFT),
+        badgeCount: total === 0 ? 0 : await this.countByType(userId, AssetType.BADGE),
+      };
+    }
 
     return {
       userId: user.id,
       username: user.username,
-      inventory: enrichedInventory,
-      totalItems: enrichedInventory.length,
-      nftCount,
-      badgeCount,
+      items: enrichedInventory,
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasMore: offset + inventoryItems.length < total,
     };
+  }
+
+  private async countByType(userId: string, assetType: AssetType): Promise<number> {
+    return this.inventoryRepository.count({ where: { userId, assetType } });
   }
 
   async getInventoryItemDetails(userId: string, inventoryItemId: string): Promise<InventoryItemDto> {
@@ -103,32 +153,76 @@ export class UserInventoryService {
     return this.mapToInventoryItemDto(savedItem, assetDetails);
   }
 
-  async getUserNFTs(userId: string): Promise<InventoryItemDto[]> {
-    const nftItems = await this.inventoryRepository.find({
+  async getUserNFTs(
+    userId: string,
+    page: number = DEFAULT_PAGE,
+    limit: number = DEFAULT_PAGE_LIMIT,
+  ): Promise<PaginatedInventoryResponseDto | InventoryItemDto[]> {
+    const { safePage, safeLimit, offset } = buildOffsetLimit(page, limit);
+
+    const [nftItems, total] = await this.inventoryRepository.findAndCount({
       where: { userId, assetType: AssetType.NFT },
       order: { acquiredAt: 'DESC' },
-    });
+      skip: offset,
+      take: safeLimit,
+    } as FindManyOptions<Inventory>);
 
-    return Promise.all(
+    const items = await Promise.all(
       nftItems.map(async (item) => {
         const assetDetails = await this.getAssetDetails(item.assetId, item.assetType);
         return this.mapToInventoryItemDto(item, assetDetails);
       }),
     );
+
+    if (safePage === 1 && total <= safeLimit) {
+      return items;
+    }
+
+    return {
+      userId,
+      items,
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasMore: offset + nftItems.length < total,
+    };
   }
 
-  async getUserBadges(userId: string): Promise<InventoryItemDto[]> {
-    const badgeItems = await this.inventoryRepository.find({
+  async getUserBadges(
+    userId: string,
+    page: number = DEFAULT_PAGE,
+    limit: number = DEFAULT_PAGE_LIMIT,
+  ): Promise<PaginatedInventoryResponseDto | InventoryItemDto[]> {
+    const { safePage, safeLimit, offset } = buildOffsetLimit(page, limit);
+
+    const [badgeItems, total] = await this.inventoryRepository.findAndCount({
       where: { userId, assetType: AssetType.BADGE },
       order: { acquiredAt: 'DESC' },
-    });
+      skip: offset,
+      take: safeLimit,
+    } as FindManyOptions<Inventory>);
 
-    return Promise.all(
+    const items = await Promise.all(
       badgeItems.map(async (item) => {
         const assetDetails = await this.getAssetDetails(item.assetId, item.assetType);
         return this.mapToInventoryItemDto(item, assetDetails);
       }),
     );
+
+    if (safePage === 1 && total <= safeLimit) {
+      return items;
+    }
+
+    return {
+      userId,
+      items,
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      hasMore: offset + badgeItems.length < total,
+    };
   }
 
   private async getAssetDetails(assetId: string, assetType: AssetType): Promise<AssetDetailDto> {
