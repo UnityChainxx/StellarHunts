@@ -48,7 +48,7 @@
     "dotenv": "^16.4.7",
     "ioredis": "^5.6.1",
     "ip2location-nodejs": "^9.6.3",
-    "joi": "^17.0.0",
+    "joi": "^18.2.3",
     "multer": "^1.4.5-lts.2",
     "nest-commander": "^3.12.2",
     "nodemailer": "^6.10.0",
