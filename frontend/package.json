@@ -33,7 +33,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^26",
     "eslint": "^8",
     "eslint-config-next": "14.2.23",
     "postcss": "^8",
