@@ -32,7 +32,7 @@ jobs:
       # included so that when npm-based jobs are added in the future,
       # the cache key already covers them.
       - name: Cache Scarb, Cargo and node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache Scarb, Cargo and node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
