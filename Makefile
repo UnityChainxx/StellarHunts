@@ -40,8 +40,8 @@ help: ## Show this help message
 	@echo "Examples:"
 	@echo "  make install         Install all monorepo dependencies"
 	@echo "  make dev             Start backend + frontend together"
-	@echo "  make test            Run all tests (backend units + onchain)"
-	@echo "  make contracts.test  Run only the Cairo contract test suite"
+	@echo "  make test            Run all tests (backend + frontend + onchain)"
+	@echo "  make contracts.test  Run only the Soroban (Rust) contract test suite"
 
 # ---------- Install ----------
 install: install-backend install-frontend ## Install backend + frontend deps
@@ -72,10 +72,10 @@ dev-stop: ## Best-effort stop of dev processes started by `make dev`
 	@echo "✓ Stopped dev processes launched by this repo."
 
 # ---------- Tests ----------
-test: test-backend contracts.test ## Run backend + onchain test suites
+test: test-backend test-frontend contracts.test ## Run backend + frontend + onchain suites
 
-test-frontend: ## Run frontend tests (currently no suite — manual)
-	@echo "No automated frontend test suite is configured. Verify UI in the browser."
+test-frontend: ## Run frontend tests (Vitest)
+	cd $(FRONTEND_DIR) && npm test
 
 test-backend: ## Run NestJS unit tests
 	cd $(BACKEND_DIR) && npm test
@@ -84,17 +84,17 @@ test-backend-e2e: ## Run NestJS E2E tests
 	cd $(BACKEND_DIR) && npm run test:e2e
 
 # ---------- Contracts ----------
-contracts.build: ## Compile Cairo contracts with Scarb
-	cd $(ONCHAIN_DIR) && scarb build
+contracts.build: ## Compile Soroban (Rust) contracts to wasm
+	cd $(ONCHAIN_DIR) && cargo build --workspace --target wasm32-unknown-unknown --release
 
-contracts.test: ## Run Cairo contract tests with snforge
-	cd $(ONCHAIN_DIR) && snforge test
+contracts.test: ## Run Soroban (Rust) contract tests with cargo
+	cd $(ONCHAIN_DIR) && cargo test --workspace
 
-contracts.fmt: ## Run `scarb fmt` and write changes
-	cd $(ONCHAIN_DIR) && scarb fmt
+contracts.fmt: ## Run `cargo fmt` and write changes
+	cd $(ONCHAIN_DIR) && cargo fmt --all
 
-contracts.fmt-check: ## Verify Cairo formatting (CI-friendly)
-	cd $(ONCHAIN_DIR) && scarb fmt --check
+contracts.fmt-check: ## Verify Rust formatting (CI-friendly)
+	cd $(ONCHAIN_DIR) && cargo fmt --all -- --check
 
 # ---------- Lint & Format ----------
 lint: lint-frontend lint-backend ## Run all lint checks
@@ -135,5 +135,5 @@ clean-onchain: ## Remove Scarb build artefacts
 	rm -rf $(ONCHAIN_DIR)/target
 
 # ---------- CI ----------
-ci: contracts.fmt-check contracts.test ## Targets used by CI pipeline
+ci: contracts.fmt-check contracts.test lint-backend test-backend lint-frontend test-frontend build-frontend build-backend ## Targets used by CI pipeline
 	@echo "✓ CI checks passed locally."

@@ -1,29 +1,3 @@
-import { Module } from "@nestjs/common"
-import { AppController } from "./app.controller"
-import { AppService } from "./app.service"
-import { TypeOrmModule } from "@nestjs/typeorm"
-import { ConfigModule, ConfigService } from "@nestjs/config"
-import { AuthModule } from "./auth/auth.module"
-import { UserInventoryModule } from "./user-inventory/user-inventory.module"
-import { CacheModule } from "./cache/cache.module"
-import appConfig from "config/app.config"
-import databaseConfig from "config/database.config"
-import { PuzzleCategoryModule } from "./puzzle-category/puzzle-category.module"
-import { RewardModule } from "./reward/reward.module"
-import { PuzzleModule } from "./puzzle/puzzle.module"
-import { PuzzleSubmissionModule } from "./puzzle-submission/puzzle-submission.module"
-import { ContentModule } from "./content/content.module"
-import { UserReportCardModule } from "./user-report-card/user-report-card.module"
-import { PuzzleDependencyModule } from "./puzzle-dependency/puzzle-dependency.module"
-import { TimeTrialModule } from "./time-trial/time-trial.module"
-import { InAppNotificationsModule } from "./in-app-notifications/in-app-notifications.module"
-import { User } from "./auth/entities/user.entity"
-import { TimeTrial } from "./time-trial/time-trial.entity"
-import { Puzzle } from "./puzzle/puzzle.entity"
-import { Category } from "./puzzle-category/entities/category.entity"
-import { AnalyticModule } from './analytic/analytic.module';
-import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { ApiKeyModule } from './api-key/api-key.module';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -31,6 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
+
+/**
+ * Hard limit (ms) we allow the graceful shutdown sequence to take before
+ * forcing process exit. Kubernetes/the container runtime send a SIGKILL
+ * ~30s after SIGTERM, so we stay safely underneath that to avoid being
+ * killed mid-shutdown while still guaranteeing the process eventually exits.
+ */
+const FORCE_SHUTDOWN_TIMEOUT_MS = 25_000;
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
@@ -63,10 +45,7 @@ async function bootstrap(): Promise<void> {
     ],
     allowedHeaders: configService.get<string[]>(
       'appConfig.cors.allowedHeaders',
-    ) ?? [
-      'Content-Type',
-      'Authorization',
-    ],
+    ) ?? ['Content-Type', 'Authorization'],
     credentials:
       configService.get<boolean>('appConfig.cors.credentials') ?? true,
   });
@@ -95,28 +74,6 @@ async function bootstrap(): Promise<void> {
       transform: true,
       forbidNonWhitelisted: false,
     }),
-    PuzzleModule,
-    PuzzleSubmissionModule,
-    ContentModule,
-    UserReportCardModule,
-    PuzzleDependencyModule,
-    TimeTrialModule,
-    InAppNotificationsModule,
-    PuzzleTranslationModule,
-    NFTClaimModule,
-    AnalyticModule,
-    RewardShopModule,
-    ApiKeyModule,
-    UserReactionModule,
-    MultiplayerQueueModule,
-    // Redis-backed caching + single-flight for the read-heavy endpoints
-    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
-    CacheModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
   );
 
   const apiVersion = configService.get<string>('appConfig.apiVersion') ?? '1.0';
@@ -137,6 +94,54 @@ export class AppModule {}
   await app.listen(port);
   logger.log(`StellarHunts API listening on http://localhost:${port}`);
   logger.log(`Swagger UI available at http://localhost:${port}/docs`);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Graceful shutdown — close HTTP, database, Redis, Socket.IO and stop
+  // scheduled (cron) jobs on SIGTERM / SIGINT (#GracefulShutdown).
+  //
+  // We register our own handlers (instead of app.enableShutdownHooks())
+  // so we control logging and the process exit code. `app.close()` runs
+  // the Nest lifecycle hooks in order:
+  //   beforeApplicationShutdown(signal) → onApplicationShutdown(signal)
+  // during which TypeORM disconnects (DB), the HTTP server stops
+  // accepting connections, Redis is QUIT, the Socket.IO server closes,
+  // and the SchedulerRegistry is drained of cron/interval jobs.
+  // ─────────────────────────────────────────────────────────────────────
+  let shuttingDown = false;
+  let forceTimer: NodeJS.Timeout | undefined;
+
+  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.log(`Received ${signal}, starting graceful shutdown…`);
+
+    // Safety net: never hang forever. Force exit before the platform's
+    // SIGKILL window if anything in the shutdown chain stalls.
+    forceTimer = setTimeout(() => {
+      logger.error(
+        `Graceful shutdown timed out after ${FORCE_SHUTDOWN_TIMEOUT_MS}ms — forcing exit.`,
+      );
+      process.exit(1);
+    }, FORCE_SHUTDOWN_TIMEOUT_MS);
+    forceTimer.unref();
+
+    try {
+      await app.close();
+      logger.log('Graceful shutdown complete.');
+      if (forceTimer) clearTimeout(forceTimer);
+      process.exit(0);
+    } catch (err) {
+      logger.error(
+        `Error during graceful shutdown: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      if (forceTimer) clearTimeout(forceTimer);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 bootstrap();

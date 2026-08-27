@@ -336,11 +336,19 @@ On-chain Soroban NFT badge minting.
 
 ## Multiplayer Queue
 
-Real-time matchmaking via Socket.IO. See the WebSocket gateway for event names.
+Real-time matchmaking via Socket.IO. The gateway shares the Nest HTTP server
+(`ws://localhost:3001/socket.io`) and is closed automatically during graceful
+shutdown (#GracefulShutdown).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| *(Socket.IO)* | `ws://localhost:3001` | JWT | Connect to the multiplayer matchmaking gateway |
+| *(Socket.IO)* | `ws://localhost:3001/socket.io` | JWT | Connect to the multiplayer matchmaking gateway |
+
+### Socket.IO events
+
+| Direction | Event | Payload | Description |
+|-----------|-------|---------|-------------|
+| server → client | `match_found` | `MatchResultDto` (`{ matchId, playerIds, playerUsernames, status, gameMode, skillLevel, averageWaitTime, createdAt }`) | Emitted to all clients when the matchmaking cron pairs two players. |
 
 ---
 
