@@ -76,11 +76,16 @@ pub enum DataKey {
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 fn get_schema_version(e: &Env) -> u32 {
-    e.storage().persistent().get(&DataKey::SchemaVersion).unwrap_or(0)
+    e.storage()
+        .persistent()
+        .get(&DataKey::SchemaVersion)
+        .unwrap_or(0)
 }
 
 fn set_schema_version(e: &Env) {
-    e.storage().persistent().set(&DataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
+    e.storage()
+        .persistent()
+        .set(&DataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
 }
 
 // ---------------------------------------------------------------------
@@ -236,12 +241,14 @@ impl StellarHunts {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
 
-            env.storage()
-                .persistent()
-                .set(&DataKey::QuestionsByLevel(level.clone(), new_idx), &question_id);
-            env.storage()
-                .persistent()
-                .set(&DataKey::QuestionPerLevelIndex(level.clone()), &(new_idx + 1));
+            env.storage().persistent().set(
+                &DataKey::QuestionsByLevel(level.clone(), new_idx),
+                &question_id,
+            );
+            env.storage().persistent().set(
+                &DataKey::QuestionPerLevelIndex(level.clone()),
+                &(new_idx + 1),
+            );
 
             let last_old_idx = old_idx - 1;
             for i in 0..old_idx {
@@ -257,14 +264,13 @@ impl StellarHunts {
                             .persistent()
                             .get(&DataKey::QuestionsByLevel(old_level.clone(), j + 1))
                             .unwrap_or(0u64);
-                        env.storage().persistent().set(
-                            &DataKey::QuestionsByLevel(old_level.clone(), j),
-                            &next_qid,
-                        );
+                        env.storage()
+                            .persistent()
+                            .set(&DataKey::QuestionsByLevel(old_level.clone(), j), &next_qid);
                     }
-                    env.storage().persistent().remove(
-                        &DataKey::QuestionsByLevel(old_level.clone(), last_old_idx),
-                    );
+                    env.storage()
+                        .persistent()
+                        .remove(&DataKey::QuestionsByLevel(old_level.clone(), last_old_idx));
                     break;
                 }
             }
@@ -310,10 +316,8 @@ impl StellarHunts {
         env.storage()
             .persistent()
             .set(&DataKey::RetiredQuestion(question_id), &true);
-        env.events().publish(
-            (Symbol::new(&env, "question_retired"),),
-            (question_id,),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "question_retired"),), (question_id,));
     }
 
     pub fn set_nft_contract_address(env: Env, new_address: Address) {
