@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { VerificationService } from '../services/verification.service';
+import { VerificationService } from '../services/verification.service';
 import type {
   WalletVerificationOptions,
   WalletTokenPayload,
@@ -17,7 +17,7 @@ export const WALLET_OPTIONS_KEY = 'wallet_options';
 export const WalletOptions = (options: WalletVerificationOptions) =>
   Reflector.createDecorator<WalletVerificationOptions>({
     key: WALLET_OPTIONS_KEY,
-    value: options,
+    transform: () => options,
   });
 
 @Injectable()

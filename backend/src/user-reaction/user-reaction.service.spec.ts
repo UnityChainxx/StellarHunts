@@ -1,6 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import { UserReactionService } from './user-reaction.service';
 import { Reaction } from './entities/reaction.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -8,15 +7,14 @@ import { jest } from '@jest/globals'; // Import jest to declare it
 
 describe('UserReactionService', () => {
   let service: UserReactionService;
-  let repository: Repository<Reaction>;
 
   const mockRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-    delete: jest.fn(),
-    createQueryBuilder: jest.fn(),
+    create: jest.fn<any>(),
+    save: jest.fn<any>(),
+    find: jest.fn<any>(),
+    findOne: jest.fn<any>(),
+    delete: jest.fn<any>(),
+    createQueryBuilder: jest.fn<any>(),
   };
 
   beforeEach(async () => {
@@ -31,7 +29,6 @@ describe('UserReactionService', () => {
     }).compile();
 
     service = module.get<UserReactionService>(UserReactionService);
-    repository = module.get<Repository<Reaction>>(getRepositoryToken(Reaction));
   });
 
   afterEach(() => {
@@ -122,7 +119,7 @@ describe('UserReactionService', () => {
         addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         groupBy: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([
+        getRawMany: jest.fn<any>().mockResolvedValue([
           { emoji: '👍', count: '3' },
           { emoji: '❤️', count: '2' },
           { emoji: '🤔', count: '1' },

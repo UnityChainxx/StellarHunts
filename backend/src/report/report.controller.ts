@@ -14,8 +14,8 @@ import {
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesGuard } from 'src/common/gaurds/roles.gaurds';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/gaurds/roles.gaurds';
 
 @Controller('report')
 @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))

@@ -1,4 +1,4 @@
-import { Module, type DynamicModule } from '@nestjs/common';
+import { Module, type DynamicModule, type Provider } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -17,7 +17,7 @@ export interface MaintenanceModeModuleOptions {
 @Module({})
 export class MaintenanceModeModule {
   static forRoot(options: MaintenanceModeModuleOptions = {}): DynamicModule {
-    const providers = [MaintenanceModeService, AdminGuard];
+    const providers: Provider[] = [MaintenanceModeService, AdminGuard];
 
     // Add global maintenance guard if enabled
     if (options.enableGlobalGuard !== false) {

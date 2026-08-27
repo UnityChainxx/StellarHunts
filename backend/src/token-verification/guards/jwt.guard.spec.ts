@@ -34,7 +34,7 @@ describe('JwtGuard', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        JwtGuard,
+        { provide: JwtGuard, useFactory: () => new JwtGuard(verificationService, reflector) },
         { provide: VerificationService, useValue: verificationService },
         { provide: Reflector, useValue: reflector },
       ],

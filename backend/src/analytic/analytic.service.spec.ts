@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticService } from './analytic.service';
+import { PG_POOL } from './database/postgres.provider';
 
 // Provide a no-op CacheService so Nest's reflection-based DI can resolve
 // the (optional) constructor parameter introduced in #107.
@@ -21,6 +22,7 @@ describe('AnalyticService', () => {
       providers: [
         AnalyticService,
         { provide: 'CacheService', useValue: NOOP_CACHE },
+        { provide: PG_POOL, useValue: undefined },
       ],
     }).compile();
 

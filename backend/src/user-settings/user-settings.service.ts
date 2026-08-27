@@ -4,9 +4,10 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import {
-  type UserSettings,
+  UserSettings,
   Language,
   Theme,
   NotificationFrequency,
@@ -24,6 +25,7 @@ export class UserSettingsService {
   private readonly logger = new Logger(UserSettingsService.name);
 
   constructor(
+    @InjectRepository(UserSettings)
     private readonly userSettingsRepository: Repository<UserSettings>,
   ) {}
 
@@ -207,6 +209,7 @@ export class UserSettingsService {
     }
 
     // Remove internal fields
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, ...exportableSettings } = userSettings;
     return exportableSettings;
   }
