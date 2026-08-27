@@ -24,29 +24,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cache Scarb / cargo artifacts and any (future) root-level
+      # Cache Cargo artifacts and any (future) root-level
       # node_modules. Keyed on the lockfile hash so a dependency change
       # invalidates the entry, but identical lockfiles re-use the
       # previous cache. The `**/node_modules` path is currently a
       # no-op target because no JS step runs in this workflow — it is
       # included so that when npm-based jobs are added in the future,
       # the cache key already covers them.
-      - name: Cache Scarb, Cargo and node_modules
+      - name: Cache Cargo and node_modules
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cache/scarb
-            ~/.local/share/scarb
-            ~/.scarb
             onchain/target
             **/node_modules
-          key: ${{ runner.os }}-scarb-cargo-${{ hashFiles('onchain/Scarb.lock', 'onchain/Scarb.toml', '**/package-lock.json') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', 'onchain/Cargo.toml', '**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-scarb-cargo-
+            ${{ runner.os }}-cargo-
 
-      - uses: software-mansion/setup-scarb@v1
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -80,22 +76,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Scarb, Cargo and node_modules
+      - name: Cache Cargo and node_modules
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cache/scarb
-            ~/.local/share/scarb
-            ~/.scarb
             onchain/target
             **/node_modules
-          key: ${{ runner.os }}-scarb-cargo-${{ hashFiles('onchain/Scarb.lock', 'onchain/Scarb.toml', '**/package-lock.json') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', 'onchain/Cargo.toml', '**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-scarb-cargo-
+            ${{ runner.os }}-cargo-
 
-      - uses: software-mansion/setup-scarb@v1
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
