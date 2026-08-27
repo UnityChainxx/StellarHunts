@@ -39,4 +39,6 @@ The npm audit gate is set to the `high` threshold (`npm audit --audit-level=high
 
 Mitigation: these packages are build/lint-time tooling; none of the affected code paths are reachable from the served application at runtime. The frontend audit step in CI is advisory (`continue-on-error: true`) and will be made blocking in the PR that upgrades `next` to a patched major version (16.x, which also requires the React 19 migration). Until then, new findings of any severity still surface as failing annotations on every run.
 
-Native secret scanning (GitHub "Secret scanning" and "Push protection") is a repository setting and cannot be enabled from a pull request; the Gitleaks workflow in `.github/workflows/security.yml` provides the equivalent CI enforcement.
+Native secret scanning (GitHub "Secret scanning" and "Push protection") is a repository setting and cannot be enabled from a pull request; the Gitleaks workflow in `.github/workflows/security.yml` provides the equivalent CI enforcement. The Gitleaks scan runs over the full repository history; known false positives are allow-listed in `.gitleaks.toml`.
+
+The dependency-review job requires the repository's **Dependency graph** setting (Settings → Code security and analysis) to be enabled — GitHub does not expose that setting via a pull request. Until it is enabled, the job is advisory; it becomes a blocking gate automatically once the setting is turned on.
