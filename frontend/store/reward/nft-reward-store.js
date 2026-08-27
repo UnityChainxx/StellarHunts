@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { apiUrl } from '@/lib/api';
 
-const API_URL = 'http://localhost:8000/api/rewards'; // Update with your actual API endpoint
+const API_URL = apiUrl('/rewards');
 
 const useRewardStore = create(
   devtools(
