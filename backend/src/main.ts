@@ -1,29 +1,3 @@
-import { Module } from "@nestjs/common"
-import { AppController } from "./app.controller"
-import { AppService } from "./app.service"
-import { TypeOrmModule } from "@nestjs/typeorm"
-import { ConfigModule, ConfigService } from "@nestjs/config"
-import { AuthModule } from "./auth/auth.module"
-import { UserInventoryModule } from "./user-inventory/user-inventory.module"
-import { CacheModule } from "./cache/cache.module"
-import appConfig from "config/app.config"
-import databaseConfig from "config/database.config"
-import { PuzzleCategoryModule } from "./puzzle-category/puzzle-category.module"
-import { RewardModule } from "./reward/reward.module"
-import { PuzzleModule } from "./puzzle/puzzle.module"
-import { PuzzleSubmissionModule } from "./puzzle-submission/puzzle-submission.module"
-import { ContentModule } from "./content/content.module"
-import { UserReportCardModule } from "./user-report-card/user-report-card.module"
-import { PuzzleDependencyModule } from "./puzzle-dependency/puzzle-dependency.module"
-import { TimeTrialModule } from "./time-trial/time-trial.module"
-import { InAppNotificationsModule } from "./in-app-notifications/in-app-notifications.module"
-import { User } from "./auth/entities/user.entity"
-import { TimeTrial } from "./time-trial/time-trial.entity"
-import { Puzzle } from "./puzzle/puzzle.entity"
-import { Category } from "./puzzle-category/entities/category.entity"
-import { AnalyticModule } from './analytic/analytic.module';
-import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { ApiKeyModule } from './api-key/api-key.module';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -89,34 +63,18 @@ async function bootstrap(): Promise<void> {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
 
+  // Global request validation (#335). `whitelist` strips properties that are
+  // not declared on the request DTO, and `forbidNonWhitelisted` turns any
+  // remaining unknown property into a 400 so public APIs reject unexpected
+  // fields instead of silently ignoring them. Exception: handlers that must
+  // accept extra fields (e.g. third-party webhooks) can opt out with a local
+  // pipe, e.g. `@UsePipes(new ValidationPipe({ forbidNonWhitelisted: false }))`.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false,
+      forbidNonWhitelisted: true,
     }),
-    PuzzleModule,
-    PuzzleSubmissionModule,
-    ContentModule,
-    UserReportCardModule,
-    PuzzleDependencyModule,
-    TimeTrialModule,
-    InAppNotificationsModule,
-    PuzzleTranslationModule,
-    NFTClaimModule,
-    AnalyticModule,
-    RewardShopModule,
-    ApiKeyModule,
-    UserReactionModule,
-    MultiplayerQueueModule,
-    // Redis-backed caching + single-flight for the read-heavy endpoints
-    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
-    CacheModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
   );
 
   const apiVersion = configService.get<string>('appConfig.apiVersion') ?? '1.0';
