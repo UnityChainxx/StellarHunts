@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MultiplayerQueueService } from './multiplayer-queue.service';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
 import { Match } from './entities/match.entity';
+import { DataSource } from 'typeorm';
 import { jest } from '@jest/globals';
 
 // ---------------------------------------------------------------------------
@@ -30,8 +31,7 @@ const gameModeArb = fc.constantFrom('classic', 'blitz', 'survival');
 /** Wait time in seconds (0 … 600). */
 const waitTimeArb = fc.integer({ min: 0, max: 600 });
 
-/** A single player (Queue entity shape) for testing grouping/compatibility. */
-const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
+/** A single player (Queue entity shape) for testing grouping/compatibility. */  const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
   id: uuidArb,
   userId: uuidArb,
   username: usernameArb,
@@ -54,7 +54,7 @@ const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
   createdAt: fc.date({ min: new Date(0), max: new Date() }),
   matchedAt: fc.constant(null),
   leftAt: fc.constant(null),
-} as unknown as Queue);
+});
 
 /** A batch of players in the queue. */
 const queuePlayerBatchArb = fc.array(queuePlayerArb, {
@@ -657,8 +657,8 @@ describe('MultiplayerQueueService — property-based', () => {
               createdAt: new Date(now - Math.floor(Math.random() * 60000)),
             }));
 
-            mocks.queueRepository.find.mockResolvedValue(entriesWithWait);
-            mocks.matchRepository.count.mockResolvedValue(matchesToday);
+            (mocks.queueRepository.find as any).mockResolvedValue(entriesWithWait);
+            (mocks.matchRepository.count as any).mockResolvedValue(matchesToday);
 
             const service = module.get<MultiplayerQueueService>(
               MultiplayerQueueService,
@@ -759,6 +759,8 @@ async function buildModule(): Promise<{
         provide: getRepositoryToken(Match),
         useValue: mocks.matchRepository,
       },
+      { provide: DataSource, useValue: { transaction: jest.fn() } },
+      { provide: Function, useValue: mocks.queueRepository },
     ],
   }).compile();
 

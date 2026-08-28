@@ -16,8 +16,8 @@ export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService?: ConfigService,
+    private readonly jwtService: JwtService = undefined as any,
+    private readonly configService: ConfigService = undefined as any,
   ) {}
 
   /**

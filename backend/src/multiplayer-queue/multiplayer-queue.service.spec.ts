@@ -4,6 +4,7 @@ import type { Repository } from 'typeorm';
 import { MultiplayerQueueService } from './multiplayer-queue.service';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
 import { Match } from './entities/match.entity';
+import { DataSource } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest } from '@jest/globals';
 
@@ -11,7 +12,6 @@ describe('MultiplayerQueueService', () => {
   let service: MultiplayerQueueService;
   let queueRepository: Repository<Queue>;
   let matchRepository: Repository<Match>;
-
   const mockQueueRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
@@ -40,6 +40,8 @@ describe('MultiplayerQueueService', () => {
           provide: getRepositoryToken(Match),
           useValue: mockMatchRepository,
         },
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
+        { provide: Function, useValue: mockQueueRepository },
       ],
     }).compile();
 
@@ -72,9 +74,9 @@ describe('MultiplayerQueueService', () => {
         preferences: {},
       };
 
-      mockQueueRepository.findOne.mockResolvedValue(null); // No existing entry
+      (mockQueueRepository.findOne as any).mockResolvedValue(null); // No existing entry
       mockQueueRepository.create.mockReturnValue(mockQueueEntry);
-      mockQueueRepository.save.mockResolvedValue(mockQueueEntry);
+      (mockQueueRepository.save as any).mockResolvedValue(mockQueueEntry);
 
       const result = await service.joinQueue(joinQueueDto);
 
@@ -94,7 +96,7 @@ describe('MultiplayerQueueService', () => {
       };
 
       const existingEntry = { id: 'existing', userId: joinQueueDto.userId };
-      mockQueueRepository.findOne.mockResolvedValue(existingEntry);
+      (mockQueueRepository.findOne as any).mockResolvedValue(existingEntry);
 
       await expect(service.joinQueue(joinQueueDto)).rejects.toThrow(
         BadRequestException,
@@ -112,8 +114,8 @@ describe('MultiplayerQueueService', () => {
         username: 'testuser',
       };
 
-      mockQueueRepository.findOne.mockResolvedValue(queueEntry);
-      mockQueueRepository.save.mockResolvedValue({
+      (mockQueueRepository.findOne as any).mockResolvedValue(queueEntry);
+      (mockQueueRepository.save as any).mockResolvedValue({
         ...queueEntry,
         status: QueueStatus.LEFT,
         leftAt: expect.any(Date),
@@ -131,7 +133,7 @@ describe('MultiplayerQueueService', () => {
 
     it('should throw NotFoundException if user not in queue', async () => {
       const userId = '123e4567-e89b-12d3-a456-426614174000';
-      mockQueueRepository.findOne.mockResolvedValue(null);
+      (mockQueueRepository.findOne as any).mockResolvedValue(null);
 
       await expect(service.leaveQueue(userId)).rejects.toThrow(
         NotFoundException,
@@ -155,8 +157,8 @@ describe('MultiplayerQueueService', () => {
         matchedAt: null,
       };
 
-      mockQueueRepository.findOne.mockResolvedValue(queueEntry);
-      mockQueueRepository.save.mockResolvedValue({
+      (mockQueueRepository.findOne as any).mockResolvedValue(queueEntry);
+      (mockQueueRepository.save as any).mockResolvedValue({
         ...queueEntry,
         waitTime: 30,
       });
@@ -170,7 +172,7 @@ describe('MultiplayerQueueService', () => {
 
     it('should return null if user not in queue', async () => {
       const userId = '123e4567-e89b-12d3-a456-426614174000';
-      mockQueueRepository.findOne.mockResolvedValue(null);
+      (mockQueueRepository.findOne as any).mockResolvedValue(null);
 
       const result = await service.getQueueStatus(userId);
 
@@ -193,8 +195,8 @@ describe('MultiplayerQueueService', () => {
         },
       ];
 
-      mockQueueRepository.find.mockResolvedValue(mockQueueEntries);
-      mockMatchRepository.count.mockResolvedValue(5);
+      (mockQueueRepository.find as any).mockResolvedValue(mockQueueEntries);
+      (mockMatchRepository.count as any).mockResolvedValue(5);
 
       const result = await service.getQueueStats();
 
@@ -408,13 +410,13 @@ describe('MultiplayerQueueService', () => {
 
   describe('cleanupOldEntries', () => {
     it('should delete entries older than one day with status LEFT', async () => {
-      mockQueueRepository.delete.mockResolvedValue({ affected: 3 });
+      (mockQueueRepository.delete as any).mockResolvedValue({ affected: 3 });
 
       await service.cleanupOldEntries();
 
       expect(mockQueueRepository.delete).toHaveBeenCalledTimes(1);
 
-      const deleteCall = mockQueueRepository.delete.mock.calls[0][0];
+      const deleteCall = (mockQueueRepository.delete as unknown as jest.Mock).mock.calls[0][0] as any;
 
       // Should filter by status LEFT
       expect(deleteCall.status).toBe(QueueStatus.LEFT);
@@ -431,11 +433,11 @@ describe('MultiplayerQueueService', () => {
     });
 
     it('should not delete recent or waiting entries', async () => {
-      mockQueueRepository.delete.mockResolvedValue({ affected: 0 });
+      (mockQueueRepository.delete as any).mockResolvedValue({ affected: 0 });
 
       await service.cleanupOldEntries();
 
-      const deleteCall = mockQueueRepository.delete.mock.calls[0][0];
+      const deleteCall = (mockQueueRepository.delete as unknown as jest.Mock).mock.calls[0][0] as any;
 
       // Should only target LEFT status entries
       expect(deleteCall.status).toBe(QueueStatus.LEFT);

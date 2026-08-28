@@ -34,6 +34,7 @@ describe('VerificationService', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
         { provide: Function, useValue: configService },
+        { provide: Function, useValue: configService },
       ],
     }).compile();
 
