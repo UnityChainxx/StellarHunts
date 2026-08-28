@@ -3,10 +3,13 @@
 // remains `no_std` for the WASM build.
 #![cfg_attr(not(test), no_std)]
 
+extern crate alloc;
+
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env, String,
     Symbol,
 };
+use alloc::string::ToString;
 
 // Use the shared `Levels` enum from the types crate so we can compile
 // standalone without depending on the game contract (which would create
@@ -47,7 +50,13 @@ pub enum Error {
     NotAuthorized = 1,
     AlreadyHasBadge = 2,
     AlreadyInitialized = 3,
+    InvalidBaseUri = 4,
+    MetadataTooLarge = 5,
 }
+
+const MAX_BASE_URI_LEN: usize = 200;
+const MAX_NAME_LEN: usize = 64;
+const MAX_SYMBOL_LEN: usize = 16;
 
 // ---------------------------------------------------------------------
 // Contract
@@ -71,6 +80,21 @@ impl StellarHuntsNft {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
         admin.require_auth();
+
+        let base_uri_text = base_uri.to_string();
+        let name_text = name.to_string();
+        let symbol_text = symbol.to_string();
+
+        if base_uri_text.len() > MAX_BASE_URI_LEN
+            || (!base_uri_text.starts_with("ipfs://")
+                && !base_uri_text.starts_with("https://"))
+        {
+            panic_with_error!(&env, Error::InvalidBaseUri);
+        }
+
+        if name_text.len() > MAX_NAME_LEN || symbol_text.len() > MAX_SYMBOL_LEN {
+            panic_with_error!(&env, Error::MetadataTooLarge);
+        }
 
         env.storage().instance().set(&NftDataKey::Admin, &admin);
         env.storage()
