@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UsePipes,
-  ValidationPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { PuzzleVersioningService } from './puzzle-versioning.service';
 import { CreatePuzzleVersionDto } from './dto/create-puzzle-version.dto';
 
@@ -22,7 +14,7 @@ export class PuzzleVersioningController {
   }
 
   @Post('versions')
-  @UsePipes(new ValidationPipe({ transform: true }))
+  // Relies on the global validation pipe (issue #340).
   createNewVersion(@Body() createPuzzleVersionDto: CreatePuzzleVersionDto) {
     return this.puzzleVersioningService.createNewVersion(
       createPuzzleVersionDto,

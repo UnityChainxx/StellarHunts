@@ -18,6 +18,9 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/gaurds/roles.gaurds';
 
 @Controller('report')
+// Stricter than the global policy (issue #340): report payloads are small,
+// stable shapes where unknown fields are rejected outright rather than
+// silently stripped. Kept as a justified, explicit override.
 @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
