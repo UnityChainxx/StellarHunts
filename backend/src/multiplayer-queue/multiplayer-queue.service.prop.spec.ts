@@ -84,8 +84,8 @@ const joinQueueDtoArb = fc.record({
 // ---------------------------------------------------------------------------
 
 function createMockRepos(): {
-  queueRepository: Record<string, jest.Mock>;
-  matchRepository: Record<string, jest.Mock>;
+  queueRepository: any;
+  matchRepository: any;
 } {
   return {
     queueRepository: {
