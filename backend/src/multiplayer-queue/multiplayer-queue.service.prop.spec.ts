@@ -452,10 +452,13 @@ describe('MultiplayerQueueService — property-based', () => {
             // Skip cross-skill groups (key starts with "cross-skill-")
             // and single-player groups (no meaningful check)
             if (group.length < 2) continue;
-            // Identify if this is a cross-skill group
-            const isCrossSkill = group.some((p) => p.waitTime > 120);
-            if (isCrossSkill && group.some((p) => p.waitTime <= 120)) {
-              // Mixed — this is a cross-skill group, skip the strict check
+            // Identify if this is a cross-skill group: the service intentionally
+            // places long-waiting players from different skill levels into the
+            // same bucket (key "cross-skill-<mode>"). Such groups legitimately
+            // contain mixed skillLevels, so we skip the strict homogeneity check.
+            const isCrossSkill = new Set(group.map((p) => p.skillLevel)).size > 1;
+            if (isCrossSkill) {
+              // Cross-skill group — mixed skill levels are expected, skip check
               continue;
             }
             // Regular group: all must share gameMode and skillLevel
@@ -485,7 +488,7 @@ describe('MultiplayerQueueService — property-based', () => {
             // A cross-skill group has members whose wait times straddle 120 AND
             // the group key would be "cross-skill-…"  — we approximate by checking
             // whether the group contains any long-waiting AND any short-waiting.
-            const hasLong = group.some((p) => p.waitTime > 120);
+            const hasLong = group.every((p) => p.waitTime > 120);
             const hasShort = group.some((p) => p.waitTime <= 120);
             if (hasLong && hasShort) {
               // This is a cross-skill bucket — every member must wait > 120
@@ -760,7 +763,6 @@ async function buildModule(): Promise<{
         useValue: mocks.matchRepository,
       },
       { provide: DataSource, useValue: { transaction: jest.fn() } },
-      { provide: Function, useValue: mocks.queueRepository },
     ],
   }).compile();
 

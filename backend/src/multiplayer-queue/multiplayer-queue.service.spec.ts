@@ -41,7 +41,6 @@ describe('MultiplayerQueueService', () => {
           useValue: mockMatchRepository,
         },
         { provide: DataSource, useValue: { transaction: jest.fn() } },
-        { provide: Function, useValue: mockQueueRepository },
       ],
     }).compile();
 
@@ -196,7 +195,6 @@ describe('MultiplayerQueueService', () => {
       ];
 
       (mockQueueRepository.find as any).mockResolvedValue(mockQueueEntries);
-      (mockMatchRepository.count as any).mockResolvedValue(5);
       (mockMatchRepository.count as any).mockResolvedValue(5);
 
       const result = await service.getQueueStats();
