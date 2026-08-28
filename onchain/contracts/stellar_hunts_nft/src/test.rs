@@ -84,40 +84,6 @@ fn test_double_mint_rejected() {
         &String::from_str(&env, "SHB"),
     );
 
-
-    
-fn admin(env: &Env) -> Address {
-    Address::generate(env)
-}
-
-fn recipient(env: &Env) -> Address {
-    Address::generate(env)
-}
-
-#[test]
-fn test_init_and_has_level_badge() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let admin = admin(&env);
-    let game = recipient(&env);
-
-    let contract_id = env.register_contract(None, StellarHuntsNft);
-    let client = StellarHuntsNftClient::new(&env, &contract_id);
-
-    client.init(
-        &admin,
-        &game,
-        &String::from_str(&env, "ipfs://placeholder/"),
-        &String::from_str(&env, "StellarHuntsBadge"),
-        &String::from_str(&env, "SHB"),
-    );
-
-    // Initially no badges.
-    let r = recipient(&env);
-    assert!(!client.has_level_badge(&r, &crate::Levels::Easy));
-}
-
-
     let game = FakeGameContractClient::new(&env, &game_id);
     let r = recipient(&env);
 
