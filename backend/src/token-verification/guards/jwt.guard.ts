@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { VerificationService } from '../services/verification.service';
+import { VerificationService } from '../services/verification.service';
 import type { JwtVerificationOptions } from '../interfaces/token.interface';
 
 export const JWT_OPTIONS_KEY = 'jwt_options';

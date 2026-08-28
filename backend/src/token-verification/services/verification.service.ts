@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
-import type { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { verifyMessage } from 'ethers';
 import type {

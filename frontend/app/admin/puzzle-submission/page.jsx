@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 
 const difficulties = ["Easy", "Medium", "Hard", "Expert"];

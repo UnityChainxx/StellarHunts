@@ -1,4 +1,6 @@
 import * as React from "react"
+
+/** @typedef {React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean, variant?: string, size?: string }} ButtonProps */
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
 
@@ -34,6 +36,7 @@ const buttonVariants = cva(
   }
 )
 
+/** @type {React.ForwardRefExoticComponent<ButtonProps & React.RefAttributes<any>>} */
 const Button = React.forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
   return (

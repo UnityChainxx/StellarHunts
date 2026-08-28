@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import type { VerificationService } from '../services/verification.service';
+import { VerificationService } from '../services/verification.service';
 
 @Injectable()
 export class TokenLoggingInterceptor implements NestInterceptor {
