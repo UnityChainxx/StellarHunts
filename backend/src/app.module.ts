@@ -58,6 +58,9 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
         DATABASE_USER: Joi.string().required(),
         DATABASE_PASSWORD: Joi.string().required(),
         DATABASE_NAME: Joi.string().required(),
+        STELLAR_MODE: Joi.string().valid('mock', 'live').default('live'),
+        NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+        STELLAR_NETWORK: Joi.string().valid('testnet', 'pubnet').default('testnet'),
       }),
     }),
     TypeOrmModule.forRootAsync({

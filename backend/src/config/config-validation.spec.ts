@@ -9,6 +9,9 @@ const validationSchema = Joi.object({
   DATABASE_USER: Joi.string().required(),
   DATABASE_PASSWORD: Joi.string().required(),
   DATABASE_NAME: Joi.string().required(),
+  STELLAR_MODE: Joi.string().valid('mock', 'live').default('live'),
+  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  STELLAR_NETWORK: Joi.string().valid('testnet', 'pubnet').default('testnet'),
 });
 
 describe('Config validation schema', () => {
@@ -39,6 +42,29 @@ describe('Config validation schema', () => {
     });
     expect(error).toBeUndefined();
     expect(value.DATABASE_PORT).toBe(5432);
+  });
+
+  it('defaults Stellar mode to live', () => {
+    const env = {
+      JWT_SECRET: 'super-secret',
+      DATABASE_HOST: 'localhost',
+      DATABASE_USER: 'postgres',
+      DATABASE_PASSWORD: 'password',
+      DATABASE_NAME: 'stellarhunts',
+    };
+    const { error, value } = validationSchema.validate(env, {
+      allowUnknown: true,
+    });
+    expect(error).toBeUndefined();
+    expect(value.STELLAR_MODE).toBe('live');
+  });
+
+  it('rejects unknown Stellar modes', () => {
+    const { error } = validationSchema.validate(
+      { STELLAR_MODE: 'sandbox' },
+      { allowUnknown: true },
+    );
+    expect(error).toBeDefined();
   });
 
   it('fails when JWT_SECRET is missing', () => {
