@@ -43,6 +43,7 @@ describe('PuzzleCategoryService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PuzzleCategoryService,
@@ -97,7 +98,14 @@ describe('PuzzleCategoryService', () => {
         },
       ];
 
-      mockCategoryRepository.createQueryBuilder().getMany.mockResolvedValue(mockCategories);
+      mockCategoryRepository.createQueryBuilder.mockReturnValueOnce({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockCategories),
+      });
 
       const result = await service.getPuzzlesByCategory();
 

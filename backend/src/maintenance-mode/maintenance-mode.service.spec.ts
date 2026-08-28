@@ -1,15 +1,13 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import type { Repository } from 'typeorm';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { MaintenanceModeService } from './maintenance-mode.service';
 import { MaintenanceConfig } from './entities/maintenance-config.entity';
 import { jest } from '@jest/globals';
 
 describe('MaintenanceModeService', () => {
   let service: MaintenanceModeService;
-  let repository: Repository<MaintenanceConfig>;
-  let configService: ConfigService;
 
   const mockRepository: any = {
     create: jest.fn(),
@@ -28,19 +26,25 @@ describe('MaintenanceModeService', () => {
       providers: [
         MaintenanceModeService,
         {
-          provide: Repository,
+          provide: getRepositoryToken(MaintenanceConfig),
           useValue: mockRepository,
         },
         {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: 'ConfigService',
+          useValue: mockConfigService,
+        },
+        {
+          provide: Function,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
     service = module.get<MaintenanceModeService>(MaintenanceModeService);
-    repository = module.get<Repository<MaintenanceConfig>>(Repository);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   afterEach(() => {

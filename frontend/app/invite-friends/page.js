@@ -3,8 +3,8 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Trophy, 
+import {
+  Trophy,
   TrendingUp,
   Share2
 } from "lucide-react";
@@ -14,6 +14,14 @@ import ReferralCard from "@/components/ReferralCard";
 
 export default function InviteFriendsPage() {
   const [referralLink] = useState("https://nft-hunt.com/ref/user123");
+
+  const shareReferral = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: "Join StellarHunts", url: referralLink });
+      return;
+    }
+    await navigator.clipboard?.writeText(referralLink);
+  };
 
   // Mock data for invited users
   const invitedUsers = [
@@ -108,7 +116,7 @@ export default function InviteFriendsPage() {
                   </div>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
                     style={{ width: `${(referralStats.totalInvites / 10) * 100}%` }}
                   ></div>
@@ -150,8 +158,8 @@ export default function InviteFriendsPage() {
               Ready to Share the Adventure?
             </h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Invite your friends to join StellarHunts and unlock exclusive rewards together. 
-              The more friends you invite, the more rewards you'll earn!
+              Invite your friends to join StellarHunts and unlock exclusive rewards together.
+              The more friends you invite, the more rewards you&apos;ll earn!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
@@ -174,4 +182,4 @@ export default function InviteFriendsPage() {
       </div>
     </div>
   );
-} 
+}

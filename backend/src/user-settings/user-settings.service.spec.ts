@@ -26,7 +26,7 @@ describe('UserSettingsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserSettingsService,
-        { provide: Repository, useValue: mockRepository },
+        { provide: getRepositoryToken(UserSettings), useValue: mockRepository },
       ],
     }).compile();
     service = module.get(UserSettingsService);

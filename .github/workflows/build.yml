@@ -42,9 +42,9 @@ jobs:
             ~/.scarb
             onchain/target
             **/node_modules
-          key: ${{ runner.os }}-scarb-cargo-${{ hashFiles('onchain/Scarb.lock', 'onchain/Scarb.toml', '**/package-lock.json') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', '**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-scarb-cargo-
+            ${{ runner.os }}-cargo-
 
       - uses: software-mansion/setup-scarb@v1
       - name: Install Rust toolchain
@@ -91,9 +91,9 @@ jobs:
             ~/.scarb
             onchain/target
             **/node_modules
-          key: ${{ runner.os }}-scarb-cargo-${{ hashFiles('onchain/Scarb.lock', 'onchain/Scarb.toml', '**/package-lock.json') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', '**/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-scarb-cargo-
+            ${{ runner.os }}-cargo-
 
       - uses: software-mansion/setup-scarb@v1
       - name: Install Rust toolchain
@@ -156,23 +156,13 @@ jobs:
 
       - name: Lint
         working-directory: backend
-        # Advisory only — surfaced to the annotations panel until backend's 68+
-        # pre-existing no-unused-vars errors and two pre-existing parse errors
-        # in src/main.ts:99 and src/user-settings/user-settings.service.spec.ts:237
-        # are addressed in a follow-up PR. Issue #109's expected outcome is to
-        # add the job; the gate is in place but starts non-blocking so this PR
-        # can land while the codebase is cleaned up.
+        # The backend currently contains pre-existing lint errors across
+        # unrelated modules; keep this report visible without blocking CI.
         continue-on-error: true
         run: npm run lint
 
       - name: npm audit
         working-directory: backend
-        # Issue #110 acceptance: CI fails on npm audit findings. The repo
-        # currently has ~50 known high-severity transitive advisories
-        # (mostly from `aws-sdk v2` and `webpack` via `@nestjs/cli`) that
-        # predate this gate. The strict gate is therefore set to "critical"
-        # initially so the gate is REAL and fails on real exposure; "high"
-        # hardening is the next-stage follow-up.
         run: npm audit --audit-level=critical
         continue-on-error: true
 
@@ -196,10 +186,6 @@ jobs:
 
       - name: Run unit tests
         working-directory: backend
-        # Advisory only — backend tests fail on pre-existing source issues that
-        # predate the #109 gate change. Once those are fixed downstream, drop
-        # `continue-on-error: true`.
-        continue-on-error: true
         run: npm test -- --passWithNoTests
 
   # ─────────────────────────────────────────────────────────────────────
@@ -224,15 +210,10 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        # Now that @types/node is in devDependencies (added in commit 2a7ce2a),
-        # `next lint` should pass. Kept non-blocking while we verify.
-        continue-on-error: true
         run: npm run lint
 
       - name: npm audit
         working-directory: frontend
-        # See backend-lint npm audit comment. Same rationale; start strict at
-        # critical, advance to high in a follow-up PR.
         run: npm audit --audit-level=critical
         continue-on-error: true
 
@@ -256,9 +237,6 @@ jobs:
 
       - name: Build
         working-directory: frontend
-        # Advisory only — pending fix-up of pre-existing frontend build errors
-        # in the codebase (separate PR).
-        continue-on-error: true
         run: npm run build
 
   frontend-test:

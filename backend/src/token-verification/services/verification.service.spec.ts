@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { VerificationService } from './verification.service';
-import type { JwtPayload, WalletTokenPayload, TokenValidationResult } from '../interfaces/token.interface';
+import type { JwtPayload, WalletTokenPayload } from '../interfaces/token.interface';
+import * as ethers from 'ethers';
 
 describe('VerificationService', () => {
   let service: VerificationService;
@@ -33,8 +34,6 @@ describe('VerificationService', () => {
         VerificationService,
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
-        { provide: Function, useValue: configService },
-        { provide: Function, useValue: configService },
       ],
     }).compile();
 
@@ -131,9 +130,14 @@ describe('VerificationService', () => {
     };
 
     it('validates a correct wallet signature', async () => {
+      const wallet = ethers.Wallet.createRandom();
+      const message = validPayload.message;
+      const signature = await wallet.signMessage(message);
       const result = await service.validateWalletToken({
         ...validPayload,
-        address: '0xRecoveredAddress',
+        address: wallet.address,
+        signature,
+        message,
       });
 
       expect(result.isValid).toBe(true);
@@ -159,7 +163,6 @@ describe('VerificationService', () => {
     });
 
     it('returns invalid if signature recovery fails', async () => {
-      const ethers = require('ethers');
       jest.spyOn(ethers, 'verifyMessage').mockImplementationOnce(() => {
         throw new Error('signature error');
       });
@@ -172,10 +175,12 @@ describe('VerificationService', () => {
 
     it('computes expiresAt when maxAge is set', async () => {
       const timestamp = Date.now();
+      const wallet = ethers.Wallet.createRandom();
       const result = await service.validateWalletToken(
         {
           ...validPayload,
-          address: '0xRecoveredAddress',
+          address: wallet.address,
+          signature: await wallet.signMessage(validPayload.message),
           timestamp,
         },
         { maxAge: 60000 },
