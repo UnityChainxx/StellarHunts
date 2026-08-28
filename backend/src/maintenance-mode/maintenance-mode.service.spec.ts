@@ -1,6 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import type { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MaintenanceModeService } from './maintenance-mode.service';
 import { MaintenanceConfig } from './entities/maintenance-config.entity';

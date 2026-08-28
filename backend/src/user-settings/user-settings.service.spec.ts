@@ -1,6 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import { UserSettingsService } from './user-settings.service';
 import {
   UserSettings,
@@ -13,7 +12,6 @@ import { jest } from '@jest/globals';
 
 describe('UserSettingsService', () => {
   let service: UserSettingsService;
-  let repository: Repository<UserSettings>;
   const mockRepository: Record<string, any> = {
     create: jest.fn(),
     save: jest.fn(),
@@ -30,7 +28,6 @@ describe('UserSettingsService', () => {
       ],
     }).compile();
     service = module.get(UserSettingsService);
-    repository = module.get(getRepositoryToken(UserSettings));
   });
 
   afterEach(() => jest.clearAllMocks());

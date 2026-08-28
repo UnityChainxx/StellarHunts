@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { PuzzleCategoryService } from './puzzle-category.service';
 import { Category } from './entities/category.entity';
 import { Puzzle } from './entities/puzzle.entity';
@@ -8,8 +7,6 @@ import { NotFoundException } from '@nestjs/common';
 
 describe('PuzzleCategoryService', () => {
   let service: PuzzleCategoryService;
-  let categoryRepository: Repository<Category>;
-  let puzzleRepository: Repository<Puzzle>;
 
   const mockCategoryRepository = {
     createQueryBuilder: jest.fn(() => ({
@@ -59,12 +56,6 @@ describe('PuzzleCategoryService', () => {
     }).compile();
 
     service = module.get<PuzzleCategoryService>(PuzzleCategoryService);
-    categoryRepository = module.get<Repository<Category>>(
-      getRepositoryToken(Category),
-    );
-    puzzleRepository = module.get<Repository<Puzzle>>(
-      getRepositoryToken(Puzzle),
-    );
   });
 
   it('should be defined', () => {
