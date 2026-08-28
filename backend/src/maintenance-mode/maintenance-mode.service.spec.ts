@@ -11,7 +11,7 @@ describe('MaintenanceModeService', () => {
   let repository: Repository<MaintenanceConfig>;
   let configService: ConfigService;
 
-  const mockRepository = {
+  const mockRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),

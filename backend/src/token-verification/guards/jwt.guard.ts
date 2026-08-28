@@ -13,7 +13,7 @@ export const JWT_OPTIONS_KEY = 'jwt_options';
 export const JwtOptions = (options: JwtVerificationOptions) =>
   Reflector.createDecorator<JwtVerificationOptions>({
     key: JWT_OPTIONS_KEY,
-    value: options,
+    factory: () => options,
   });
 
 @Injectable()

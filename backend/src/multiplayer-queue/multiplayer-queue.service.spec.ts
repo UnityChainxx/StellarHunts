@@ -12,7 +12,7 @@ describe('MultiplayerQueueService', () => {
   let queueRepository: Repository<Queue>;
   let matchRepository: Repository<Match>;
 
-  const mockQueueRepository = {
+  const mockQueueRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
@@ -21,7 +21,7 @@ describe('MultiplayerQueueService', () => {
     count: jest.fn(),
   };
 
-  const mockMatchRepository = {
+  const mockMatchRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),

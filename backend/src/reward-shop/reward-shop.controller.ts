@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { RewardShopService, ShopItem, Purchase } from './reward-shop.service';
 import {

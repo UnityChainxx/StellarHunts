@@ -54,7 +54,7 @@ const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
   createdAt: fc.date({ min: new Date(0), max: new Date() }),
   matchedAt: fc.constant(null),
   leftAt: fc.constant(null),
-} as unknown as fc.Record<Queue>);
+} as unknown as Queue);
 
 /** A batch of players in the queue. */
 const queuePlayerBatchArb = fc.array(queuePlayerArb, {
@@ -83,7 +83,10 @@ const joinQueueDtoArb = fc.record({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createMockRepos() {
+function createMockRepos(): {
+  queueRepository: Record<string, jest.Mock>;
+  matchRepository: Record<string, jest.Mock>;
+} {
   return {
     queueRepository: {
       create: jest.fn(),

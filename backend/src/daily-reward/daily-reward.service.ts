@@ -31,6 +31,7 @@ export class DailyRewardService {
     let currentStreak = 1;
     if (lastCheckIn) {
       const lastCheckInDate = new Date(lastCheckIn.timestamp);
+      lastCheckInDate.setHours(0, 0, 0, 0);
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
       yesterday.setHours(0, 0, 0, 0);

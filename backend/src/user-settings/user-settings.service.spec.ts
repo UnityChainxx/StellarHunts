@@ -10,7 +10,7 @@ describe("UserSettingsService", () => {
   let service: UserSettingsService
   let repository: Repository<UserSettings>
 
-  const mockRepository = {
+  const mockRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
@@ -234,4 +234,4 @@ describe("UserSettingsService", () => {
       const result = await service.resetUserSettings(userId)
 
       expect(result.language).toBe(Language.ENGLISH)
-      expect(result.\
+      expect(result.language).toBe(Language.ENGLISH)

@@ -197,7 +197,7 @@ describe('AnalyticService — property-based', () => {
           for (const r of records) {
             await svc.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
           }
-          const solved = await svc.getMostSolvedPuzzlesAsync(limit);
+          const solved = await svc.getMostSolvedPuzzlesAsync(limit || undefined);
           expect(solved.length).toBeLessThanOrEqual(limit);
           expect(solved.length).toBeLessThanOrEqual(
             countByPuzzle(records).size,
@@ -259,7 +259,7 @@ describe('AnalyticService — property-based', () => {
           // Service that receives both batches
           const svcCombined = freshService();
           for (const r of combined) {
-            await svc.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
+            await svcCombined.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
           }
           const solvedCombined = await svcCombined.getMostSolvedPuzzlesAsync();
 

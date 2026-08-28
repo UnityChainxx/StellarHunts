@@ -10,7 +10,7 @@ describe('UserReactionService', () => {
   let service: UserReactionService;
   let repository: Repository<Reaction>;
 
-  const mockRepository = {
+  const mockRepository: Record<string, jest.Mock> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),

@@ -33,6 +33,7 @@ describe('VerificationService', () => {
         VerificationService,
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
+        { provide: Function, useValue: configService },
       ],
     }).compile();
 
@@ -158,7 +159,7 @@ describe('VerificationService', () => {
 
     it('returns invalid if signature recovery fails', async () => {
       const ethers = require('ethers');
-      jest.spyOn(ethers.utils, 'verifyMessage').mockImplementationOnce(() => {
+      jest.spyOn(ethers, 'verifyMessage').mockImplementationOnce(() => {
         throw new Error('signature error');
       });
 
