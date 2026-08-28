@@ -89,34 +89,14 @@ async function bootstrap(): Promise<void> {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
 
+  // Global validation policy (issue #340): unknown properties are stripped,
+  // DTOs are transformed, and all controllers share the same defaults.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: false,
     }),
-    PuzzleModule,
-    PuzzleSubmissionModule,
-    ContentModule,
-    UserReportCardModule,
-    PuzzleDependencyModule,
-    TimeTrialModule,
-    InAppNotificationsModule,
-    PuzzleTranslationModule,
-    NFTClaimModule,
-    AnalyticModule,
-    RewardShopModule,
-    ApiKeyModule,
-    UserReactionModule,
-    MultiplayerQueueModule,
-    // Redis-backed caching + single-flight for the read-heavy endpoints
-    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
-    CacheModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
   );
 
   const apiVersion = configService.get<string>('appConfig.apiVersion') ?? '1.0';
