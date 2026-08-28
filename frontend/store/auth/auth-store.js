@@ -4,8 +4,21 @@ import { devtools } from "zustand/middleware";
 
 const ENCRYPTION_KEY_NAME = "stellar-hunts-ek";
 
+const safeSessionStorage = () => {
+	if (typeof window === "undefined") {
+		return {
+			getItem: () => null,
+			setItem: () => {},
+			removeItem: () => {},
+		};
+	}
+
+	return window.sessionStorage;
+};
+
 async function getOrCreateEncryptionKey() {
-	const stored = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+	const storage = safeSessionStorage();
+	const stored = storage.getItem(ENCRYPTION_KEY_NAME);
 	if (stored) {
 		const raw = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
 		return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, true, [
@@ -19,7 +32,7 @@ async function getOrCreateEncryptionKey() {
 		["encrypt", "decrypt"]
 	);
 	const exported = await crypto.subtle.exportKey("raw", key);
-	sessionStorage.setItem(
+	storage.setItem(
 		ENCRYPTION_KEY_NAME,
 		btoa(String.fromCharCode(...new Uint8Array(exported)))
 	);
@@ -139,7 +152,7 @@ const useAuthStore = create(
 			}),
 			{
 				name: "auth-storage",
-				getStorage: () => localStorage,
+				getStorage: () => safeSessionStorage(),
 			}
 		),
 		{ name: "AuthStore" }

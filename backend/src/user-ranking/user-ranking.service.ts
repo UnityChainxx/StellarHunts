@@ -37,6 +37,9 @@ export class UserRankingService {
     const allRanks = await this.userRankRepository
       .createQueryBuilder('rank')
       .orderBy('rank.score', 'DESC')
+      .addOrderBy('rank.achievements', 'DESC')
+      .addOrderBy('rank.activityPoints', 'DESC')
+      .addOrderBy('rank.userId', 'ASC')
       .getMany();
 
     allRanks.forEach((rank, index) => {
