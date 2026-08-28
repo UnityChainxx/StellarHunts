@@ -235,11 +235,11 @@ export class MultiplayerQueueService {
    */
   @Cron(CronExpression.EVERY_10_SECONDS)
   async processMatchmaking(): Promise<void> {
-    const waitingPlayers = await this.queueRepository.find({
+    const waitingPlayers = (await this.queueRepository.find({
       where: { status: QueueStatus.WAITING },
       order: { createdAt: 'ASC' },
       take: 200,
-    });
+    })) ?? [];
 
     if (waitingPlayers.length < 2) {
       return;

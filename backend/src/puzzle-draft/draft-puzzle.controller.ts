@@ -13,9 +13,9 @@ import { DraftPuzzleService } from './draft-puzzle.service';
 import { CreateDraftDto } from './dto/create-draft.dto';
 import { UpdateDraftDto } from './dto/update-draft.dto';
 // Assume AuthGuard is set up to handle roles like admin/contributor
-import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { JwtAuthGuard as AuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/gaurds/roles.gaurds';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('drafts')
 @UseGuards(AuthGuard, RolesGuard)

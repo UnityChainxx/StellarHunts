@@ -53,7 +53,7 @@ describe('AuthService', () => {
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<
       Repository<User>
     >;
-    jwtService = module.get<JwtService>(JwtService);
+    jwtService = module.get<JwtService>(JwtService) as unknown as jest.Mocked<JwtService>;
   });
 
   afterEach(() => {
@@ -63,6 +63,7 @@ describe('AuthService', () => {
   describe('register', () => {
     const registerDto: RegisterDto = {
       name: 'John Doe',
+      username: 'johnny_doe',
       email: 'john@example.com',
       password: 'SecurePass123!',
     };
@@ -110,7 +111,7 @@ describe('AuthService', () => {
         name: 'John Doe',
         email: 'john@example.com',
         isActive: true,
-        validatePassword: jest.fn().mockResolvedValue(true),
+        validatePassword: jest.fn<any>().mockResolvedValue(true),
       } as User & { validatePassword: jest.Mock };
 
       userRepository.findOne.mockResolvedValue(mockUser);

@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RedisModule, RedisOptions } from '@nestjs-modules/ioredis';
+import { RedisModule } from '@nestjs-modules/ioredis';
+import type { RedisModuleOptions } from '@nestjs-modules/ioredis';
 import { CacheService } from './cache.service';
 
 /**
@@ -19,7 +20,7 @@ import { CacheService } from './cache.service';
     RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService): RedisOptions => {
+      useFactory: (configService: ConfigService): RedisModuleOptions => {
         const host =
           configService.get<string>('cache.redisHost') ||
           process.env.REDIS_HOST ||
@@ -42,16 +43,12 @@ import { CacheService } from './cache.service';
         return {
           type: 'single',
           url,
-          host: url ? undefined : host,
-          port: url ? undefined : port,
-          password,
-          db,
+          ...(url ? {} : { host, port }),
+          ...(password ? { password } : {}),
           // Lazy connect so the app can boot even when Redis is temporarily
           // unavailable; the cache becomes a no-op and reads fall through
           // to the loader (#107). Subsequent requests will reconnect.
-          lazyConnect: true,
-          maxRetriesPerRequest: 1,
-          enableOfflineQueue: false,
+
         };
       },
     }),

@@ -158,7 +158,7 @@ export class PuzzleCategoryService {
   async createPuzzle(
     createPuzzleDto: CreatePuzzleDto | any,
   ): Promise<CategoryPuzzle> {
-    const puzzle = this.puzzleRepository.create(createPuzzleDto) as CategoryPuzzle;
+    const puzzle = this.puzzleRepository.create(createPuzzleDto) as unknown as CategoryPuzzle;
 
     // Handle category relationships if categoryIds are provided
     if (createPuzzleDto.categoryIds && createPuzzleDto.categoryIds.length > 0) {

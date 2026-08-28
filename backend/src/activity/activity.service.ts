@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Activity } from './entities/activity.entity';
+import { Activity, ActivityType } from './entities/activity.entity';
 import { Repository } from 'typeorm';
 import { FilterActivityDto } from './dto/filter-activity.dto';
 
@@ -49,7 +49,7 @@ export class ActivityService {
 
   async logActivity(
     userId: string,
-    type: string,
+    type: ActivityType,
     metadata: Record<string, any> = {},
   ) {
     const activity = this.activityRepo.create({

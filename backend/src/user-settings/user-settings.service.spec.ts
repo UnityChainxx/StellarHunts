@@ -14,7 +14,7 @@ import { jest } from '@jest/globals';
 describe('UserSettingsService', () => {
   let service: UserSettingsService;
   let repository: Repository<UserSettings>;
-  const mockRepository: Record<string, jest.Mock> = {
+  const mockRepository: Record<string, any> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
@@ -26,7 +26,7 @@ describe('UserSettingsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserSettingsService,
-        { provide: getRepositoryToken(UserSettings), useValue: mockRepository },
+        { provide: Repository, useValue: mockRepository },
       ],
     }).compile();
     service = module.get(UserSettingsService);

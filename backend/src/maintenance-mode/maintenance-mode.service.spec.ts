@@ -28,7 +28,7 @@ describe('MaintenanceModeService', () => {
       providers: [
         MaintenanceModeService,
         {
-          provide: getRepositoryToken(MaintenanceConfig),
+          provide: Repository,
           useValue: mockRepository,
         },
         {
@@ -39,9 +39,7 @@ describe('MaintenanceModeService', () => {
     }).compile();
 
     service = module.get<MaintenanceModeService>(MaintenanceModeService);
-    repository = module.get<Repository<MaintenanceConfig>>(
-      getRepositoryToken(MaintenanceConfig),
-    );
+    repository = module.get<Repository<MaintenanceConfig>>(Repository);
     configService = module.get<ConfigService>(ConfigService);
   });
 

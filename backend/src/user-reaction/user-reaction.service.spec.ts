@@ -10,7 +10,7 @@ describe('UserReactionService', () => {
   let service: UserReactionService;
   let repository: Repository<Reaction>;
 
-  const mockRepository: Record<string, jest.Mock> = {
+  const mockRepository: Record<string, any> = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
@@ -122,7 +122,7 @@ describe('UserReactionService', () => {
         addSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         groupBy: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([
+        getRawMany: jest.fn<any>().mockResolvedValue([
           { emoji: '👍', count: '3' },
           { emoji: '❤️', count: '2' },
           { emoji: '🤔', count: '1' },

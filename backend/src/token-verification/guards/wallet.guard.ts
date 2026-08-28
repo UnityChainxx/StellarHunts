@@ -17,7 +17,7 @@ export const WALLET_OPTIONS_KEY = 'wallet_options';
 export const WalletOptions = (options: WalletVerificationOptions) =>
   Reflector.createDecorator<WalletVerificationOptions>({
     key: WALLET_OPTIONS_KEY,
-    factory: () => options,
+    transform: () => options,
   });
 
 @Injectable()

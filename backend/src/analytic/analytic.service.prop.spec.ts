@@ -197,7 +197,7 @@ describe('AnalyticService — property-based', () => {
           for (const r of records) {
             await svc.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
           }
-          const solved = await svc.getMostSolvedPuzzlesAsync(limit || undefined);
+          const solved = await svc.getMostSolvedPuzzlesAsync(limit);
           expect(solved.length).toBeLessThanOrEqual(limit);
           expect(solved.length).toBeLessThanOrEqual(
             countByPuzzle(records).size,

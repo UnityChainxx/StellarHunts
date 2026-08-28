@@ -14,7 +14,7 @@ export class UpdateMaintenanceConfigDto {
     example: true,
   })
   @IsBoolean()
-  isMaintenanceMode: boolean;
+  isMaintenanceMode?: boolean;
 
   @ApiPropertyOptional({
     description: 'Message to display during maintenance',

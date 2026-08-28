@@ -83,7 +83,8 @@ export class AnalyticService {
     offset?: number,
   ): Promise<Array<{ puzzleId: string; solveCount: number }>> {
     this.logger.log('Fetching most solved puzzles...');
-    const sql = limit
+    const effectiveLimit = limit === undefined ? undefined : Math.max(0, Math.floor(limit));
+    const sql = effectiveLimit !== undefined
       ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
          ORDER BY solve_count DESC LIMIT $1 OFFSET $2`
       : offset
@@ -97,9 +98,9 @@ export class AnalyticService {
       return [...counts.entries()]
         .map(([puzzleId, solveCount]) => ({ puzzleId, solveCount }))
         .sort((a, b) => b.solveCount - a.solveCount)
-        .slice(offset ?? 0, limit ? (offset ?? 0) + limit : undefined);
+        .slice(offset ?? 0, effectiveLimit === undefined ? undefined : (offset ?? 0) + effectiveLimit);
     }
-    const params = limit ? [limit, offset ?? 0] : offset ? [offset] : [];
+    const params = effectiveLimit !== undefined ? [effectiveLimit, offset ?? 0] : offset ? [offset] : [];
     const { rows } = await this.pool.query(sql, params);
     return rows.map((r) => ({
       puzzleId: r.puzzle_id as string,

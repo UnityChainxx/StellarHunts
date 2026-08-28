@@ -11,4 +11,4 @@ export {
 
 // Interface and DTO exports
 export * from './interfaces/token-history.interface';
-export * from './dto/token-history.dto';
+export { CreateTokenHistoryDto } from './dto/token-history.dto';

@@ -133,7 +133,6 @@ export class ChallengeService {
       where: {
         status: ChallengeStatus.ACTIVE,
         unlockTime: MoreThan(today),
-        unlockTime: LessThan(tomorrow),
       },
     });
   }
@@ -150,7 +149,6 @@ export class ChallengeService {
       where: {
         status: ChallengeStatus.ACTIVE,
         unlockTime: MoreThan(startOfWeek),
-        unlockTime: LessThan(endOfWeek),
         metadata: { type: 'weekly' },
       },
     });

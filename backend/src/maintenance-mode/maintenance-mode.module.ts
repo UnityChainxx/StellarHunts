@@ -17,7 +17,7 @@ export interface MaintenanceModeModuleOptions {
 @Module({})
 export class MaintenanceModeModule {
   static forRoot(options: MaintenanceModeModuleOptions = {}): DynamicModule {
-    const providers = [MaintenanceModeService, AdminGuard];
+    const providers: any[] = [MaintenanceModeService, AdminGuard];
 
     // Add global maintenance guard if enabled
     if (options.enableGlobalGuard !== false) {

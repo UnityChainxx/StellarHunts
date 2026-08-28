@@ -97,9 +97,7 @@ describe('PuzzleCategoryService', () => {
         },
       ];
 
-      mockCategoryRepository
-        .createQueryBuilder()
-        .getMany.mockResolvedValue(mockCategories);
+      mockCategoryRepository.createQueryBuilder().getMany.mockResolvedValue(mockCategories);
 
       const result = await service.getPuzzlesByCategory();
 

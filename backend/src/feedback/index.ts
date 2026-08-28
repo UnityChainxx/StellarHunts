@@ -7,4 +7,7 @@ export { Feedback, TargetType } from './entities/feedback.entity';
 
 // Interface and DTO exports
 export * from './interfaces/feedback.interface';
-export * from './dto/feedback.dto';
+export {
+  CreateFeedbackDto,
+  UpdateFeedbackDto,
+} from './dto/feedback.dto';
