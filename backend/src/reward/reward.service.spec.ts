@@ -11,6 +11,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { DataSource, QueryFailedError } from 'typeorm';
 
 describe('RewardService', () => {
   let service: RewardService;
@@ -23,6 +24,7 @@ describe('RewardService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
+    increment: jest.fn(),
     count: jest.fn(),
   };
 
@@ -32,6 +34,16 @@ describe('RewardService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     count: jest.fn(),
+  };
+
+  // `claimReward` runs inside `dataSource.transaction` (issue #302); the mock
+  // manager routes `getRepository` back to the repositories above.
+  const mockManager = {
+    getRepository: (entity: any) =>
+      entity === Reward ? mockRewardRepository : mockRewardClaimRepository,
+  };
+  const mockDataSource = {
+    transaction: jest.fn((callback: any) => callback(mockManager)),
   };
 
   beforeEach(async () => {
@@ -45,6 +57,10 @@ describe('RewardService', () => {
         {
           provide: getRepositoryToken(RewardClaim),
           useValue: mockRewardClaimRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -223,7 +239,7 @@ describe('RewardService', () => {
       mockRewardRepository.findOne.mockResolvedValue(mockReward); // Reward exists
       mockRewardClaimRepository.create.mockReturnValue(expectedClaim);
       mockRewardClaimRepository.save.mockResolvedValue(expectedClaim);
-      mockRewardRepository.update.mockResolvedValue({ affected: 1 });
+      mockRewardRepository.increment.mockResolvedValue({ affected: 1 });
 
       const result = await service.claimReward(claimRewardDto);
 
@@ -233,9 +249,11 @@ describe('RewardService', () => {
         challengeId: 'challenge-001',
         status: 'claimed',
       });
-      expect(mockRewardRepository.update).toHaveBeenCalledWith('reward-001', {
-        currentClaims: 6,
-      });
+      expect(mockRewardRepository.increment).toHaveBeenCalledWith(
+        { id: 'reward-001' },
+        'currentClaims',
+        1,
+      );
       expect(result).toEqual(expectedClaim);
     });
 
@@ -250,6 +268,29 @@ describe('RewardService', () => {
       expect(mockRewardClaimRepository.findOne).toHaveBeenCalledWith({
         where: { userId: 'user-001', challengeId: 'challenge-001' },
       });
+    });
+
+    it('should throw ConflictException when a concurrent duplicate claim hits the unique index', async () => {
+      const duplicateError = new QueryFailedError(
+        'INSERT INTO reward_claims',
+        [],
+        { code: '23505' } as any,
+      );
+
+      mockRewardClaimRepository.findOne.mockResolvedValue(null);
+      mockRewardRepository.findOne.mockResolvedValue(mockReward);
+      mockRewardClaimRepository.create.mockReturnValue({
+        id: 'claim-001',
+        userId: 'user-001',
+        rewardId: 'reward-001',
+        challengeId: 'challenge-001',
+        status: 'claimed',
+      });
+      mockRewardClaimRepository.save.mockRejectedValue(duplicateError);
+
+      await expect(service.claimReward(claimRewardDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw BadRequestException when reward limit reached', async () => {
