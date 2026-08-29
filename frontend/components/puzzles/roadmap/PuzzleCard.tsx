@@ -16,9 +16,9 @@ export default function PuzzleCard({ puzzle }: Props) {
         <Image
           src={imageUrl}
           alt={title}
-          layout="fill"
-          objectFit="cover"
-          className="rounded-xl"
+          fill
+          sizes="(max-width: 768px) 100vw, 320px"
+          className="rounded-xl object-cover"
         />
       </div>
       <h2 className="text-xl font-semibold mb-1 text-center">{title}</h2>

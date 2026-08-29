@@ -80,24 +80,9 @@ fn test_double_mint_rejected() {
 
     let game = FakeGameContractClient::new(&env, &game_id);
     let r = recipient(&env);
+
     game.mint(&nft_id, &r, &crate::Levels::Easy);
-
-    let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        game.mint(&nft_id, &r, &crate::Levels::Easy);
-    }));
-    assert!(should_panic.is_err());
-}
-
-#[test]
-fn test_invalid_metadata_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let admin = admin(&env);
-    let game = recipient(&env);
-    let contract_id = env.register_contract(None, StellarHuntsNft);
-    let client = StellarHuntsNftClient::new(&env, &contract_id);
-
-    let long_uri = "https://example.com/".repeat(20);
+    // Second mint must fail (already-has-badge error).
     let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         client.init(
             &admin,

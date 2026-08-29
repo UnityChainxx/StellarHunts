@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { GeoStats } from './entities/geostat.entity';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { isIP } from 'node:net';
+import { assertSafeHttpUrl } from '../common/security/safe-url';
 
 @Injectable()
 export class GeoStatService {
@@ -15,8 +17,18 @@ export class GeoStatService {
 
   async trackUser(ipAddress: string): Promise<GeoStats> {
     try {
+      // The IP is interpolated into the path of a fixed, known host, but we
+      // still (1) require a real IP literal to prevent path injection and
+      // (2) use the validated https URL so the outbound call stays on an
+      // approved scheme/host (issue #318).
+      if (!isIP(ipAddress)) {
+        throw new Error('Invalid IP address');
+      }
+      const lookupUrl = `https://ip-api.com/json/${ipAddress}`;
+      assertSafeHttpUrl(lookupUrl, 'geolocation lookup URL');
+
       const { data } = await firstValueFrom(
-        this.httpService.get(`http://ip-api.com/json/${ipAddress}`),
+        this.httpService.get(lookupUrl),
       );
 
       const newGeoStat = this.geoStatsRepository.create({

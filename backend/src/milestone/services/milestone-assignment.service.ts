@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { Repository } from 'typeorm';
-import type { UserMilestone } from '../entities/user-milestone.entity';
+import type { Repository, EntityManager } from 'typeorm';
+import { UserMilestone } from '../entities/user-milestone.entity';
 import {
   type MilestoneTemplate,
   MilestoneType,
@@ -8,6 +8,7 @@ import {
 } from '../entities/milestone-template.entity';
 import type { UserProgressService } from './user-progress.service';
 import type { MilestoneTemplateService } from './milestone-template.service';
+import { isUniqueViolation } from '../../common/security/unique-violation';
 
 @Injectable()
 export class MilestoneAssignmentService {
@@ -17,9 +18,16 @@ export class MilestoneAssignmentService {
     private readonly templateService: MilestoneTemplateService,
   ) {}
 
+  /**
+   * Check every relevant template and assign any newly-earned milestones.
+   * `manager` is passed through when the caller runs inside a progression
+   * transaction (issue #302) so assignment commits atomically with the
+   * progress updates that triggered it.
+   */
   async checkAndAssignMilestones(
     userId: string,
     category?: MilestoneCategory,
+    manager?: EntityManager,
   ): Promise<UserMilestone[]> {
     const templates = category
       ? await this.templateService.getTemplatesByCategory(category)
@@ -31,16 +39,22 @@ export class MilestoneAssignmentService {
       const hasAchieved = await this.hasUserAchievedMilestone(
         userId,
         template.id,
+        manager,
       );
       if (hasAchieved) continue;
 
-      const shouldAssign = await this.shouldAssignMilestone(userId, template);
+      const shouldAssign = await this.shouldAssignMilestone(
+        userId,
+        template,
+        manager,
+      );
       if (shouldAssign.eligible) {
         const milestone = await this.assignMilestone(
           userId,
           template,
           shouldAssign.achievedValue,
           shouldAssign.context,
+          manager,
         );
         newAchievements.push(milestone);
       }
@@ -52,13 +66,14 @@ export class MilestoneAssignmentService {
   private async shouldAssignMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     switch (template.milestoneType) {
       case MilestoneType.COUNT_BASED:
-        return this.checkCountBasedMilestone(userId, template);
+        return this.checkCountBasedMilestone(userId, template, manager);
 
       case MilestoneType.STREAK_BASED:
-        return this.checkStreakBasedMilestone(userId, template);
+        return this.checkStreakBasedMilestone(userId, template, manager);
 
       case MilestoneType.TIME_BASED:
         return this.checkTimeBasedMilestone(userId, template);
@@ -77,6 +92,7 @@ export class MilestoneAssignmentService {
   private async checkCountBasedMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     if (!template.requiredCount) return { eligible: false };
 
@@ -99,6 +115,7 @@ export class MilestoneAssignmentService {
       userId,
       template.category,
       progressKey,
+      manager,
     );
     if (!progress) return { eligible: false };
 
@@ -112,6 +129,7 @@ export class MilestoneAssignmentService {
   private async checkStreakBasedMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     if (!template.requiredStreak) return { eligible: false };
 
@@ -119,11 +137,13 @@ export class MilestoneAssignmentService {
       userId,
       MilestoneCategory.STREAK,
       'current_streak',
+      manager,
     );
     const longestStreak = await this.progressService.getProgress(
       userId,
       MilestoneCategory.STREAK,
       'longest_streak',
+      manager,
     );
 
     const maxStreak = Math.max(
@@ -208,8 +228,12 @@ export class MilestoneAssignmentService {
     template: MilestoneTemplate,
     achievedValue?: number,
     context?: any,
+    manager?: EntityManager,
   ): Promise<UserMilestone> {
-    const milestone = this.userMilestoneRepository.create({
+    const repo =
+      manager?.getRepository(UserMilestone) ?? this.userMilestoneRepository;
+
+    const milestone = repo.create({
       userId,
       milestoneTemplateId: template.id,
       achievedAt: new Date(),
@@ -217,14 +241,28 @@ export class MilestoneAssignmentService {
       achievementContext: context ? JSON.stringify(context) : null,
     });
 
-    return this.userMilestoneRepository.save(milestone);
+    try {
+      return await repo.save(milestone);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        // A concurrent request already assigned this milestone — return the
+        // existing record instead of throwing (idempotent progression, #302).
+        return repo.findOneOrFail({
+          where: { userId, milestoneTemplateId: template.id },
+        });
+      }
+      throw error;
+    }
   }
 
   private async hasUserAchievedMilestone(
     userId: string,
     templateId: string,
+    manager?: EntityManager,
   ): Promise<boolean> {
-    const existing = await this.userMilestoneRepository.findOne({
+    const repo =
+      manager?.getRepository(UserMilestone) ?? this.userMilestoneRepository;
+    const existing = await repo.findOne({
       where: { userId, milestoneTemplateId: templateId },
     });
     return !!existing;
@@ -262,12 +300,13 @@ export class MilestoneAssignmentService {
   async onPuzzleCompleted(
     userId: string,
     puzzleMetadata?: any,
+    manager?: EntityManager,
   ): Promise<UserMilestone[]> {
     // Update progress
-    await this.progressService.incrementPuzzleCount(userId, puzzleMetadata);
+    await this.progressService.incrementPuzzleCount(userId, puzzleMetadata, manager);
 
     // Check and assign puzzle-related milestones
-    return this.checkAndAssignMilestones(userId, MilestoneCategory.PUZZLE);
+    return this.checkAndAssignMilestones(userId, MilestoneCategory.PUZZLE, manager);
   }
 
   // Method to be called when a user's streak changes
@@ -275,13 +314,14 @@ export class MilestoneAssignmentService {
     userId: string,
     currentStreak: number,
     longestStreak: number,
+    manager?: EntityManager,
   ): Promise<UserMilestone[]> {
     // Update progress
-    await this.progressService.updateCurrentStreak(userId, currentStreak);
-    await this.progressService.updateLongestStreak(userId, longestStreak);
+    await this.progressService.updateCurrentStreak(userId, currentStreak, manager);
+    await this.progressService.updateLongestStreak(userId, longestStreak, manager);
 
     // Check and assign streak-related milestones
-    return this.checkAndAssignMilestones(userId, MilestoneCategory.STREAK);
+    return this.checkAndAssignMilestones(userId, MilestoneCategory.STREAK, manager);
   }
 
   // Method for custom milestone triggers
@@ -290,6 +330,7 @@ export class MilestoneAssignmentService {
     category: MilestoneCategory,
     eventType: string,
     eventData?: any,
+    manager?: EntityManager,
   ): Promise<UserMilestone[]> {
     // Record custom progress
     await this.progressService.recordCustomProgress(
@@ -298,9 +339,10 @@ export class MilestoneAssignmentService {
       eventType,
       1,
       eventData,
+      manager,
     );
 
     // Check and assign related milestones
-    return this.checkAndAssignMilestones(userId, category);
+    return this.checkAndAssignMilestones(userId, category, manager);
   }
 }
