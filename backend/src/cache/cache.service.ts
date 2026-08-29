@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 
@@ -20,7 +24,7 @@ import Redis from 'ioredis';
  *     which is the same behaviour as before this PR (#107).
  */
 @Injectable()
-export class CacheService {
+export class CacheService implements OnApplicationShutdown {
   private readonly logger = new Logger(CacheService.name);
   private readonly inFlight = new Map<string, Promise<unknown>>();
 
@@ -111,5 +115,29 @@ export class CacheService {
   /** Test/observability helper: number of in-flight loaders right now. */
   inflightCount(): number {
     return this.inFlight.size;
+  }
+
+  /**
+   * Graceful shutdown hook — release the Redis connection so the event
+   * loop can drain and the process can exit. The underlying client uses
+   * `lazyConnect`, so it may be in the `wait` (never connected) or `end`
+   * (already closed) state; in those cases there is nothing to quit.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    const status = this.redis.status;
+    try {
+      if (status === 'ready') {
+        await this.redis.quit();
+      } else if (status !== 'end') {
+        // 'wait' | 'connecting' | 'reconnecting' — tear down without a
+        // round-trip to a server we never fully connected to.
+        this.redis.disconnect();
+      }
+      this.logger.log(`Redis connection closed (status was "${status}").`);
+    } catch (err) {
+      this.logger.warn(
+        `Redis disconnect failed (status "${status}"): ${(err as Error).message}`,
+      );
+    }
   }
 }

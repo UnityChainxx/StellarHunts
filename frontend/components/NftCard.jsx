@@ -1,3 +1,4 @@
+import Image from "next/image";
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Lock, Shield } from "lucide-react";
@@ -16,14 +17,8 @@ const RARITY_GRADIENTS = {
 const getRarityColor = (rarity) =>
   RARITY_GRADIENTS[rarity] || "from-gray-400 to-gray-600";
 
-// Displays a single NFT with rarity gradient, lock state, and claim action.
+// Wrapped in React.memo so unchanged cards avoid unnecessary reconciliation.
 const NFTCard = ({ nft, onClaim }) => {
-// Wrapped in React.memo so that when a parent re-renders (e.g. the wallet
-// store updating) and passes the same `nft` reference to every card in
-// a gallery, the heavy gradient DOM tree doesn't get re-reconciled for
-// every card. Default shallow prop comparison is sufficient — the only
-// prop is `nft`.
-const NFTCard = ({ nft }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleKeyDown = useCallback(
@@ -52,16 +47,16 @@ const NFTCard = ({ nft }) => {
         <div className="relative mb-4 overflow-hidden rounded-lg aspect-square">
           {/* Image with Gradient */}
           <div
-            className={`w-full h-full bg-gradient-to-br ${getRarityColor(
+            className={`relative w-full h-full bg-gradient-to-br ${getRarityColor(
               nft.rarity
             )} opacity-80`}
           >
-            {/* Using regular img tag with proper styling */}
-            <img
+            <Image
               src={nft.src}
-              alt={nft.name}
-              className="object-cover w-full h-full mix-blend-overlay"
-              loading="lazy"
+              alt={nft.name || "StellarHunts NFT"}
+              fill
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover mix-blend-overlay"
             />
           </div>
 

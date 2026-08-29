@@ -8,6 +8,9 @@ import {
 
 @Entity()
 @Index(['playerId', 'puzzleId'])
+// One attempt number per player+puzzle: concurrent duplicate submissions
+// collide here instead of silently creating duplicate rows (issue #364).
+@Index(['playerId', 'puzzleId', 'attemptCount'], { unique: true })
 export class PuzzleSubmission {
   @PrimaryGeneratedColumn()
   id: number;
