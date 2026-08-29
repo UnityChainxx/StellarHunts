@@ -167,14 +167,9 @@ jobs:
 
       - name: npm audit
         working-directory: backend
-        # Issue #110 acceptance: CI fails on npm audit findings. The repo
-        # currently has ~50 known high-severity transitive advisories
-        # (mostly from `aws-sdk v2` and `webpack` via `@nestjs/cli`) that
-        # predate this gate. The strict gate is therefore set to "critical"
-        # initially so the gate is REAL and fails on real exposure; "high"
-        # hardening is the next-stage follow-up.
-        run: npm audit --audit-level=critical
-        continue-on-error: true
+        # Fail on high-severity findings; dependency updates are required
+        # before merging a vulnerable backend build.
+        run: npm audit --audit-level=high
 
 
   backend-test:
@@ -231,10 +226,14 @@ jobs:
 
       - name: npm audit
         working-directory: frontend
-        # See backend-lint npm audit comment. Same rationale; start strict at
-        # critical, advance to high in a follow-up PR.
-        run: npm audit --audit-level=critical
+        # The high threshold is enforced (issue #344). All auto-fixable
+        # findings have been resolved; the remaining high-severity
+        # advisories are Next.js framework issues (next <16.3.3, plus the
+        # glob/postcss pinned by @next/eslint-plugin-next) that only a
+        # Next.js major upgrade can clear. Tracked as residual risk in
+        # SECURITY.md; advisory until that upgrade lands.
         continue-on-error: true
+        run: npm audit --audit-level=high
 
 
   frontend-build:

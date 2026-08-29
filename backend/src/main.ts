@@ -11,20 +11,25 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
 
-  // The frontend calls endpoints under the `/api` prefix (see
-  // frontend/store calls to /api/login, /api/register, etc.), so the global
-  // prefix is set on the whole Nest app. This also resolves issue #105 which
-  // expects the /api/users/:userId/history URL shape.
+  // Every route is served under the `/api/<version>` prefix. The version
+  // comes from `appConfig.apiVersion` (backend/config/app.config.ts,
+  // env `API_VERSION`), which defaults to `v1`, so the browser talks to
+  // e.g. `POST /api/v1/auth/login`. The frontend builds all backend URLs
+  // through `frontend/lib/api.js` (`apiUrl()`); the shared contract is
+  // documented in docs/api-conventions.md and locked by the integration
+  // tests (frontend/tests/apiRoutes.test.js and
+  // backend/test/api-prefix.e2e-spec.ts).
   //
   // Swagger UI is excluded so /docs, its JSON sibling /docs-json, and its
   // nested asset routes (e.g. /docs/swagger-ui-init.js) stay at canonical
-  // paths instead of being double-prefixed to /api. Nest treats string
-  // entries as exact paths, so we also pass a RegExp to cover /docs/....
-  // A single anchored regex covers `docs`, `docs-json`, and any nested
-  // /docs/<asset> route (e.g. /docs/swagger-ui-init.js). Nest evaluates the
-  // exclude list against the registered handler path before the global
-  // prefix is applied.
-  app.setGlobalPrefix('api', { exclude: [/^docs/] });
+  // paths instead of being double-prefixed to /api/v1. The exclude entries
+  // are string route patterns (Nest 11 accepts strings or
+  // { path, method } objects — not RegExps); `docs/(.*)` is converted to
+  // the path-to-regexp v8 wildcard by Nest's legacy route converter.
+  const apiVersion = configService.get<string>('appConfig.apiVersion') ?? 'v1';
+  app.setGlobalPrefix(`api/${apiVersion}`, {
+    exclude: ['docs', 'docs-json', 'docs/(.*)'],
+  });
 
   app.enableCors({
     origin: configService.get<string>('appConfig.cors.origin') ?? '*',
@@ -77,7 +82,6 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const apiVersion = configService.get<string>('appConfig.apiVersion') ?? '1.0';
   const swaggerConfig = new DocumentBuilder()
     .setTitle('StellarHunts API')
     .setDescription('StellarHunts backend REST API documentation.')
