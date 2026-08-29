@@ -1,4 +1,5 @@
 // pages/success.js
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -64,9 +65,11 @@ export default function NFTSuccessPage() {
         <h1 className="text-3xl font-bold text-green-400">🎉 NFT Minted Successfully!</h1>
 
         <div className="mt-4">
-          <img
+          <Image
             src={mockNFT.image}
-            alt={mockNFT.name}
+            alt={mockNFT.name || 'Minted NFT'}
+            width={400}
+            height={400}
             className="w-full rounded-xl shadow-lg"
           />
           <p className="mt-4 text-lg font-semibold">{mockNFT.name}</p>

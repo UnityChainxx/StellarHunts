@@ -35,21 +35,27 @@ export class ReferralBonusService {
   ): Promise<ReferralBonus[]> {
     const bonusConfig = { ...this.defaultConfig, ...config };
     const bonuses: ReferralBonus[] = [];
+    const existingBonuses = await this.bonusRepository.find({
+      where: { referralInviteId: invite.id },
+    });
+    const existingTypes = new Set(existingBonuses.map((bonus) => bonus.type));
 
     // Referral reward for the referrer
-    const referralBonus = this.bonusRepository.create({
-      userId: invite.referralCode.user.id,
-      referralInviteId: invite.id,
-      type: BonusType.REFERRAL_REWARD,
-      amount: bonusConfig.referralReward,
-      currency: bonusConfig.currency,
-      description: `Referral bonus for inviting ${invite.email}`,
-    });
+    if (!existingTypes.has(BonusType.REFERRAL_REWARD)) {
+      const referralBonus = this.bonusRepository.create({
+        userId: invite.referralCode.user.id,
+        referralInviteId: invite.id,
+        type: BonusType.REFERRAL_REWARD,
+        amount: bonusConfig.referralReward,
+        currency: bonusConfig.currency,
+        description: `Referral bonus for inviting ${invite.email}`,
+      });
 
-    bonuses.push(await this.bonusRepository.save(referralBonus));
+      bonuses.push(await this.bonusRepository.save(referralBonus));
+    }
 
     // Signup bonus for the new user (if they registered)
-    if (invite.invitedUserId) {
+    if (invite.invitedUserId && !existingTypes.has(BonusType.SIGNUP_BONUS)) {
       const signupBonus = this.bonusRepository.create({
         userId: invite.invitedUserId,
         referralInviteId: invite.id,
