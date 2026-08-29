@@ -27,6 +27,8 @@ import Redis from 'ioredis';
 export class CacheService implements OnApplicationShutdown {
   private readonly logger = new Logger(CacheService.name);
   private readonly inFlight = new Map<string, Promise<unknown>>();
+  private readonly namespace =
+    process.env.CACHE_NAMESPACE?.trim() || 'stellarhunts';
 
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
@@ -45,10 +47,12 @@ export class CacheService implements OnApplicationShutdown {
     loader: () => Promise<T>,
     jitterSeconds: number = 10,
   ): Promise<T> {
+    const scopedKey = `${this.namespace}:${key}`;
+
     // 1. Try Redis first.
     let cached: string | null = null;
     try {
-      cached = await this.redis.get(key);
+      cached = await this.redis.get(scopedKey);
     } catch (err) {
       this.logger.warn(
         `Redis READ failed for key "${key}": ${(err as Error).message}. Falling through to loader.`,
@@ -66,7 +70,7 @@ export class CacheService implements OnApplicationShutdown {
     }
 
     // 2. Single-flight: piggyback on the in-flight promise if one exists.
-    const existing = this.inFlight.get(key);
+    const existing = this.inFlight.get(scopedKey);
     if (existing) {
       return existing as Promise<T>;
     }
@@ -82,7 +86,7 @@ export class CacheService implements OnApplicationShutdown {
           const ttl =
             baseTtlSeconds +
             Math.floor(Math.random() * Math.max(1, jitterSeconds));
-          await this.redis.set(key, JSON.stringify(fresh), 'EX', ttl);
+          await this.redis.set(scopedKey, JSON.stringify(fresh), 'EX', ttl);
         } catch (err) {
           this.logger.warn(
             `Redis WRITE failed for key "${key}": ${(err as Error).message}. Returning value without caching.`,
@@ -94,7 +98,7 @@ export class CacheService implements OnApplicationShutdown {
       }
     })();
 
-    this.inFlight.set(key, promise);
+    this.inFlight.set(scopedKey, promise);
     return promise as Promise<T>;
   }
 

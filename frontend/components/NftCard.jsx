@@ -21,28 +21,33 @@ const getRarityColor = (rarity) =>
 const NFTCard = ({ nft, onClaim }) => {
   const [isHovered, setIsHovered] = useState(false);
 
+  const handleClaim = useCallback(() => {
+    if (!nft.locked) {
+      onClaim?.(nft);
+    }
+  }, [nft, onClaim]);
+
   const handleKeyDown = useCallback(
     (e) => {
       if (!nft.locked && (e.key === "Enter" || e.key === " ")) {
         e.preventDefault();
-        onClaim?.(nft);
+        handleClaim();
       }
     },
-    [nft, onClaim]
+    [nft.locked, handleClaim]
   );
 
   return (
     <div
       role="article"
       aria-label={nft?.name ? `NFT: ${nft.name}${nft.locked ? " (locked)" : ""}` : "NFT card"}
-      className="relative overflow-hidden transition-transform duration-300 group rounded-xl hover:scale-105 focus-within:ring-2 focus-within:ring-purple-500 focus-within:ring-offset-2 focus-within:ring-offset-black"
+      className={`relative overflow-hidden transition-transform duration-300 group rounded-xl hover:scale-105 focus-within:ring-2 focus-within:ring-purple-500 focus-within:ring-offset-2 focus-within:ring-offset-black ${
+        isHovered ? "shadow-2xl shadow-purple-500/20" : ""
+      }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Card Background with Gradient */}
       <div className="absolute inset-0 border bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm border-white/10" />
-
-      {/* NFT Image Container */}
       <div className="relative p-4">
         <div className="relative mb-4 overflow-hidden rounded-lg aspect-square">
           {/* Image with Gradient */}
@@ -60,7 +65,6 @@ const NFTCard = ({ nft, onClaim }) => {
             />
           </div>
 
-          {/* Locked Overlay */}
           {nft.locked && (
             <div
               role="status"
@@ -71,7 +75,6 @@ const NFTCard = ({ nft, onClaim }) => {
             </div>
           )}
 
-          {/* Rarity Badge */}
           <div
             className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${getRarityColor(
               nft.rarity
@@ -81,12 +84,10 @@ const NFTCard = ({ nft, onClaim }) => {
           </div>
         </div>
 
-        {/* NFT Details */}
         <div className="relative z-10">
           <h3 className="mb-2 text-xl font-bold text-white">{nft.name}</h3>
           <p className="mb-4 text-sm text-gray-300">{nft.description}</p>
 
-          {/* Requirements and Stats */}
           <div className="flex flex-wrap gap-3 mb-4 text-sm">
             {nft.requirements.map((req, index) => (
               <div
@@ -99,7 +100,6 @@ const NFTCard = ({ nft, onClaim }) => {
             ))}
           </div>
 
-          {/* Action Button */}
           <Button
             className={`w-full ${
               nft.locked
@@ -108,8 +108,8 @@ const NFTCard = ({ nft, onClaim }) => {
             }`}
             disabled={nft.locked}
             aria-disabled={nft.locked}
-            aria-pressed={!nft.locked ? undefined : undefined}
             aria-label={nft.locked ? `${nft.name} is locked. Complete challenges to unlock.` : `Claim ${nft.name} NFT`}
+            onClick={handleClaim}
             onKeyDown={handleKeyDown}
             tabIndex={0}
           >

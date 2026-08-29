@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Home, RefreshCcw } from "lucide-react";
 
 export default function GlobalError({ error, reset }) {
@@ -21,16 +20,12 @@ export default function GlobalError({ error, reset }) {
                 <p className="text-lg text-gray-300">A critical error occurred.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Button asChild className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg hover:shadow-purple-500/50">
-                  <Link href="/" className="flex items-center gap-2">
-                    <Home size={20} /> Return Home
-                  </Link>
-                </Button>
-                <Button onClick={reload} variant="outline" className="w-full sm:w-auto border-white/20 text-white hover:bg-white/10 bg-transparent font-bold py-4 px-8 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <RefreshCcw size={20} /> Try Again
-                  </div>
-                </Button>
+                <Link href="/" className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg hover:shadow-purple-500/50 flex items-center justify-center gap-2">
+                  <Home size={20} /> Return Home
+                </Link>
+                <button onClick={reload} className="w-full sm:w-auto border border-white/20 text-white hover:bg-white/10 bg-transparent font-bold py-4 px-8 rounded-lg flex items-center justify-center gap-2">
+                  <RefreshCcw size={20} /> Try Again
+                </button>
               </div>
             </div>
           </div>
