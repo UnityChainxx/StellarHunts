@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'path';
 import * as Joi from 'joi';
 
 import appConfig from 'config/app.config';
@@ -108,8 +109,10 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         password: configService.get('database.password'),
         database: configService.get('database.name'),
         entities: [User, TimeTrial, Puzzle, Category, Report],
-        synchronize: configService.get('database.synchronize'),
-        autoLoadEntities: configService.get('database.autoload'),
+        migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
+        synchronize: configService.get('database.synchronize') === true,
+        autoLoadEntities: configService.get('database.autoload') === true,
+        migrationsRun: configService.get('database.migrationsRun') === true,
       }),
     }),
     ActivityModule,
