@@ -5,7 +5,16 @@
 // work. The presence of this contract keeps the test surface compatible
 // with the historical game test suite.
 
-use soroban_sdk::{contract, contractimpl, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
+
+#[cfg(test)]
+use stellar_hunts_nft::{StellarHuntsNft, StellarHuntsNftClient};
+
+#[cfg(test)]
+use stellar_hunts_types::Levels;
+
+#[cfg(test)]
+use soroban_sdk::testutils::Address as _;
 
 #[contract]
 pub struct MockReceiver;

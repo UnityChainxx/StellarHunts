@@ -5,6 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+/**
+ * Hard limit (ms) we allow the graceful shutdown sequence to take before
+ * forcing process exit. Kubernetes/the container runtime send a SIGKILL
+ * ~30s after SIGTERM, so we stay safely underneath that to avoid being
+ * killed mid-shutdown while still guaranteeing the process eventually exits.
+ */
+const FORCE_SHUTDOWN_TIMEOUT_MS = 25_000;
+
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);

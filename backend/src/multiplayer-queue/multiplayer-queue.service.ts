@@ -13,6 +13,7 @@ import type { JoinQueueDto } from './dto/join-queue.dto';
 import type { QueueStatusDto } from './dto/queue-status.dto';
 import type { MatchResultDto } from './dto/match-result.dto';
 import type { QueueStatsDto } from './dto/queue-stats.dto';
+import { MultiplayerQueueGateway } from './multiplayer-queue.gateway';
 
 @Injectable()
 export class MultiplayerQueueService {
@@ -24,6 +25,7 @@ export class MultiplayerQueueService {
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
     private readonly dataSource: DataSource,
+    private readonly gateway: MultiplayerQueueGateway,
   ) {}
 
   /**
@@ -257,7 +259,11 @@ export class MultiplayerQueueService {
         // Use graph-based stable pairing instead of naive slice(0,2)
         const pairs = this.pairPlayersInGroup(group);
         for (const pair of pairs) {
-          await this.createMatch(pair);
+          const match = await this.createMatch(pair);
+          if (match) {
+            // Real-time notification so clients leave the queue immediately.
+            this.gateway.notifyMatchCreated(this.mapToMatchResultDto(match));
+          }
         }
       }
     }

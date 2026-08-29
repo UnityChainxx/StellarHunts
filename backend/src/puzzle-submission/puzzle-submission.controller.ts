@@ -16,15 +16,13 @@ export class PuzzleSubmissionController {
       playerId: string;
       puzzleId: string;
       answer: string;
-      correctAnswer: string;
     },
   ) {
-    const { playerId, puzzleId, answer, correctAnswer } = body;
+    const { playerId, puzzleId, answer } = body;
     const result = await this.submissionService.submitAnswer(
       playerId,
       puzzleId,
       answer,
-      correctAnswer,
     );
     return result;
   }

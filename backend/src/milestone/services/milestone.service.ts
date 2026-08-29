@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { DataSource } from 'typeorm';
 import type { MilestoneAssignmentService } from './milestone-assignment.service';
 import type { UserProgressService } from './user-progress.service';
 import type { MilestoneTemplateService } from './milestone-template.service';
@@ -15,6 +16,7 @@ export class MilestoneService {
     private readonly assignmentService: MilestoneAssignmentService,
     private readonly progressService: UserProgressService,
     private readonly templateService: MilestoneTemplateService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async getUserMilestones(userId: string): Promise<MilestoneAchievementDto[]> {
@@ -167,14 +169,19 @@ export class MilestoneService {
     await this.assignmentService.markMilestoneAsViewed(userId, milestoneId);
   }
 
-  // Public methods for triggering milestone checks
+  // Public methods for triggering milestone checks.
+  //
+  // Each progression flow (puzzle completion, streak update, custom event)
+  // runs inside a single DB transaction: the progress counters and the
+  // milestone rows they unlock commit atomically, so a mid-flow failure can
+  // never leave a user with incremented progress but no milestone (or vice
+  // versa) — issue #302.
   async onPuzzleCompleted(
     userId: string,
     puzzleData?: any,
   ): Promise<MilestoneAchievementDto[]> {
-    const newMilestones = await this.assignmentService.onPuzzleCompleted(
-      userId,
-      puzzleData,
+    const newMilestones = await this.dataSource.transaction((manager) =>
+      this.assignmentService.onPuzzleCompleted(userId, puzzleData, manager),
     );
     return this.convertToAchievementDtos(newMilestones);
   }
@@ -184,10 +191,13 @@ export class MilestoneService {
     currentStreak: number,
     longestStreak: number,
   ): Promise<MilestoneAchievementDto[]> {
-    const newMilestones = await this.assignmentService.onStreakUpdated(
-      userId,
-      currentStreak,
-      longestStreak,
+    const newMilestones = await this.dataSource.transaction((manager) =>
+      this.assignmentService.onStreakUpdated(
+        userId,
+        currentStreak,
+        longestStreak,
+        manager,
+      ),
     );
     return this.convertToAchievementDtos(newMilestones);
   }
@@ -198,11 +208,14 @@ export class MilestoneService {
     eventType: string,
     eventData?: any,
   ): Promise<MilestoneAchievementDto[]> {
-    const newMilestones = await this.assignmentService.onCustomEvent(
-      userId,
-      category,
-      eventType,
-      eventData,
+    const newMilestones = await this.dataSource.transaction((manager) =>
+      this.assignmentService.onCustomEvent(
+        userId,
+        category,
+        eventType,
+        eventData,
+        manager,
+      ),
     );
     return this.convertToAchievementDtos(newMilestones);
   }

@@ -6,9 +6,12 @@ import {
   IsBoolean,
   IsArray,
   IsDateString,
+  IsUrl,
   Min,
   Max,
+  Validate,
 } from 'class-validator';
+import { IsSafeHttpUrlConstraint } from '../../common/security/safe-url.constraint';
 import {
   ChallengeDifficulty,
   ChallengeType,
@@ -76,8 +79,9 @@ export class CreateChallengeDto {
   @IsOptional()
   multipleChoiceOptions?: string[];
 
-  @IsString()
   @IsOptional()
+  @IsUrl({ require_tld: false })
+  @Validate(IsSafeHttpUrlConstraint)
   imageUrl?: string;
 
   @IsBoolean()

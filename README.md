@@ -52,7 +52,7 @@ StellarHunts uses URI versioning for API routes configured via `API_VERSION` in 
 
 ```bash
 # Clone the repository
-git clone https://github.com/UnityChainx/StellarHunts.git
+git clone https://github.com/UnityChainxx/StellarHunts.git
 cd StellarHunts
 
 # Install frontend dependencies

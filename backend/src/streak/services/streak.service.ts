@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { Streak } from '../entities/streak.entity';
-import type {
+import {
   StreakActivity,
-  ActivityType,
+  type ActivityType,
 } from '../entities/streak-activity.entity';
 import type {
   StreakCalculationService,
@@ -29,17 +29,21 @@ export class StreakService {
   // `undefined` to stay backwards-compatible with the existing manual DI shape
   // used throughout this codebase (CI also constructs services for tests).
   private readonly cacheService?: CacheService;
+  // Optional: when present, `recordActivity` runs atomically (issue #302).
+  private readonly dataSource?: DataSource;
 
   constructor(
     streakRepository: Repository<Streak>,
     activityRepository: Repository<StreakActivity>,
     calculationService: StreakCalculationService,
     cacheService?: CacheService,
+    dataSource?: DataSource,
   ) {
     this.streakRepository = streakRepository;
     this.activityRepository = activityRepository;
     this.calculationService = calculationService;
     this.cacheService = cacheService;
+    this.dataSource = dataSource;
   }
 
   async recordActivity(
@@ -47,6 +51,28 @@ export class StreakService {
     recordDto: RecordActivityDto,
     config: Partial<StreakCalculationConfig> = {},
   ): Promise<Streak> {
+    // The streak row, the activity row and the recalculation are a single
+    // unit of work (issue #302). When a DataSource is available they commit
+    // atomically; otherwise fall back to the direct repositories so the
+    // existing manual-DI call sites keep working.
+    if (this.dataSource) {
+      return this.dataSource.transaction((manager) =>
+        this.recordActivityWithManager(manager, userId, recordDto, config),
+      );
+    }
+    return this.recordActivityWithManager(undefined, userId, recordDto, config);
+  }
+
+  private async recordActivityWithManager(
+    manager: EntityManager | undefined,
+    userId: string,
+    recordDto: RecordActivityDto,
+    config: Partial<StreakCalculationConfig>,
+  ): Promise<Streak> {
+    const streakRepo = manager?.getRepository(Streak) ?? this.streakRepository;
+    const activityRepo =
+      manager?.getRepository(StreakActivity) ?? this.activityRepository;
+
     const activityDate = recordDto.activityDate
       ? new Date(recordDto.activityDate)
       : new Date();
@@ -55,23 +81,23 @@ export class StreakService {
     const normalizedDate = new Date(activityDate.toDateString());
 
     // Get or create streak record
-    let streak = await this.streakRepository.findOne({
+    let streak = await streakRepo.findOne({
       where: { userId },
     });
 
     if (!streak) {
-      streak = this.streakRepository.create({
+      streak = streakRepo.create({
         userId,
         currentStreak: 0,
         longestStreak: 0,
         totalActiveDays: 0,
         isActive: true,
       });
-      streak = await this.streakRepository.save(streak);
+      streak = await streakRepo.save(streak);
     }
 
     // Check if activity already recorded for this date and type
-    const existingActivity = await this.activityRepository.findOne({
+    const existingActivity = await activityRepo.findOne({
       where: {
         streakId: streak.id,
         userId,
@@ -88,10 +114,10 @@ export class StreakService {
       existingActivity.metadata = recordDto.metadata
         ? JSON.stringify(recordDto.metadata)
         : existingActivity.metadata;
-      await this.activityRepository.save(existingActivity);
+      await activityRepo.save(existingActivity);
     } else {
       // Create new activity record
-      const activity = this.activityRepository.create({
+      const activity = activityRepo.create({
         streakId: streak.id,
         userId,
         activityDate: normalizedDate,
@@ -102,18 +128,23 @@ export class StreakService {
           ? JSON.stringify(recordDto.metadata)
           : null,
       });
-      await this.activityRepository.save(activity);
+      await activityRepo.save(activity);
     }
 
-    // Recalculate streak
-    return this.recalculateStreak(userId, config);
+    // Recalculate streak inside the same unit of work
+    return this.recalculateStreak(userId, config, manager);
   }
 
   async recalculateStreak(
     userId: string,
     config: Partial<StreakCalculationConfig> = {},
+    manager?: EntityManager,
   ): Promise<Streak> {
-    const streak = await this.streakRepository.findOne({
+    const streakRepo = manager?.getRepository(Streak) ?? this.streakRepository;
+    const activityRepo =
+      manager?.getRepository(StreakActivity) ?? this.activityRepository;
+
+    const streak = await streakRepo.findOne({
       where: { userId },
     });
 
@@ -122,7 +153,7 @@ export class StreakService {
     }
 
     // Get all activity dates for this user
-    const activities = await this.activityRepository
+    const activities = await activityRepo
       .createQueryBuilder('activity')
       .select('DISTINCT activity.activityDate', 'activityDate')
       .where('activity.userId = :userId', { userId })
@@ -156,7 +187,7 @@ export class StreakService {
       streak.lastResetAt = new Date();
     }
 
-    return this.streakRepository.save(streak);
+    return streakRepo.save(streak);
   }
 
   async getStreakStats(
@@ -202,14 +233,23 @@ export class StreakService {
     };
   }
 
-  async getLeaderboard(limit = 10): Promise<StreakLeaderboardDto[]> {
+  async getLeaderboard(
+    limit = 10,
+    page = 1,
+  ): Promise<StreakLeaderboardDto[]> {
+    const normalizedLimit = Math.max(1, Math.min(limit, 100));
+    const normalizedPage = Math.max(1, page);
+
     const compute = async (): Promise<StreakLeaderboardDto[]> => {
       const streaks = await this.streakRepository
         .createQueryBuilder('streak')
         .where('streak.isActive = :isActive', { isActive: true })
         .orderBy('streak.currentStreak', 'DESC')
         .addOrderBy('streak.longestStreak', 'DESC')
-        .limit(limit)
+        .addOrderBy('streak.totalActiveDays', 'DESC')
+        .addOrderBy('streak.userId', 'ASC')
+        .skip((normalizedPage - 1) * normalizedLimit)
+        .take(normalizedLimit)
         .getMany();
 
       return streaks.map((streak, index) => ({
@@ -226,7 +266,7 @@ export class StreakService {
     // codebase used before this PR (#107).
     if (this.cacheService) {
       return this.cacheService.getOrSet(
-        `streak:leaderboard:limit:${limit}`,
+        `streak:leaderboard:page:${normalizedPage}:limit:${normalizedLimit}`,
         LEADERBOARD_TTL_SECONDS,
         compute,
       );

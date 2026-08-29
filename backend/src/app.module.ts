@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'path';
 import * as Joi from 'joi';
 
 import appConfig from 'config/app.config';
@@ -43,6 +44,7 @@ import { UserRankingModule } from './user-ranking/user-ranking.module';
 import { UserReactionModule } from './user-reaction/user-reaction.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
+import { GracefulShutdownService } from './graceful-shutdown.service';
 
 @Module({
   imports: [
@@ -52,9 +54,15 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
       load: [appConfig, databaseConfig],
       cache: true,
       validationSchema: Joi.object({
+        NODE_ENV: Joi.string()
+          .valid('development', 'test', 'production')
+          .default('development'),
+        PORT: Joi.number().port().default(3001),
         JWT_SECRET: Joi.string().required(),
+        JWT_EXPIRES_IN: Joi.string().default('15m'),
+        FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
         DATABASE_HOST: Joi.string().required(),
-        DATABASE_PORT: Joi.number().default(5432),
+        DATABASE_PORT: Joi.number().port().default(5432),
         DATABASE_USER: Joi.string().required(),
         DATABASE_PASSWORD: Joi.string().required(),
         DATABASE_NAME: Joi.string().required(),
@@ -74,8 +82,10 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
         password: configService.get('database.password'),
         database: configService.get('database.name'),
         entities: [User, TimeTrial, Puzzle, Category, Report],
-        synchronize: configService.get('database.synchronize'),
-        autoLoadEntities: configService.get('database.autoload'),
+        migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
+        synchronize: configService.get('database.synchronize') === true,
+        autoLoadEntities: configService.get('database.autoload') === true,
+        migrationsRun: configService.get('database.migrationsRun') === true,
       }),
     }),
     ActivityModule,
@@ -108,6 +118,6 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
     MaintenanceModeModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, GracefulShutdownService],
 })
 export class AppModule {}
