@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Progress } from './progress.entity';
+import { Progress } from './entities/progress.entity';
 import { ProgressResponseDto } from './dto/progress-response.dto';
 
 @Injectable()
