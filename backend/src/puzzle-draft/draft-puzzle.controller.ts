@@ -9,46 +9,48 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { AdminRole } from '../admin/admin-role.enum';
+import { JwtAuthGuard } from '../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../admin/guards/roles.guard';
+import { Roles } from '../admin/roles.decorator';
 import { DraftPuzzleService } from './draft-puzzle.service';
 import { CreateDraftDto } from './dto/create-draft.dto';
 import { UpdateDraftDto } from './dto/update-draft.dto';
-// Assume AuthGuard is set up to handle roles like admin/contributor
-import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
 
+// The draft workflow is an admin-only concern: creating, curating and
+// publishing puzzle drafts requires an authenticated admin account.
 @Controller('drafts')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class DraftPuzzleController {
   constructor(private readonly draftService: DraftPuzzleService) {}
 
   @Post()
-  @Roles('admin', 'contributor')
+  @Roles(AdminRole.ADMIN)
   create(@Body() dto: CreateDraftDto, @Req() req) {
     return this.draftService.create(dto, req.user.id);
   }
 
   @Get()
-  @Roles('admin')
+  @Roles(AdminRole.ADMIN)
   findAll() {
     return this.draftService.findAll();
   }
 
   @Patch(':id')
-  @Roles('admin', 'contributor')
+  @Roles(AdminRole.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateDraftDto) {
     return this.draftService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Roles(AdminRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.draftService.remove(id);
   }
 
   @Post(':id/publish')
-  @Roles('admin')
-  publish(@Param('id') id: string) {
-    return this.draftService.publish(id);
+  @Roles(AdminRole.ADMIN)
+  publish(@Param('id') id: string, @Req() req) {
+    return this.draftService.publish(id, req.user?.id ?? 'system');
   }
 }
