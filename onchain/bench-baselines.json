@@ -1,0 +1,20 @@
+{
+  "description": "Resource-budget baselines for the stellar-hunts contract benchmarks (issue #281). Measured by the bench_* tests in onchain/contracts/stellar_hunts/src/bench.rs and enforced by scripts/check-bench-budgets.py in CI. Raise a baseline only with a documented, justified change to the hot path; any material regression should fail the build.",
+  "benchmarks": {
+    "submit_answer_cpu": {
+      "max": 5000000,
+      "unit": "instructions",
+      "notes": "Single submit_answer call (incl. first-call player initialisation). Typical is ~200-500k; 5M is a generous ceiling."
+    },
+    "submit_answer_mem": {
+      "max": 131072,
+      "unit": "bytes",
+      "notes": "Memory cost of a single submit_answer call. 128 KB ceiling."
+    },
+    "ten_submit_answers_avg_cpu": {
+      "max": 5000000,
+      "unit": "instructions",
+      "notes": "Average CPU cost across ten consecutive correct submit_answer calls. Should stay well under the single-call ceiling."
+    }
+  }
+}

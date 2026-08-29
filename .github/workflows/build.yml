@@ -121,10 +121,17 @@ jobs:
       # ── Resource bench ─────────────────────────────────────────
       # Bench tests for submit_answer budget (issue #34). Output is
       # captured as an artifact so budget regressions are visible in
-      # the CI run summary.
+      # the CI run summary, and then enforced against the documented
+      # baselines in onchain/bench-baselines.json (issue #281) — a
+      # material regression fails the job.
       - name: Run resource bench
         working-directory: onchain
         run: cargo test --workspace --locked -- bench_ --nocapture 2>&1 | tee bench-output.txt
+
+      - name: Check bench budget thresholds
+        # Fails when any measured metric exceeds its baseline or when
+        # the bench produced no measurements at all (silent regression).
+        run: python3 scripts/check-bench-budgets.py onchain/bench-output.txt
 
       - name: Upload bench artifact
         uses: actions/upload-artifact@v4

@@ -84,13 +84,7 @@ fn test_double_mint_rejected() {
     game.mint(&nft_id, &r, &crate::Levels::Easy);
     // Second mint must fail (already-has-badge error).
     let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.init(
-            &admin,
-            &game,
-            &String::from_str(&env, &long_uri),
-            &String::from_str(&env, "StellarHuntsBadge"),
-            &String::from_str(&env, "SHB"),
-        );
+        game.mint(&nft_id, &r, &crate::Levels::Easy);
     }));
     assert!(should_panic.is_err());
 }

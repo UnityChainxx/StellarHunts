@@ -31,6 +31,7 @@ import { PuzzleCategoryModule } from './puzzle-category/puzzle-category.module';
 import { PuzzleDependencyModule } from './puzzle-dependency/puzzle-dependency.module';
 import { PuzzleModule } from './puzzle/puzzle.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
+import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReportModule } from './report/report.module';
@@ -131,6 +132,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     PuzzleModule,
     PuzzleSubmissionModule,
     PuzzleTranslationModule,
+    RateLimiterModule,
     ReferralModule,
     ReportModule,
     RewardShopModule,

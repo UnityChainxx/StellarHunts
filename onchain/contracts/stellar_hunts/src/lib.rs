@@ -76,11 +76,16 @@ pub enum DataKey {
 const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 fn get_schema_version(e: &Env) -> u32 {
-    e.storage().persistent().get(&DataKey::SchemaVersion).unwrap_or(0)
+    e.storage()
+        .persistent()
+        .get(&DataKey::SchemaVersion)
+        .unwrap_or(0)
 }
 
 fn set_schema_version(e: &Env) {
-    e.storage().persistent().set(&DataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
+    e.storage()
+        .persistent()
+        .set(&DataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
 }
 
 // ---------------------------------------------------------------------
@@ -102,6 +107,7 @@ pub enum Error {
     MissingNftContract = 9,
     AttemptTooSoon = 10,
     LevelImmutable = 11,
+    ArithmeticOverflow = 12,
 }
 
 // ---------------------------------------------------------------------
@@ -139,7 +145,12 @@ impl StellarHunts {
             .instance()
             .get(&DataKey::QuestionCount)
             .unwrap_or(0u64);
-        let question_id = count + 1;
+        // Explicit checked arithmetic: at u64::MAX the next question id
+        // cannot be represented, so the call fails with a defined error
+        // instead of silently wrapping.
+        let question_id = count
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
         env.storage()
             .instance()
             .set(&DataKey::QuestionCount, &question_id);
@@ -172,12 +183,15 @@ impl StellarHunts {
             panic_with_error!(&env, Error::QuestionPerLevelLimit);
         }
 
+        let next_index = idx
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
         env.storage()
             .persistent()
             .set(&DataKey::QuestionsByLevel(level.clone(), idx), &question_id);
         env.storage()
             .persistent()
-            .set(&DataKey::QuestionPerLevelIndex(level.clone()), &(idx + 1));
+            .set(&DataKey::QuestionPerLevelIndex(level.clone()), &next_index);
 
         env.events()
             .publish((Symbol::new(&env, "question_added"),), (question_id, level));
@@ -236,14 +250,24 @@ impl StellarHunts {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
 
-            env.storage()
-                .persistent()
-                .set(&DataKey::QuestionsByLevel(level.clone(), new_idx), &question_id);
-            env.storage()
-                .persistent()
-                .set(&DataKey::QuestionPerLevelIndex(level.clone()), &(new_idx + 1));
+            let new_next_index = new_idx
+                .checked_add(1)
+                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
+            env.storage().persistent().set(
+                &DataKey::QuestionsByLevel(level.clone(), new_idx),
+                &question_id,
+            );
+            env.storage().persistent().set(
+                &DataKey::QuestionPerLevelIndex(level.clone()),
+                &new_next_index,
+            );
 
-            let last_old_idx = old_idx - 1;
+            // `old_idx` counts the questions in the old level, so it is
+            // >= 1 whenever the question being moved exists there; a
+            // checked_sub keeps the underflow behavior explicit anyway.
+            let last_old_idx = old_idx
+                .checked_sub(1)
+                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
             for i in 0..old_idx {
                 let qid: u64 = env
                     .storage()
@@ -257,14 +281,13 @@ impl StellarHunts {
                             .persistent()
                             .get(&DataKey::QuestionsByLevel(old_level.clone(), j + 1))
                             .unwrap_or(0u64);
-                        env.storage().persistent().set(
-                            &DataKey::QuestionsByLevel(old_level.clone(), j),
-                            &next_qid,
-                        );
+                        env.storage()
+                            .persistent()
+                            .set(&DataKey::QuestionsByLevel(old_level.clone(), j), &next_qid);
                     }
-                    env.storage().persistent().remove(
-                        &DataKey::QuestionsByLevel(old_level.clone(), last_old_idx),
-                    );
+                    env.storage()
+                        .persistent()
+                        .remove(&DataKey::QuestionsByLevel(old_level.clone(), last_old_idx));
                     break;
                 }
             }
@@ -310,10 +333,8 @@ impl StellarHunts {
         env.storage()
             .persistent()
             .set(&DataKey::RetiredQuestion(question_id), &true);
-        env.events().publish(
-            (Symbol::new(&env, "question_retired"),),
-            (question_id,),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "question_retired"),), (question_id,));
     }
 
     pub fn set_nft_contract_address(env: Env, new_address: Address) {
@@ -371,13 +392,19 @@ impl StellarHunts {
             panic_with_error!(&env, Error::AttemptTooSoon);
         }
         lp.last_attempt_ledger = current_ledger;
-        lp.attempts += 1;
+        lp.attempts = lp
+            .attempts
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
 
         let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
         let is_correct = hashed == question.hashed_answer;
 
         if is_correct {
-            lp.last_question_index += 1;
+            lp.last_question_index = lp
+                .last_question_index
+                .checked_add(1)
+                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
             let per_level: u32 = env
                 .storage()
                 .instance()
@@ -643,3 +670,9 @@ fn require_admin(env: &Env) {
         .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
     admin.require_auth();
 }
+
+#[cfg(test)]
+mod test;
+
+#[cfg(test)]
+mod bench;

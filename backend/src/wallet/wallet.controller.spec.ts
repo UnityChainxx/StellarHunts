@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
+import { RateLimitGuard } from '../rate-limiter/rate-limit.guard';
+import { RateLimiterService } from '../rate-limiter/rate-limiter.service';
 
 describe('WalletController', () => {
   let controller: WalletController;
@@ -10,6 +13,9 @@ describe('WalletController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WalletController],
       providers: [
+        Reflector,
+        RateLimiterService,
+        RateLimitGuard,
         {
           provide: WalletService,
           useValue: {

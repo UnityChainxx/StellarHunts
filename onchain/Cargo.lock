@@ -1429,6 +1429,8 @@ name = "stellar-hunts-receiver"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-hunts-nft",
+ "stellar-hunts-types",
 ]
 
 [[package]]

@@ -21,6 +21,17 @@ import type {
   ReviewValidationResult,
 } from '../interfaces/review.interface';
 
+// Allowlist mapping public sort keys to known database columns (issue
+// #277). Arbitrary strings are never interpolated into the query builder;
+// anything not in this map is rejected with a 400.
+const REVIEW_SORT_COLUMNS: Record<string, string> = {
+  createdAt: 'review.createdAt',
+  rating: 'review.rating',
+  helpfulCount: 'review.helpfulCount',
+};
+
+const SORT_ORDERS = new Set(['ASC', 'DESC']);
+
 @Injectable()
 export class PuzzleReviewService {
   private readonly logger = new Logger(PuzzleReviewService.name);
@@ -298,10 +309,22 @@ export class PuzzleReviewService {
     // Get total count
     const total = await queryBuilder.getCount();
 
-    // Apply sorting
+    // Apply sorting. `sortBy` / `sortOrder` are runtime inputs (TS union
+    // types do not validate them), so map them through the allowlists
+    // before touching the query builder — never interpolate raw values.
     const sortBy = filters?.sortBy || 'createdAt';
-    const sortOrder = filters?.sortOrder || 'DESC';
-    queryBuilder.orderBy(`review.${sortBy}`, sortOrder);
+    const sortColumn = REVIEW_SORT_COLUMNS[sortBy];
+    if (!sortColumn) {
+      throw new BadRequestException(`Invalid sortBy field: "${sortBy}"`);
+    }
+
+    const sortOrder = (filters?.sortOrder || 'DESC').toUpperCase();
+    if (!SORT_ORDERS.has(sortOrder)) {
+      throw new BadRequestException(
+        `Invalid sortOrder: "${sortOrder}" (expected ASC or DESC)`,
+      );
+    }
+    queryBuilder.orderBy(sortColumn, sortOrder as 'ASC' | 'DESC');
 
     // Apply pagination
     const reviews = await queryBuilder
