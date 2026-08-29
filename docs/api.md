@@ -40,6 +40,7 @@ Interactive docs: `http://localhost:3001/api/docs` (Swagger UI)
 - [Activity](#activity)
 - [Wallet](#wallet)
 - [Admin](#admin)
+- [Health Probes](#health-probes)
 
 ---
 
@@ -405,3 +406,32 @@ Error bodies follow the NestJS default shape:
   "error": "Bad Request"
 }
 ```
+
+## Health Probes
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health/live` | Public | Liveness probe — returns `200` while the process is accepting requests |
+| GET | `/health/ready` | Public | Readiness probe — returns `200` only when required dependencies are reachable; `503` otherwise |
+
+### Liveness (`GET /health/live`)
+
+Minimal `{ status, uptime, timestamp }` payload. It never touches external
+dependencies, so a degraded dependency does not cause orchestrators to
+restart the pod.
+
+### Readiness (`GET /health/ready`)
+
+Runs dependency checks via [@nestjs/terminus](https://docs.nestjs.com/recipes/terminus)
+and returns the standard Terminus payload `{ status, info, error, details }`:
+
+- `postgres` — executes a `SELECT 1` against the TypeORM connection (1.5s timeout).
+- `redis` — pings the shared Redis client (1.5s timeout).
+- `stellar-rpc` — HTTP GET against `SOROBAN_RPC_URL` (2s timeout). Only
+  included when `STELLAR_MODE != mock` and `SOROBAN_RPC_URL` is configured;
+  in mock mode the check is reported healthy.
+
+Any failed required check flips `status` to `"error"` and returns HTTP `503`,
+so load balancers and orchestrators stop routing traffic to the instance.
+The endpoint returns HTTP `200` only when every required dependency is
+available.

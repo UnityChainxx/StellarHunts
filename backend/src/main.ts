@@ -1,32 +1,6 @@
-import { Module } from "@nestjs/common"
-import { AppController } from "./app.controller"
-import { AppService } from "./app.service"
-import { TypeOrmModule } from "@nestjs/typeorm"
-import { ConfigModule, ConfigService } from "@nestjs/config"
-import { AuthModule } from "./auth/auth.module"
-import { UserInventoryModule } from "./user-inventory/user-inventory.module"
-import { CacheModule } from "./cache/cache.module"
-import appConfig from "config/app.config"
-import databaseConfig from "config/database.config"
-import { PuzzleCategoryModule } from "./puzzle-category/puzzle-category.module"
-import { RewardModule } from "./reward/reward.module"
-import { PuzzleModule } from "./puzzle/puzzle.module"
-import { PuzzleSubmissionModule } from "./puzzle-submission/puzzle-submission.module"
-import { ContentModule } from "./content/content.module"
-import { UserReportCardModule } from "./user-report-card/user-report-card.module"
-import { PuzzleDependencyModule } from "./puzzle-dependency/puzzle-dependency.module"
-import { TimeTrialModule } from "./time-trial/time-trial.module"
-import { InAppNotificationsModule } from "./in-app-notifications/in-app-notifications.module"
-import { User } from "./auth/entities/user.entity"
-import { TimeTrial } from "./time-trial/time-trial.entity"
-import { Puzzle } from "./puzzle/puzzle.entity"
-import { Category } from "./puzzle-category/entities/category.entity"
-import { AnalyticModule } from './analytic/analytic.module';
-import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { ApiKeyModule } from './api-key/api-key.module';
-import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
@@ -44,13 +18,14 @@ async function bootstrap(): Promise<void> {
   //
   // Swagger UI is excluded so /docs, its JSON sibling /docs-json, and its
   // nested asset routes (e.g. /docs/swagger-ui-init.js) stay at canonical
-  // paths instead of being double-prefixed to /api. Nest treats string
-  // entries as exact paths, so we also pass a RegExp to cover /docs/....
-  // A single anchored regex covers `docs`, `docs-json`, and any nested
-  // /docs/<asset> route (e.g. /docs/swagger-ui-init.js). Nest evaluates the
-  // exclude list against the registered handler path before the global
-  // prefix is applied.
-  app.setGlobalPrefix('api', { exclude: [/^docs/] });
+  // paths instead of being double-prefixed to /api.
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'docs', method: RequestMethod.ALL },
+      { path: 'docs-json', method: RequestMethod.ALL },
+      { path: 'docs/(.*)', method: RequestMethod.ALL },
+    ],
+  });
 
   app.enableCors({
     origin: configService.get<string>('appConfig.cors.origin') ?? '*',
@@ -95,28 +70,6 @@ async function bootstrap(): Promise<void> {
       transform: true,
       forbidNonWhitelisted: false,
     }),
-    PuzzleModule,
-    PuzzleSubmissionModule,
-    ContentModule,
-    UserReportCardModule,
-    PuzzleDependencyModule,
-    TimeTrialModule,
-    InAppNotificationsModule,
-    PuzzleTranslationModule,
-    NFTClaimModule,
-    AnalyticModule,
-    RewardShopModule,
-    ApiKeyModule,
-    UserReactionModule,
-    MultiplayerQueueModule,
-    // Redis-backed caching + single-flight for the read-heavy endpoints
-    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
-    CacheModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
   );
 
   const apiVersion = configService.get<string>('appConfig.apiVersion') ?? '1.0';

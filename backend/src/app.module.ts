@@ -16,7 +16,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 import { ActivityModule } from './activity/activity.module';
-import { AnalyticModule } from './analytic/analytic.module';
+import { AnalyticsModule } from './analytic/analytic.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { AuthModule } from './auth/auth.module';
 import { ContentModule } from './content/content.module';
@@ -32,9 +32,9 @@ import { PuzzleModule } from './puzzle/puzzle.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
 import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
 import { ReferralModule } from './referral/referral.module';
-import { ReportModule } from './report/report.module';
+import { ReportsModule } from './report/report.module';
 import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { RewardModule } from './reward/reward.module';
+import { RewardsModule } from './reward/reward.module';
 import { StreakModule } from './streak/streak.module';
 import { TimeTrialModule } from './time-trial/time-trial.module';
 import { UserActivityLogModule } from './user-activity-log/user-activity-log.module';
@@ -42,6 +42,7 @@ import { UserInventoryModule } from './user-inventory/user-inventory.module';
 import { UserRankingModule } from './user-ranking/user-ranking.module';
 import { UserReactionModule } from './user-reaction/user-reaction.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
+import { HealthModule } from './health/health.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
 
 @Module({
@@ -76,8 +77,9 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
       }),
     }),
     ActivityModule,
-    AnalyticModule,
+    AnalyticsModule,
     ApiKeyModule,
+    HealthModule,
     AuthModule,
     ContentModule,
     ContentRatingModule,
@@ -92,9 +94,9 @@ import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.modul
     PuzzleSubmissionModule,
     PuzzleTranslationModule,
     ReferralModule,
-    ReportModule,
+    ReportsModule,
     RewardShopModule,
-    RewardModule,
+    RewardsModule,
     StreakModule,
     TimeTrialModule,
     UserActivityLogModule,
