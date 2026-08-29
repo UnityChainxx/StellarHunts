@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 
@@ -20,9 +24,11 @@ import Redis from 'ioredis';
  *     which is the same behaviour as before this PR (#107).
  */
 @Injectable()
-export class CacheService {
+export class CacheService implements OnApplicationShutdown {
   private readonly logger = new Logger(CacheService.name);
   private readonly inFlight = new Map<string, Promise<unknown>>();
+  private readonly namespace =
+    process.env.CACHE_NAMESPACE?.trim() || 'stellarhunts';
 
   constructor(@InjectRedis() private readonly redis: Redis) {}
 
@@ -41,10 +47,12 @@ export class CacheService {
     loader: () => Promise<T>,
     jitterSeconds: number = 10,
   ): Promise<T> {
+    const scopedKey = `${this.namespace}:${key}`;
+
     // 1. Try Redis first.
     let cached: string | null = null;
     try {
-      cached = await this.redis.get(key);
+      cached = await this.redis.get(scopedKey);
     } catch (err) {
       this.logger.warn(
         `Redis READ failed for key "${key}": ${(err as Error).message}. Falling through to loader.`,
@@ -62,7 +70,7 @@ export class CacheService {
     }
 
     // 2. Single-flight: piggyback on the in-flight promise if one exists.
-    const existing = this.inFlight.get(key);
+    const existing = this.inFlight.get(scopedKey);
     if (existing) {
       return existing as Promise<T>;
     }
@@ -78,7 +86,7 @@ export class CacheService {
           const ttl =
             baseTtlSeconds +
             Math.floor(Math.random() * Math.max(1, jitterSeconds));
-          await this.redis.set(key, JSON.stringify(fresh), 'EX', ttl);
+          await this.redis.set(scopedKey, JSON.stringify(fresh), 'EX', ttl);
         } catch (err) {
           this.logger.warn(
             `Redis WRITE failed for key "${key}": ${(err as Error).message}. Returning value without caching.`,
@@ -90,7 +98,7 @@ export class CacheService {
       }
     })();
 
-    this.inFlight.set(key, promise);
+    this.inFlight.set(scopedKey, promise);
     return promise as Promise<T>;
   }
 
@@ -111,5 +119,29 @@ export class CacheService {
   /** Test/observability helper: number of in-flight loaders right now. */
   inflightCount(): number {
     return this.inFlight.size;
+  }
+
+  /**
+   * Graceful shutdown hook — release the Redis connection so the event
+   * loop can drain and the process can exit. The underlying client uses
+   * `lazyConnect`, so it may be in the `wait` (never connected) or `end`
+   * (already closed) state; in those cases there is nothing to quit.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    const status = this.redis.status;
+    try {
+      if (status === 'ready') {
+        await this.redis.quit();
+      } else if (status !== 'end') {
+        // 'wait' | 'connecting' | 'reconnecting' — tear down without a
+        // round-trip to a server we never fully connected to.
+        this.redis.disconnect();
+      }
+      this.logger.log(`Redis connection closed (status was "${status}").`);
+    } catch (err) {
+      this.logger.warn(
+        `Redis disconnect failed (status "${status}"): ${(err as Error).message}`,
+      );
+    }
   }
 }

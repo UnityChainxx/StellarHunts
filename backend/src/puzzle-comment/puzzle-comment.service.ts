@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { sanitizeText } from '../common/sanitize-text';
 
 export interface PuzzleComment {
   id: string;
@@ -100,7 +101,7 @@ export class PuzzleCommentService {
       id: `comment-${this.commentCounter}`,
       userId,
       puzzleId,
-      commentText,
+      commentText: sanitizeText(commentText),
       timestamp: new Date(),
       isFlagged: false,
     };

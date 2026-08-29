@@ -97,6 +97,10 @@ export class ReferralInviteService {
       throw new NotFoundException('Invite not found');
     }
 
+    if (invite.status === InviteStatus.COMPLETED) {
+      return invite;
+    }
+
     if (invite.status !== InviteStatus.REGISTERED) {
       throw new ConflictException(
         'Invite must be in registered status to complete',

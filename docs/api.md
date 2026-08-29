@@ -1,7 +1,16 @@
 # StellarHunts API Reference
 
 Base URL: `http://localhost:3001` (development)  
-Interactive docs: `http://localhost:3001/api/docs` (Swagger UI)
+Interactive docs: `http://localhost:3001/docs` (Swagger UI)
+
+> **Global prefix:** every route below is served under the **`/api/v1`**
+> prefix (version from `API_VERSION` in `backend/config/app.config.ts`).
+> For example, `POST /auth/login` is called as
+> `POST http://localhost:3001/api/v1/auth/login`. The frontend builds all
+> backend URLs through `apiUrl()` in `frontend/lib/api.js` — see
+> [API route conventions](api-conventions.md) and the route-compatibility
+> tests (`frontend/tests/apiRoutes.test.js`,
+> `backend/test/api-prefix.e2e-spec.ts`).
 
 **Authentication:** Unless noted as _Public_, all endpoints require a
 `Authorization: Bearer <jwt>` header obtained from `POST /auth/login`.
@@ -336,11 +345,19 @@ On-chain Soroban NFT badge minting.
 
 ## Multiplayer Queue
 
-Real-time matchmaking via Socket.IO. See the WebSocket gateway for event names.
+Real-time matchmaking via Socket.IO. The gateway shares the Nest HTTP server
+(`ws://localhost:3001/socket.io`) and is closed automatically during graceful
+shutdown (#GracefulShutdown).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| *(Socket.IO)* | `ws://localhost:3001` | JWT | Connect to the multiplayer matchmaking gateway |
+| *(Socket.IO)* | `ws://localhost:3001/socket.io` | JWT | Connect to the multiplayer matchmaking gateway |
+
+### Socket.IO events
+
+| Direction | Event | Payload | Description |
+|-----------|-------|---------|-------------|
+| server → client | `match_found` | `MatchResultDto` (`{ matchId, playerIds, playerUsernames, status, gameMode, skillLevel, averageWaitTime, createdAt }`) | Emitted to all clients when the matchmaking cron pairs two players. |
 
 ---
 
