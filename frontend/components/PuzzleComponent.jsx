@@ -269,7 +269,7 @@ const PuzzleComponent = ({
                 walletConnected ? "bg-emerald-400 shadow-sm shadow-emerald-400/50" : "bg-gray-500"
               } transition-colors duration-300`}
             />
-            <span className="text-[10px] text-gray-500">
+            <span className="text-[10px] mt-0.5 text-gray-400">
               {walletConnected
                 ? `${walletAddress?.slice(0, 4)}…${walletAddress?.slice(-4)}`
                 : "Wallet disconnected"}
@@ -328,10 +328,10 @@ const PuzzleComponent = ({
               value={answer}
               onChange={handleAnswerChange}
               disabled={submitting || isCorrect}
-              className="h-12 border-white/10 bg-white/[0.04] pr-12 text-white placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-2 focus:ring-purple-400/20"
+              className="h-12 border-white/10 bg-white/[0.04] pr-12 text-white placeholder:text-gray-400 focus:border-purple-400/50 focus:ring-2 focus:ring-purple-400/30"
             />
             {/* Character count indicator */}
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
               {answer.length}
             </span>
           </div>

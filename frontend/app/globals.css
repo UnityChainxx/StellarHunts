@@ -33,6 +33,22 @@ body {
     --brand-pink: 236 72 153;
     --brand-dark: 9 9 11;
   }
+
+  /* ── Keyboard focus visibility (#324) ─────────────────────
+     Baseline visible focus indicator for every interactive
+     element, so a keyboard user can always see where they are.
+     Components that define their own focus ring (Tailwind
+     `focus-visible:ring-*` in the utilities layer) override
+     this with their more specific styling. `:focus-visible`
+     (not `:focus`) means mouse/pointer clicks do NOT flash a
+     ring, only keyboard navigation. High-contrast brand-purple
+     ring with clear offset works on both light and dark themes.
+     ──────────────────────────────────────────────────────── */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring, rgb(var(--brand-purple) / 0.9));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 }
 
 /* ── Reduced-motion support ─────────────────────────────────

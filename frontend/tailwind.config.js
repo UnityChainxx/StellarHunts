@@ -6,12 +6,14 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  theme: {
-  	extend: {
-  		colors: {
-  			background: 'var(--background)',
-  			foreground: 'var(--foreground)'
-  		},
+  theme: {  		extend: {
+  			colors: {
+  				background: 'var(--background)',
+  				foreground: 'var(--foreground)',
+  				'brand-purple': 'rgb(var(--brand-purple) / <alpha-value>)',
+  				'brand-pink': 'rgb(var(--brand-pink) / <alpha-value>)',
+  				'brand-dark': 'rgb(var(--brand-dark) / <alpha-value>)'
+  			},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

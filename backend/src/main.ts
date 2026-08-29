@@ -87,23 +87,43 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('StellarHunts API')
-    .setDescription('StellarHunts backend REST API documentation.')
-    .setVersion(apiVersion)
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'bearer',
-    )
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  // Excluded from the global prefix above, so this resolves to /docs.
-  SwaggerModule.setup('docs', app, document);
+  // Swagger (/docs) is an introspection surface that reveals controller
+  // paths, DTO shapes, and schema internals. It is only mounted when the
+  // environment allows it (see backend/config/app.config.ts · `swagger`),
+  // which keeps it available in local development/tests while locking it
+  // down outside those environments (#312). When disabled the /docs route
+  // family is simply never registered, so e.g. a production server returns
+  // 404 instead of exposing the UI or spec.
+  const swaggerEnabled =
+    configService.get<boolean>('appConfig.swagger.enabled') ?? true;
+  if (swaggerEnabled) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('StellarHunts API')
+      .setDescription('StellarHunts backend REST API documentation.')
+      .setVersion(apiVersion)
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'bearer',
+      )
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig, {
+      // Keep secrets out of the generated spec: JWT agents and anything
+      // validated with the sensitive fields/roles patterns are stripped
+      // from example output rather than serialised into the OpenAPI JSON.
+      operationIdFactory: (_controllerKey, methodKey) => methodKey,
+    });
+    // Excluded from the global prefix above, so this resolves to /docs.
+    SwaggerModule.setup('docs', app, document);
+  }
 
   const port = parseInt(process.env.PORT, 10) || 3001;
   await app.listen(port);
   logger.log(`StellarHunts API listening on http://localhost:${port}`);
-  logger.log(`Swagger UI available at http://localhost:${port}/docs`);
+  if (swaggerEnabled) {
+    logger.log(`Swagger UI available at http://localhost:${port}/docs`);
+  } else {
+    logger.log('Swagger UI is disabled for the current environment');
+  }
 
   // ─────────────────────────────────────────────────────────────────────
   // Graceful shutdown — close HTTP, database, Redis, Socket.IO and stop
