@@ -10,23 +10,22 @@ import { LoginDto } from "../dto/login.dto"
 import { InjectRepository } from "@nestjs/typeorm"
 
 export interface JwtPayload {
-  sub: string // user id
-  email: string
-  name: string
-  username?: string
-  iat?: number
-  exp?: number
+  sub: string; // user id
+  email: string;
+  name: string;
+  username?: string;
+  iat?: number;
+  exp?: number;
 }
 
 @Injectable()
 export class AuthService {
-
   constructor(
-  @InjectRepository(User)
-  private readonly userRepository: Repository<User>,
-  private readonly jwtService: JwtService,
-  private readonly configService: ConfigService,
-) {}
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Registers a new user.
@@ -44,10 +43,12 @@ export class AuthService {
     const { name, username, email, password } = registerDto
 
     try {
+      this.assertPasswordPolicy(password, email, username);
+
       // Check if user already exists
       const existingUser = await this.userRepository.findOne({
         where: { email: email.toLowerCase() },
-      })
+      });
 
       if (existingUser) {
         return this.genericRegistrationMessage()
@@ -59,23 +60,23 @@ export class AuthService {
         username: username.trim(),
         email: email.toLowerCase(),
         password, // Will be hashed by the entity hook
-      })
+      });
 
-      const savedUser = await this.userRepository.save(user)
+      const savedUser = await this.userRepository.save(user);
 
       // Generate JWT token
       const payload: JwtPayload = {
         sub: savedUser.id,
         email: savedUser.email,
         name: savedUser.name,
-      }
+      };
 
-      const accessToken = this.jwtService.sign(payload)
-      const expiresIn = this.getTokenExpirationTime()
+      const accessToken = this.jwtService.sign(payload);
+      const expiresIn = this.getTokenExpirationTime();
 
       return {
         accessToken,
-        tokenType: "Bearer",
+        tokenType: 'Bearer',
         expiresIn,
         user: {
           id: savedUser.id,
@@ -83,9 +84,9 @@ export class AuthService {
           email: savedUser.email,
           createdAt: savedUser.createdAt,
         },
-      }
+      };
     } catch (error) {
-      console.error("Registration error:", error) // Add logging
+      console.error('Registration error:', error); // Add logging
 
       if (error.code === "23505") {
         // PostgreSQL unique violation (email/username collision). Same
@@ -107,13 +108,13 @@ export class AuthService {
    * login response.
    */
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    const { email, password } = loginDto
+    const { email, password } = loginDto;
 
     try {
       // Find user by email
       const user = await this.userRepository.findOne({
         where: { email: email.toLowerCase() },
-      })
+      });
 
       // Check password. Nobody exists OR account deactivated OR wrong
       // password all surface the exact same generic message & status.
@@ -125,21 +126,21 @@ export class AuthService {
       // Update last login time
       await this.userRepository.update(user.id, {
         lastLoginAt: new Date(),
-      })
+      });
 
       // Generate JWT token
       const payload: JwtPayload = {
         sub: user.id,
         email: user.email,
         name: user.name,
-      }
+      };
 
-      const accessToken = this.jwtService.sign(payload)
-      const expiresIn = this.getTokenExpirationTime()
+      const accessToken = this.jwtService.sign(payload);
+      const expiresIn = this.getTokenExpirationTime();
 
       return {
         accessToken,
-        tokenType: "Bearer",
+        tokenType: 'Bearer',
         expiresIn,
         user: {
           id: user.id,
@@ -147,12 +148,12 @@ export class AuthService {
           email: user.email,
           createdAt: user.createdAt,
         },
-      }
+      };
     } catch (error) {
-      console.error("Login error:", error) // Add logging
+      console.error('Login error:', error); // Add logging
 
       if (error instanceof UnauthorizedException) {
-        throw error
+        throw error;
       }
 
       throw new BadRequestException("Login failed")
@@ -162,25 +163,25 @@ export class AuthService {
   async validateUser(payload: JwtPayload): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
-    })
+    });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException("User not found or inactive")
+      throw new UnauthorizedException('User not found or inactive');
     }
 
-    return user
+    return user;
   }
 
   async getUserById(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
-    })
+    });
 
     if (!user) {
-      throw new UnauthorizedException("User not found")
+      throw new UnauthorizedException('User not found');
     }
 
-    return user
+    return user;
   }
 
   /**
@@ -194,27 +195,53 @@ export class AuthService {
   }
 
   private getTokenExpirationTime(): number {
-    const expiresIn = this.configService.get("JWT_EXPIRES_IN") || "15m"
+    const expiresIn = this.configService.get('JWT_EXPIRES_IN') || '15m';
 
     // Convert time string to seconds
-    if (typeof expiresIn === "string") {
-      const timeValue = Number.parseInt(expiresIn)
-      const timeUnit = expiresIn.slice(-1)
+    if (typeof expiresIn === 'string') {
+      const timeValue = Number.parseInt(expiresIn);
+      const timeUnit = expiresIn.slice(-1);
 
       switch (timeUnit) {
-        case "s":
-          return timeValue
-        case "m":
-          return timeValue * 60
-        case "h":
-          return timeValue * 60 * 60
-        case "d":
-          return timeValue * 24 * 60 * 60
+        case 's':
+          return timeValue;
+        case 'm':
+          return timeValue * 60;
+        case 'h':
+          return timeValue * 60 * 60;
+        case 'd':
+          return timeValue * 24 * 60 * 60;
         default:
-          return 900 // 15 minutes default
+          return 900; // 15 minutes default
       }
     }
 
-    return typeof expiresIn === "number" ? expiresIn : 900
+    return typeof expiresIn === 'number' ? expiresIn : 900;
+  }
+
+  private assertPasswordPolicy(
+    password: string,
+    email: string,
+    username: string,
+  ): void {
+    const normalized = password.trim().toLowerCase();
+    const localPart = email.split('@')[0]?.toLowerCase() ?? '';
+    const userName = username.toLowerCase();
+
+    if (BREACHED_PASSWORDS.has(normalized)) {
+      throw new BadRequestException(
+        'Choose a stronger password that is not widely compromised',
+      );
+    }
+
+    if (
+      normalized.includes(localPart) ||
+      normalized.includes(userName) ||
+      normalized.includes('password')
+    ) {
+      throw new BadRequestException(
+        'Choose a password that does not contain your personal identifiers',
+      );
+    }
   }
 }

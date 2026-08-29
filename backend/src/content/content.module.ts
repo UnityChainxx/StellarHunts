@@ -10,4 +10,4 @@ import { Content } from './content.entity';
   providers: [ContentService],
   exports: [ContentService],
 })
-export class ContentModule {} 
+export class ContentModule {}

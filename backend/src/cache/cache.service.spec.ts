@@ -15,6 +15,9 @@ describe('CacheService', () => {
     get: jest.Mock;
     set: jest.Mock;
     del: jest.Mock;
+    status: string;
+    quit: jest.Mock;
+    disconnect: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -22,6 +25,9 @@ describe('CacheService', () => {
       get: jest.fn(),
       set: jest.fn().mockResolvedValue('OK'),
       del: jest.fn().mockResolvedValue(1),
+      status: 'ready',
+      quit: jest.fn().mockResolvedValue('OK'),
+      disconnect: jest.fn(),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -71,7 +77,9 @@ describe('CacheService', () => {
     const results = await Promise.all(promises);
 
     expect(loaderCalls).toBe(1);
-    expect(results.every((r) => r && (r as any).value === 'expensive')).toBe(true);
+    expect(results.every((r) => r && (r as any).value === 'expensive')).toBe(
+      true,
+    );
     expect(redisMock.set).toHaveBeenCalledTimes(1);
     // The in-flight map must drain after completion.
     expect(service.inflightCount()).toBe(0);
@@ -88,7 +96,11 @@ describe('CacheService', () => {
     const results = await Promise.all(promises);
 
     expect(loader).toHaveBeenCalledTimes(1);
-    expect(results.every((r) => r instanceof Error && (r as Error).message === 'boom')).toBe(true);
+    expect(
+      results.every(
+        (r) => r instanceof Error && (r as Error).message === 'boom',
+      ),
+    ).toBe(true);
     expect(redisMock.set).not.toHaveBeenCalled();
     expect(service.inflightCount()).toBe(0);
   });
@@ -133,5 +145,34 @@ describe('CacheService', () => {
 
     redisMock.del.mockRejectedValueOnce(new Error('redis down'));
     await expect(service.invalidate('c')).resolves.toBeUndefined();
+  });
+
+  describe('onApplicationShutdown (graceful shutdown)', () => {
+    it('QUITs an active (ready) Redis connection', async () => {
+      redisMock.status = 'ready';
+      await service.onApplicationShutdown();
+      expect(redisMock.quit).toHaveBeenCalledTimes(1);
+      expect(redisMock.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('disconnects without a round-trip when the client never connected (lazyConnect "wait")', async () => {
+      redisMock.status = 'wait';
+      await service.onApplicationShutdown();
+      expect(redisMock.disconnect).toHaveBeenCalledTimes(1);
+      expect(redisMock.quit).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the connection is already ended', async () => {
+      redisMock.status = 'end';
+      await service.onApplicationShutdown();
+      expect(redisMock.quit).not.toHaveBeenCalled();
+      expect(redisMock.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('tolerates a failed quit without throwing', async () => {
+      redisMock.status = 'ready';
+      redisMock.quit.mockRejectedValueOnce(new Error('connection lost'));
+      await expect(service.onApplicationShutdown()).resolves.toBeUndefined();
+    });
   });
 });

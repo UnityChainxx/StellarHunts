@@ -12,12 +12,18 @@ export class CreatePuzzleDependencyDto {
   @IsNotEmpty()
   dependsOnPuzzleId: string;
 
-  @ApiProperty({ description: 'Whether this dependency is required', default: true })
+  @ApiProperty({
+    description: 'Whether this dependency is required',
+    default: true,
+  })
   @IsBoolean()
   @IsOptional()
   isRequired?: boolean;
 
-  @ApiProperty({ description: 'Optional description of the dependency', required: false })
+  @ApiProperty({
+    description: 'Optional description of the dependency',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   description?: string;

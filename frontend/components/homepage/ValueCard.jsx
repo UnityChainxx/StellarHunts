@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   Brain,
   Trophy,
@@ -11,12 +14,16 @@ import {
 } from "lucide-react";
 
 const ValueCard = ({ icon: Icon, title, description, stats, delay }) => {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <div
       className="relative group"
-      style={{
-        animation: `fadeInUp 0.6s ease-out ${delay}s both`,
-      }}
+      style={
+        prefersReducedMotion
+          ? undefined
+          : { animation: `fadeInUp 0.6s ease-out ${delay}s both` }
+      }
     >
       {/* Animated border gradient */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur opacity-0 group-hover:opacity-75 transition duration-500" />

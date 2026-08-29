@@ -21,15 +21,15 @@ describe("AuthService", () => {
     create: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
-  } as unknown as jest.Mocked<Partial<Repository<User>>>
+  } as unknown as jest.Mocked<Partial<Repository<User>>>;
 
   const mockJwtService = {
     sign: jest.fn(),
-  } as unknown as jest.Mocked<JwtService>
+  } as unknown as jest.Mocked<JwtService>;
 
   const mockConfigService = {
     get: jest.fn(),
-  } as unknown as jest.Mocked<ConfigService>
+  } as unknown as jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -48,7 +48,7 @@ describe("AuthService", () => {
           useValue: mockConfigService,
         },
       ],
-    }).compile()
+    }).compile();
 
     service = module.get<AuthService>(AuthService)
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>
@@ -56,10 +56,10 @@ describe("AuthService", () => {
   })
 
   afterEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
-  describe("register", () => {
+  describe('register', () => {
     const registerDto: RegisterDto = {
       name: "John Doe",
       username: "john_doe",
@@ -83,10 +83,10 @@ describe("AuthService", () => {
 
       const result = (await service.register(registerDto)) as AuthResponseDto
 
-      expect(result).toHaveProperty("accessToken", "jwt-token")
-      expect(result).toHaveProperty("user")
-      expect(result.user.email).toBe("john@example.com")
-    })
+      expect(result).toHaveProperty('accessToken', 'jwt-token');
+      expect(result).toHaveProperty('user');
+      expect(result.user.email).toBe('john@example.com');
+    });
 
     it("should return a generic neutral message if user already exists (anti-enumeration)", async () => {
       const existingUser = { id: "existing-user" } as User
@@ -114,11 +114,11 @@ describe("AuthService", () => {
     })
   })
 
-  describe("login", () => {
+  describe('login', () => {
     const loginDto: LoginDto = {
-      email: "john@example.com",
-      password: "SecurePass123!",
-    }
+      email: 'john@example.com',
+      password: 'SecurePass123!',
+    };
 
     const validatedUser = (isActive: boolean, passwordMatches: boolean) => {
       const user = {
@@ -138,11 +138,11 @@ describe("AuthService", () => {
       jwtService.sign.mockReturnValue("jwt-token")
       mockConfigService.get.mockReturnValue("15m")
 
-      const result = await service.login(loginDto)
+      const result = await service.login(loginDto);
 
-      expect(result).toHaveProperty("accessToken", "jwt-token")
-      expect(result).toHaveProperty("user")
-    })
+      expect(result).toHaveProperty('accessToken', 'jwt-token');
+      expect(result).toHaveProperty('user');
+    });
 
     it("should throw UnauthorizedException for unknown email without revealing that the account does not exist", async () => {
       userRepository.findOne.mockResolvedValue(null)

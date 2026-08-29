@@ -1,185 +1,110 @@
-import { useState, useEffect, useCallback } from 'react';
-import puzzleReviewService from '../services/puzzleReviewService';
+import { useState, useCallback } from 'react';
+import {
+  usePuzzleReviewsQuery,
+  useReviewStatsQuery,
+  useApproveReviewMutation,
+  useRejectReviewMutation,
+  useBulkApproveReviewsMutation,
+  useBulkRejectReviewsMutation,
+} from '../services/puzzleReviewHooks';
 
+/**
+ * Thin glue hook — wraps TanStack Query hooks for the puzzle review dashboard.
+ * The page component uses this hook so it doesn't need useState/useCallback itself.
+ */
 export const usePuzzleReviews = () => {
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  });
   const [filters, setFilters] = useState({
     status: 'PENDING',
     sortBy: 'createdAt',
     sortOrder: 'DESC',
   });
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
 
-  // Fetch reviews with current filters and pagination
-  const fetchReviews = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await puzzleReviewService.getPuzzleReviews({
-        ...filters,
-        page: pagination.page,
-        limit: pagination.limit,
-      });
-      
-      if (response.success) {
-        setReviews(response.data.reviews);
-        setPagination(prev => ({
-          ...prev,
-          total: response.data.total,
-          totalPages: response.data.totalPages,
-        }));
-      } else {
-        setError(response.message || 'Failed to fetch reviews');
-      }
-    } catch (err) {
-      setError(err.message || 'An error occurred while fetching reviews');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, pagination.page, pagination.limit]);
+  const queryFilters = { ...filters, page, limit };
 
-  // Update filters and reset to first page
+  const {
+    data: queryData,
+    isLoading: loading,
+    error: queryError,
+  } = usePuzzleReviewsQuery(queryFilters);
+
+  const {
+    data: stats,
+    isLoading: statsLoading,
+  } = useReviewStatsQuery();
+
+  const approveReviewMutation = useApproveReviewMutation();
+  const rejectReviewMutation = useRejectReviewMutation();
+  const bulkApproveMutation = useBulkApproveReviewsMutation();
+  const bulkRejectMutation = useBulkRejectReviewsMutation();
+
+  const error = queryError?.message || null;
+
+  const reviews = queryData?.reviews ?? [];
+  const pagination = {
+    page,
+    limit,
+    total: queryData?.total ?? 0,
+    totalPages: queryData?.totalPages ?? 0,
+  };
+
   const updateFilters = useCallback((newFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setFilters((prev) => ({ ...prev, ...newFilters }));
+    setPage(1);
   }, []);
 
-  // Update pagination
   const updatePagination = useCallback((newPagination) => {
-    setPagination(prev => ({ ...prev, ...newPagination }));
+    if (newPagination.page) setPage(newPagination.page);
   }, []);
 
-  // Approve a review
-  const approveReview = useCallback(async (reviewId, moderationReason = '') => {
-    try {
-      const response = await puzzleReviewService.updateReviewStatus(
-        reviewId,
-        'APPROVED',
-        moderationReason
-      );
-      
-      if (response.success) {
-        // Update the review in the local state
-        setReviews(prev => 
-          prev.map(review => 
-            review.id === reviewId 
-              ? { ...review, status: 'APPROVED', moderationInfo: response.data.moderationInfo }
-              : review
-          )
-        );
+  const approveReview = useCallback(
+    async (reviewId, moderationReason = '') => {
+      try {
+        await approveReviewMutation.mutateAsync({ reviewId, moderationReason });
         return { success: true, message: 'Review approved successfully' };
-      } else {
-        return { success: false, message: response.message };
+      } catch (err) {
+        return { success: false, message: err.message };
       }
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  }, []);
+    },
+    [approveReviewMutation],
+  );
 
-  // Reject a review
-  const rejectReview = useCallback(async (reviewId, moderationReason = '') => {
-    try {
-      const response = await puzzleReviewService.updateReviewStatus(
-        reviewId,
-        'REJECTED',
-        moderationReason
-      );
-      
-      if (response.success) {
-        // Update the review in the local state
-        setReviews(prev => 
-          prev.map(review => 
-            review.id === reviewId 
-              ? { ...review, status: 'REJECTED', moderationInfo: response.data.moderationInfo }
-              : review
-          )
-        );
+  const rejectReview = useCallback(
+    async (reviewId, moderationReason = '') => {
+      try {
+        await rejectReviewMutation.mutateAsync({ reviewId, moderationReason });
         return { success: true, message: 'Review rejected successfully' };
-      } else {
-        return { success: false, message: response.message };
+      } catch (err) {
+        return { success: false, message: err.message };
       }
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  }, []);
+    },
+    [rejectReviewMutation],
+  );
 
-  // Bulk approve reviews
-  const bulkApproveReviews = useCallback(async (reviewIds, moderationReason = '') => {
-    try {
-      const response = await puzzleReviewService.bulkUpdateReviewStatuses(
-        reviewIds,
-        'APPROVED',
-        moderationReason
-      );
-      
-      if (response.success) {
-        // Refresh the reviews list
-        await fetchReviews();
+  const bulkApproveReviews = useCallback(
+    async (reviewIds, moderationReason = '') => {
+      try {
+        await bulkApproveMutation.mutateAsync({ reviewIds, moderationReason });
         return { success: true, message: `${reviewIds.length} reviews approved successfully` };
-      } else {
-        return { success: false, message: response.message };
+      } catch (err) {
+        return { success: false, message: err.message };
       }
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  }, [fetchReviews]);
+    },
+    [bulkApproveMutation],
+  );
 
-  // Bulk reject reviews
-  const bulkRejectReviews = useCallback(async (reviewIds, moderationReason = '') => {
-    try {
-      const response = await puzzleReviewService.bulkUpdateReviewStatuses(
-        reviewIds,
-        'REJECTED',
-        moderationReason
-      );
-      
-      if (response.success) {
-        // Refresh the reviews list
-        await fetchReviews();
+  const bulkRejectReviews = useCallback(
+    async (reviewIds, moderationReason = '') => {
+      try {
+        await bulkRejectMutation.mutateAsync({ reviewIds, moderationReason });
         return { success: true, message: `${reviewIds.length} reviews rejected successfully` };
-      } else {
-        return { success: false, message: response.message };
+      } catch (err) {
+        return { success: false, message: err.message };
       }
-    } catch (err) {
-      return { success: false, message: err.message };
-    }
-  }, [fetchReviews]);
-
-  // Get review statistics
-  const [stats, setStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
-      const response = await puzzleReviewService.getReviewStats();
-      if (response.success) {
-        setStats(response.data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch stats:', err);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  // Fetch reviews on mount and when filters/pagination change
-  useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
-
-  // Fetch stats on mount
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    },
+    [bulkRejectMutation],
+  );
 
   return {
     // State
@@ -190,15 +115,13 @@ export const usePuzzleReviews = () => {
     filters,
     stats,
     statsLoading,
-    
+
     // Actions
-    fetchReviews,
     updateFilters,
     updatePagination,
     approveReview,
     rejectReview,
     bulkApproveReviews,
     bulkRejectReviews,
-    fetchStats,
   };
-}; 
+};

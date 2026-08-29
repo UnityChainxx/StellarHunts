@@ -1,27 +1,77 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import axios from "axios";
+import { apiUrl } from "@/lib/api";
 
-// Keep only a small, lightweight index of NFTs in localStorage so we never
-// blow the ~5MB quota as the collection grows (#104). Full NFT payloads are
-// fetched from the server on demand via the paginated inventory endpoints.
-const PERSISTED_NFT_LIMIT = 50;
+/**
+ * Returns a storage adapter that debounces `setItem` so that the
+ * hot-path game actions (auth, score updates, NFT additions) don't
+ * trigger a synchronous localStorage write on every `set()` call.
+ * Bursts of mutations within `delayMs` collapse into one write.
+ *
+ * `removeItem` is flushed immediately so logout/reset semantics
+ * aren't affected by the throttle window.
+ *
+ * Implementation note: the returned adapter is captured by
+ * `createJSONStorage` exactly once (Zustand invokes the factory
+ * function once and caches the result). The closure-scoped `timer`
+ * and `pendingValue` therefore survive across `setItem` calls. Do
+ * not move the factory invocation inside `setItem` or the debounce
+ * will be defeated by per-call instance re-creation.
+ */
 
-const buildLightweightNftIndex = (nfts = []) => {
-  return nfts.slice(-PERSISTED_NFT_LIMIT).map((nft) => {
-    if (!nft || typeof nft !== "object") return nft;
-    return {
-      id: nft.id ?? nft.assetId ?? null,
-      assetId: nft.assetId ?? nft.id ?? null,
-      assetType: nft.assetType ?? "nft",
-      name: nft.name,
-      rarity: nft.rarity,
-      imageUrl: nft.imageUrl,
-      src: nft.src,
-      acquiredAt: nft.acquiredAt,
-    };
-  });
+const createThrottledStorage = (storage, delayMs = 150) => {
+  let timer = null;
+  let pendingValue = null;
+  const flush = () => {
+    if (pendingValue !== null) {
+      try {
+        storage.setItem("game-storage", pendingValue);
+      } catch (e) {
+        // Quota or serialization errors should not break gameplay.
+      }
+      pendingValue = null;
+    }
+    timer = null;
+  };
+  return {
+    getItem: (name) => storage.getItem(name),
+    setItem: (name, value) => {
+      pendingValue = value;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(flush, delayMs);
+    },
+    removeItem: (name) => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      pendingValue = null;
+      storage.removeItem(name);
+    },
+  };
 };
+
+/**
+ * Returns `window.localStorage` in the browser, or a no-op storage
+ * during SSR so `persist` doesn't crash during Next.js static
+ * generation / server rendering.
+ */
+const safeLocalStorage = () => {
+  if (typeof window === "undefined") {
+    return {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
+  }
+  return window.localStorage;
+};
+
+const DIFFICULTY_LEVELS = ["easy", "medium", "difficult", "advanced"];
+const POINTS_PER_COMPLETION = 100;
 
 const useGameStore = create(
   persist(
@@ -39,41 +89,56 @@ const useGameStore = create(
       // NFT collection
       nfts: [],
 
+      // Error surface
+      errors: [],
+
+      // Difficulty configuration (loaded from API)
+      difficultyConfig: null,
+
+      clearError: (index) =>
+        set((state) => ({
+          errors: state.errors.filter((_, i) => i !== index),
+        })),
+
       // Auth actions
       register: async (username, password) => {
         try {
           const response = await axios.post(
-            "http://localhost:4001/auth/register",
+            apiUrl("/auth/register"),
             { username, password },
-            { withCredentials: true }
+            { withCredentials: true },
           );
           set({ user: response.data });
+          return { ok: true };
         } catch (error) {
-          console.error("Registration failed:", error);
-          throw error;
+          const entry = { action: "register", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
+          return { ok: false, error: error.message };
         }
       },
 
       login: async (username, password) => {
         try {
           const response = await axios.post(
-            "http://localhost:4001/auth/login",
+            apiUrl("/auth/login"),
             { username, password },
-            { withCredentials: true }
+            { withCredentials: true },
           );
           set({ user: response.data });
+          return { ok: true };
         } catch (error) {
-          console.error("Login failed:", error);
-          throw error;
+          const entry = { action: "login", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
+          return { ok: false, error: error.message };
         }
       },
 
       logout: async () => {
         try {
           await axios.post(
-            "http://localhost:4001/auth/logout",
+            apiUrl("/auth/logout"),
             {},
-            { withCredentials: true }
+            { withCredentials: true },
           );
           set({
             user: null,
@@ -85,7 +150,20 @@ const useGameStore = create(
             nfts: [],
           });
         } catch (error) {
-          console.error("Logout failed:", error);
+          const entry = { action: "logout", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
+        }
+      },
+
+      fetchDifficultyConfig: async () => {
+        try {
+          const response = await axios.get(
+            apiUrl("/game/difficulty-config"),
+          );
+          set({ difficultyConfig: response.data });
+        } catch (error) {
+          const entry = { action: "fetchDifficultyConfig", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
         }
       },
 
@@ -98,12 +176,13 @@ const useGameStore = create(
           completedPuzzles,
           completedDifficulties,
           score,
+          difficultyConfig,
         } = get();
         if (!user) return;
 
         const newCompletedPuzzles = [...completedPuzzles, puzzleId];
         const currentDifficultyPuzzles = newCompletedPuzzles.filter((id) =>
-          id.startsWith(currentDifficulty)
+          id.startsWith(currentDifficulty),
         );
 
         const isLevelCompleted = currentDifficultyPuzzles.length === 5;
@@ -115,20 +194,21 @@ const useGameStore = create(
         let nextPuzzleIndex = (currentPuzzleIndex + 1) % 5;
 
         if (isLevelCompleted) {
-          const difficultyLevels = ["easy", "medium", "difficult", "advanced"];
-          const currentIndex = difficultyLevels.indexOf(currentDifficulty);
-          if (currentIndex < difficultyLevels.length - 1) {
-            nextDifficulty = difficultyLevels[currentIndex + 1];
+          const levels = difficultyConfig?.levels ?? DIFFICULTY_LEVELS;
+          const currentIndex = levels.indexOf(currentDifficulty);
+          if (currentIndex < levels.length - 1) {
+            nextDifficulty = levels[currentIndex + 1];
             nextPuzzleIndex = 0;
           }
         }
 
-        const newScore = score + 100;
+        const pointsPerCompletion = difficultyConfig?.pointsPerCompletion ?? POINTS_PER_COMPLETION;
+        const newScore = score + pointsPerCompletion;
 
         // Update the backend
         try {
           await axios.post(
-            "http://localhost:4001/game/update",
+            apiUrl("/game/update"),
             {
               userId: user.id,
               completedPuzzles: newCompletedPuzzles,
@@ -137,7 +217,7 @@ const useGameStore = create(
               currentPuzzleIndex: nextPuzzleIndex,
               score: newScore,
             },
-            { withCredentials: true }
+            { withCredentials: true },
           );
 
           set({
@@ -148,7 +228,8 @@ const useGameStore = create(
             score: newScore,
           });
         } catch (error) {
-          console.error("Failed to update game progress:", error);
+          const entry = { action: "completePuzzle", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
         }
       },
 
@@ -158,17 +239,18 @@ const useGameStore = create(
 
         try {
           await axios.post(
-            "http://localhost:4001/nft/add",
+            apiUrl("/nft/add"),
             {
               userId: user.id,
               nft,
             },
-            { withCredentials: true }
+            { withCredentials: true },
           );
 
           set({ nfts: [...nfts, nft] });
         } catch (error) {
-          console.error("Failed to add NFT:", error);
+          const entry = { action: "addNFT", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
         }
       },
 
@@ -181,11 +263,11 @@ const useGameStore = create(
 
         try {
           const response = await axios.get(
-            `http://localhost:4001/users/${user.id}/inventory/nfts`,
+            apiUrl(`/users/${user.id}/inventory/nfts`),
             {
               params: { page, limit },
               withCredentials: true,
-            }
+            },
           );
 
           const data = response.data || {};
@@ -199,14 +281,15 @@ const useGameStore = create(
             const existing = get().nfts || [];
             const seen = new Set(existing.map((n) => n.id));
             const merged = existing.concat(
-              items.filter((n) => n && !seen.has(n.id))
+              items.filter((n) => n && !seen.has(n.id)),
             );
             set({ nfts: merged });
           }
 
           return { items, page, limit, total, hasMore };
         } catch (error) {
-          console.error("Failed to fetch NFT page:", error);
+          const entry = { action: "fetchNftsPage", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
           return { items: [], page, limit, total: 0, hasMore: false };
         }
       },
@@ -218,12 +301,13 @@ const useGameStore = create(
 
         try {
           const response = await axios.get(
-            `http://localhost:4001/user/${user.id}`,
-            { withCredentials: true }
+            apiUrl(`/users/${user.id}`),
+            { withCredentials: true },
           );
           set(response.data);
         } catch (error) {
-          console.error("Failed to load user data:", error);
+          const entry = { action: "loadUserData", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
         }
       },
 
@@ -234,9 +318,9 @@ const useGameStore = create(
 
         try {
           await axios.post(
-            `http://localhost:4001/game/reset`,
+            apiUrl("/game/reset"),
             { userId: user.id },
-            { withCredentials: true }
+            { withCredentials: true },
           );
           set({
             currentDifficulty: "easy",
@@ -247,91 +331,33 @@ const useGameStore = create(
             nfts: [],
           });
         } catch (error) {
-          console.error("Failed to reset progress:", error);
+          const entry = { action: "resetProgress", message: error.message, time: Date.now() };
+          set((state) => ({ errors: [...state.errors, entry] }));
         }
       },
     }),
     {
       name: "game-storage",
-      storage: createJSONStorage(() => {
-        // Wrap localStorage in a defensive try/catch — if quota is exceeded
-        // (#104) we drop the NFT index instead of throwing and corrupting the
-        // hydration of the rest of the persisted state.
-        const safeStorage = {
-          getItem: (name) => {
-            try {
-              return localStorage.getItem(name);
-            } catch (err) {
-              console.warn("localStorage read failed:", err);
-              return null;
-            }
-          },
-          setItem: (name, value) => {
-            try {
-              localStorage.setItem(name, value);
-            } catch (err) {
-              // Quota exceeded — persist everything except the NFT index.
-              try {
-                const slim = JSON.parse(value);
-                if (slim && slim.state && Array.isArray(slim.state.nfts)) {
-                  slim.state.nfts = [];
-                  localStorage.setItem(name, JSON.stringify(slim));
-                  return;
-                }
-              } catch (_) {
-                /* fallthrough */
-              }
-              console.warn("localStorage write failed:", err);
-            }
-          },
-          removeItem: (name) => {
-            try {
-              localStorage.removeItem(name);
-            } catch (err) {
-              console.warn("localStorage remove failed:", err);
-            }
-          },
-        };
-        return safeStorage;
-      }),
+      // Throttle writes so the localStorage payload is only re-serialised
+      // and written once per coalescing window (see `createThrottledStorage`).
+      storage: createJSONStorage(() =>
+        createThrottledStorage(safeLocalStorage()),
+      ),
+      // Only durable progress fields are persisted. Transient state (none
+      // currently, but a narrow allow-list keeps the storage size small and
+      // future-proofs against accidental bloat) is excluded.
       partialize: (state) => ({
-        // Persist everything except the full NFT payloads — we keep only a
-        // trimmed lightweight index to avoid hitting the quota (#104).
         user: state.user,
-        currentDifficulty: state.currentDifficulty,
-        currentPuzzleIndex: state.currentPuzzleIndex,
         completedPuzzles: state.completedPuzzles,
         completedDifficulties: state.completedDifficulties,
+        currentDifficulty: state.currentDifficulty,
+        currentPuzzleIndex: state.currentPuzzleIndex,
         score: state.score,
-        nfts: buildLightweightNftIndex(state.nfts),
+        nfts: state.nfts,
       }),
-      version: 2,
-      migrate: (persistedState, fromVersion) => {
-        // v1 → v2: nothing to migrate; older `nfts` payloads (if oversized)
-        // are simply replaced on next save by the new partialize function.
-        if (!persistedState) return persistedState;
-        return persistedState;
-      },
-      // IMPORTANT (#104): on rehydration the persisted `nfts` is only the
-      // trimmed lightweight index (latest 50, metadata stripped). Without
-      // this onRehydrateStorage hook consumers would render broken cards
-      // (missing imageUrl/src) after a refresh. We auto-fire the first
-      // server-side page so the in-memory collection is back to full.
-      onRehydrateStorage: () => (rehydratedState) => {
-        if (!rehydratedState || !rehydratedState.user) return;
-        // Defer to a microtask so callers that already subscribe to the
-        // store observe the populated `nfts` in the next render.
-        queueMicrotask(() => {
-          const { fetchNftsPage } = rehydratedState;
-          if (typeof fetchNftsPage === "function") {
-            // 50 matches `PERSISTED_NFT_LIMIT`; bump if you change one or
-            // the other.
-            fetchNftsPage({ page: 1, limit: 50 }).catch(() => {});
-          }
-        });
-      },
-    }
-  )
+      version: 1,
+    },
+  ),
 );
 
 export default useGameStore;

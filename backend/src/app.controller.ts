@@ -10,7 +10,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
   // @Auth(AuthType.None)  //  this route is public
   @Get()
-  @ApiOperation({summary: 'Get Hello World Message'})
+  @ApiOperation({ summary: 'Get Hello World Message' })
   getHello(): string {
     return this.appService.getHello();
   }

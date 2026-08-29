@@ -1,4 +1,10 @@
-import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { PuzzleForkService } from './puzzle-fork.service';
 import { CreateForkDto } from './dto/create-fork.dto';
 

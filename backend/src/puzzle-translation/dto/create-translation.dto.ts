@@ -13,4 +13,4 @@ export class CreateTranslationDto {
 
   @IsString()
   description: string;
-} 
+}

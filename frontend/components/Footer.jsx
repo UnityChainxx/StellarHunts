@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Github, Twitter, Linkedin, ExternalLink } from "lucide-react";
+import { SOCIAL_LINKS } from "@/lib/socials";
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -52,7 +53,7 @@ const Footer = () => {
             <h3 className="text-white font-semibold mb-2">Community</h3>
             <div className="flex space-x-4">
               <a
-                href="https://twitter.com"
+                href={SOCIAL_LINKS.TWITTER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-300 hover:text-white transition-colors"
@@ -60,7 +61,7 @@ const Footer = () => {
                 <Twitter className="w-6 h-6" />
               </a>
               <a
-                href="https://Linkedin.com"
+                href={SOCIAL_LINKS.LINKEDIN_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-300 hover:text-white transition-colors"
@@ -68,7 +69,7 @@ const Footer = () => {
                 <Linkedin className="w-6 h-6" />
               </a>
               <a
-                href="https://github.com"
+                href={SOCIAL_LINKS.GITHUB_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-300 hover:text-white transition-colors"
@@ -113,7 +114,7 @@ const Footer = () => {
         {/* Copyright */}
         <div className="mt-8 pt-4 border-t border-white/10 text-center text-gray-400 text-sm">
           <p>
-            © {new Date().getFullYear()} StellarHunts. All rights
+            © {CURRENT_YEAR} StellarHunts. All rights
             reserved.
           </p>
         </div>

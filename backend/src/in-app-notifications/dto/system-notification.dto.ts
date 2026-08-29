@@ -13,7 +13,10 @@ export class SystemNotificationDto {
   @IsNotEmpty()
   message: string;
 
-  @ApiProperty({ description: 'Type of notification', enum: InAppNotificationType })
+  @ApiProperty({
+    description: 'Type of notification',
+    enum: InAppNotificationType,
+  })
   @IsEnum(InAppNotificationType)
   type: InAppNotificationType;
 }

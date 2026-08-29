@@ -4,22 +4,37 @@ import { ActivityType } from '../entities/activity.entity';
 import { Type } from 'class-transformer';
 
 export class FilterActivityDto {
-  @ApiPropertyOptional({ enum: ActivityType, description: 'Filter by activity type' })
+  @ApiPropertyOptional({
+    enum: ActivityType,
+    description: 'Filter by activity type',
+  })
   @IsOptional()
   @IsEnum(ActivityType)
   type?: ActivityType;
 
-  @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Filter from date (ISO string)' })
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description: 'Filter from date (ISO string)',
+  })
   @IsOptional()
   @IsDateString()
   from?: string;
 
-  @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Filter to date (ISO string)' })
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description: 'Filter to date (ISO string)',
+  })
   @IsOptional()
   @IsDateString()
   to?: string;
 
-  @ApiPropertyOptional({ type: Number, example: 10, description: 'Results per page' })
+  @ApiPropertyOptional({
+    type: Number,
+    example: 10,
+    description: 'Results per page',
+  })
   @IsOptional()
   @Type(() => Number)
   limit?: number;

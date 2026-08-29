@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, IsEnum, IsOptional, IsObject, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsUUID,
+  IsEnum,
+  IsOptional,
+  IsObject,
+  IsDateString,
+} from 'class-validator';
 import { AssetType } from '../entities/inventory';
 
 export class AssetDetailDto {

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsUUID, IsEnum, IsOptional, IsObject } from 'class-validator';
-import { AssetType } from '../entities/inventory'; 
+import { AssetType } from '../entities/inventory';
 
 export class AddInventoryItemDto {
   @ApiProperty()

@@ -14,7 +14,7 @@ export class PuzzleVersioningService {
 
   async createNewVersion(dto: CreatePuzzleVersionDto): Promise<PuzzleVersion> {
     let version = 1;
-    const puzzleId = dto.puzzleId || uuidv4(); 
+    const puzzleId = dto.puzzleId || uuidv4();
 
     if (dto.puzzleId) {
       const latestVersion = await this.findLatestVersion(dto.puzzleId);
@@ -47,11 +47,11 @@ export class PuzzleVersioningService {
   async findAllVersions(puzzleId: string): Promise<PuzzleVersion[]> {
     const versions = await this.puzzleVersionRepository.find({
       where: { puzzleId },
-      order: { version: 'DESC' }, 
+      order: { version: 'DESC' },
     });
 
     if (!versions || versions.length === 0) {
-        throw new NotFoundException(`No puzzle found with ID "${puzzleId}"`);
+      throw new NotFoundException(`No puzzle found with ID "${puzzleId}"`);
     }
     return versions;
   }

@@ -32,8 +32,8 @@ export class ContentService {
   }
 
   async findOne(id: string): Promise<Content> {
-    const content = await this.contentRepository.findOne({ 
-      where: { id, isActive: true } 
+    const content = await this.contentRepository.findOne({
+      where: { id, isActive: true },
     });
     if (!content) {
       throw new NotFoundException('Content not found');
@@ -41,7 +41,10 @@ export class ContentService {
     return content;
   }
 
-  async update(id: string, updateContentDto: UpdateContentDto): Promise<Content> {
+  async update(
+    id: string,
+    updateContentDto: UpdateContentDto,
+  ): Promise<Content> {
     const content = await this.findOne(id);
     Object.assign(content, updateContentDto);
     return this.contentRepository.save(content);
@@ -66,7 +69,10 @@ export class ContentService {
     return content;
   }
 
-  async updateAdmin(id: string, updateContentDto: UpdateContentDto): Promise<Content> {
+  async updateAdmin(
+    id: string,
+    updateContentDto: UpdateContentDto,
+  ): Promise<Content> {
     const content = await this.findOneAdmin(id);
     Object.assign(content, updateContentDto);
     return this.contentRepository.save(content);
@@ -76,4 +82,4 @@ export class ContentService {
     const content = await this.findOneAdmin(id);
     await this.contentRepository.remove(content);
   }
-} 
+}

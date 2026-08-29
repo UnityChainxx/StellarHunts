@@ -1,5 +1,10 @@
 // src/promo-code/entities/promo-code.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
 
 @Entity('promo_codes')
 export class PromoCode {

@@ -6,9 +6,7 @@ import { BroadcasterService } from './services/broadcaster.service';
 import { InAppNotification } from './entities/in-app-notification.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([InAppNotification]),
-  ],
+  imports: [TypeOrmModule.forFeature([InAppNotification])],
   controllers: [InAppNotificationsController],
   providers: [InAppNotificationsService, BroadcasterService],
   exports: [InAppNotificationsService, BroadcasterService],

@@ -17,11 +17,12 @@ export enum BonusStatus {
 @Entity("referral_bonuses")
 @Index(["userId"])
 @Index(["referralInviteId"])
+@Index(["referralInviteId", "type"], { unique: true })
 export class ReferralBonus {
   @PrimaryGeneratedColumn("uuid")
   id: string
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", length: 128 })
   userId: string
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })

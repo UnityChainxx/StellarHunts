@@ -18,7 +18,7 @@ updates:
     labels:
       - "dependencies"
       - "npm"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     versioning-strategy: auto
     groups:
       nestjs:
@@ -51,7 +51,7 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     versioning-strategy: auto
     ignore:
       # Next.js v15 is a breaking change; handle manually
@@ -85,7 +85,7 @@ updates:
     labels:
       - "dependencies"
       - "backend"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     versioning-strategy: auto
     groups:
       nestjs:
@@ -116,7 +116,7 @@ updates:
       - "dependencies"
       - "onchain"
       - "rust"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     groups:
       soroban:
         patterns:

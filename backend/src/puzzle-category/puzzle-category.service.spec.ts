@@ -58,8 +58,12 @@ describe('PuzzleCategoryService', () => {
     }).compile();
 
     service = module.get<PuzzleCategoryService>(PuzzleCategoryService);
-    categoryRepository = module.get<Repository<Category>>(getRepositoryToken(Category));
-    puzzleRepository = module.get<Repository<Puzzle>>(getRepositoryToken(Puzzle));
+    categoryRepository = module.get<Repository<Category>>(
+      getRepositoryToken(Category),
+    );
+    puzzleRepository = module.get<Repository<Puzzle>>(
+      getRepositoryToken(Puzzle),
+    );
   });
 
   it('should be defined', () => {
@@ -93,7 +97,9 @@ describe('PuzzleCategoryService', () => {
         },
       ];
 
-      mockCategoryRepository.createQueryBuilder().getMany.mockResolvedValue(mockCategories);
+      mockCategoryRepository
+        .createQueryBuilder()
+        .getMany.mockResolvedValue(mockCategories);
 
       const result = await service.getPuzzlesByCategory();
 
@@ -154,7 +160,9 @@ describe('PuzzleCategoryService', () => {
     it('should throw NotFoundException when category not found', async () => {
       mockCategoryRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.getCategoryById(999)).rejects.toThrow(NotFoundException);
+      await expect(service.getCategoryById(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -173,7 +181,9 @@ describe('PuzzleCategoryService', () => {
       const result = await service.createCategory(createCategoryDto);
 
       expect(result).toEqual(mockCategory);
-      expect(mockCategoryRepository.create).toHaveBeenCalledWith(createCategoryDto);
+      expect(mockCategoryRepository.create).toHaveBeenCalledWith(
+        createCategoryDto,
+      );
       expect(mockCategoryRepository.save).toHaveBeenCalledWith(mockCategory);
     });
   });
@@ -253,4 +263,4 @@ describe('PuzzleCategoryService', () => {
       expect(mockCategoryRepository.save).not.toHaveBeenCalled();
     });
   });
-}); 
+});

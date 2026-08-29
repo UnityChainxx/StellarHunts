@@ -20,10 +20,23 @@ import { CacheService } from './cache.service';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): RedisOptions => {
-        const host = configService.get<string>('cache.redisHost') || process.env.REDIS_HOST || 'localhost';
-        const port = Number(configService.get<string>('cache.redisPort') || process.env.REDIS_PORT || 6379);
-        const password = configService.get<string>('cache.redisPassword') || process.env.REDIS_PASSWORD;
-        const db = Number(configService.get<string>('cache.redisDb') || process.env.REDIS_DB || 0);
+        const host =
+          configService.get<string>('cache.redisHost') ||
+          process.env.REDIS_HOST ||
+          'localhost';
+        const port = Number(
+          configService.get<string>('cache.redisPort') ||
+            process.env.REDIS_PORT ||
+            6379,
+        );
+        const password =
+          configService.get<string>('cache.redisPassword') ||
+          process.env.REDIS_PASSWORD;
+        const db = Number(
+          configService.get<string>('cache.redisDb') ||
+            process.env.REDIS_DB ||
+            0,
+        );
         const url = process.env.REDIS_URL;
 
         return {

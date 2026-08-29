@@ -1,11 +1,11 @@
-import { IsOptional, IsDateString, IsBoolean } from "class-validator"
+import { IsOptional, IsDateString, IsBoolean } from 'class-validator';
 
 export class CreateReferralCodeDto {
   @IsOptional()
   @IsDateString()
-  expiresAt?: string
+  expiresAt?: string;
 
   @IsOptional()
   @IsBoolean()
-  isActive?: boolean
+  isActive?: boolean;
 }

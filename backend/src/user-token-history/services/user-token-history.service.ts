@@ -1,6 +1,10 @@
-import { Injectable, Logger, BadRequestException } from "@nestjs/common"
-import type { Repository } from "typeorm"
-import { TokenHistory, TokenType, TokenStatus } from "../entities/token-history.entity"
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import type { Repository } from 'typeorm';
+import {
+  TokenHistory,
+  TokenType,
+  TokenStatus,
+} from '../entities/token-history.entity';
 import type {
   CreateTokenHistoryDto,
   TokenHistoryResponse,
@@ -8,13 +12,13 @@ import type {
   TokenHistoryFilters,
   TokenHistoryStats,
   UserTokenSummary,
-} from "../interfaces/token-history.interface"
-import * as crypto from "crypto"
-import type { JwtService } from "@nestjs/jwt"
+} from '../interfaces/token-history.interface';
+import * as crypto from 'crypto';
+import type { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UserTokenHistoryService {
-  private readonly logger = new Logger(UserTokenHistoryService.name)
+  private readonly logger = new Logger(UserTokenHistoryService.name);
 
   constructor(
     private readonly tokenHistoryRepository: Repository<TokenHistory>,
@@ -24,15 +28,17 @@ export class UserTokenHistoryService {
   /**
    * Record a new token issuance
    */
-  async recordTokenIssuance(tokenData: CreateTokenHistoryDto): Promise<TokenHistoryResponse> {
-    this.logger.log(`Recording token issuance for user: ${tokenData.userId}`)
+  async recordTokenIssuance(
+    tokenData: CreateTokenHistoryDto,
+  ): Promise<TokenHistoryResponse> {
+    this.logger.log(`Recording token issuance for user: ${tokenData.userId}`);
 
     try {
       // Generate token hash for security
-      const tokenHash = this.generateTokenHash(tokenData.token)
+      const tokenHash = this.generateTokenHash(tokenData.token);
 
       // Decode JWT to extract information
-      const decodedToken = this.jwtService.decode(tokenData.token) as any
+      const decodedToken = this.jwtService.decode(tokenData.token) as any;
 
       const tokenHistory = this.tokenHistoryRepository.create({
         userId: tokenData.userId,
@@ -40,52 +46,64 @@ export class UserTokenHistoryService {
         jti: tokenData.jti || decodedToken?.jti || crypto.randomUUID(),
         tokenType: tokenData.tokenType || TokenType.ACCESS,
         status: TokenStatus.ACTIVE,
-        issuedAt: tokenData.issuedAt || new Date(decodedToken?.iat * 1000) || new Date(),
-        expiresAt: tokenData.expiresAt || new Date(decodedToken?.exp * 1000) || new Date(Date.now() + 3600000), // 1 hour default
+        issuedAt:
+          tokenData.issuedAt ||
+          new Date(decodedToken?.iat * 1000) ||
+          new Date(),
+        expiresAt:
+          tokenData.expiresAt ||
+          new Date(decodedToken?.exp * 1000) ||
+          new Date(Date.now() + 3600000), // 1 hour default
         metadata: {
           ...tokenData.metadata,
           recordedAt: new Date().toISOString(),
         },
-        issuer: tokenData.issuer || decodedToken?.iss || "default",
-        scopes: tokenData.scopes || decodedToken?.scope?.split(" ") || [],
-      })
+        issuer: tokenData.issuer || decodedToken?.iss || 'default',
+        scopes: tokenData.scopes || decodedToken?.scope?.split(' ') || [],
+      });
 
-      const savedToken = await this.tokenHistoryRepository.save(tokenHistory)
+      const savedToken = await this.tokenHistoryRepository.save(tokenHistory);
 
-      this.logger.log(`Token recorded successfully: ${savedToken.id}`)
+      this.logger.log(`Token recorded successfully: ${savedToken.id}`);
 
-      return this.mapToResponse(savedToken)
+      return this.mapToResponse(savedToken);
     } catch (error) {
-      this.logger.error(`Failed to record token: ${error.message}`)
-      throw new BadRequestException(`Failed to record token: ${error.message}`)
+      this.logger.error(`Failed to record token: ${error.message}`);
+      throw new BadRequestException(`Failed to record token: ${error.message}`);
     }
   }
 
   /**
    * Revoke a specific token
    */
-  async revokeToken(tokenHash: string, revokedBy: string, reason?: string): Promise<TokenHistoryResponse | null> {
-    this.logger.log(`Revoking token: ${tokenHash.substring(0, 8)}...`)
+  async revokeToken(
+    tokenHash: string,
+    revokedBy: string,
+    reason?: string,
+  ): Promise<TokenHistoryResponse | null> {
+    this.logger.log(`Revoking token: ${tokenHash.substring(0, 8)}...`);
 
     const tokenHistory = await this.tokenHistoryRepository.findOne({
       where: { tokenHash, status: TokenStatus.ACTIVE },
-    })
+    });
 
     if (!tokenHistory) {
-      this.logger.warn(`Token not found or already revoked: ${tokenHash.substring(0, 8)}...`)
-      return null
+      this.logger.warn(
+        `Token not found or already revoked: ${tokenHash.substring(0, 8)}...`,
+      );
+      return null;
     }
 
-    tokenHistory.status = TokenStatus.REVOKED
-    tokenHistory.revokedAt = new Date()
-    tokenHistory.revokedBy = revokedBy
-    tokenHistory.revocationReason = reason || "Manual revocation"
+    tokenHistory.status = TokenStatus.REVOKED;
+    tokenHistory.revokedAt = new Date();
+    tokenHistory.revokedBy = revokedBy;
+    tokenHistory.revocationReason = reason || 'Manual revocation';
 
-    const updatedToken = await this.tokenHistoryRepository.save(tokenHistory)
+    const updatedToken = await this.tokenHistoryRepository.save(tokenHistory);
 
-    this.logger.log(`Token revoked successfully: ${updatedToken.id}`)
+    this.logger.log(`Token revoked successfully: ${updatedToken.id}`);
 
-    return this.mapToResponse(updatedToken)
+    return this.mapToResponse(updatedToken);
   }
 
   /**
@@ -97,19 +115,21 @@ export class UserTokenHistoryService {
     reason?: string,
     tokenType?: TokenType,
   ): Promise<TokenRevocationResult> {
-    this.logger.log(`Revoking all tokens for user: ${userId}${tokenType ? ` (type: ${tokenType})` : ""}`)
+    this.logger.log(
+      `Revoking all tokens for user: ${userId}${tokenType ? ` (type: ${tokenType})` : ''}`,
+    );
 
     try {
       const queryBuilder = this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .where("token.userId = :userId", { userId })
-        .andWhere("token.status = :status", { status: TokenStatus.ACTIVE })
+        .createQueryBuilder('token')
+        .where('token.userId = :userId', { userId })
+        .andWhere('token.status = :status', { status: TokenStatus.ACTIVE });
 
       if (tokenType) {
-        queryBuilder.andWhere("token.tokenType = :tokenType", { tokenType })
+        queryBuilder.andWhere('token.tokenType = :tokenType', { tokenType });
       }
 
-      const activeTokens = await queryBuilder.getMany()
+      const activeTokens = await queryBuilder.getMany();
 
       if (activeTokens.length === 0) {
         return {
@@ -117,11 +137,11 @@ export class UserTokenHistoryService {
           revokedCount: 0,
           errors: [],
           revokedTokens: [],
-        }
+        };
       }
 
-      const revokedTokens: string[] = []
-      const errors: string[] = []
+      const revokedTokens: string[] = [];
+      const errors: string[] = [];
 
       // Update all tokens in batch
       const updateResult = await this.tokenHistoryRepository
@@ -131,35 +151,42 @@ export class UserTokenHistoryService {
           status: TokenStatus.REVOKED,
           revokedAt: new Date(),
           revokedBy,
-          revocationReason: reason || "Bulk revocation",
+          revocationReason: reason || 'Bulk revocation',
         })
-        .where("userId = :userId", { userId })
-        .andWhere("status = :status", { status: TokenStatus.ACTIVE })
-        .andWhere(tokenType ? "tokenType = :tokenType" : "1=1", tokenType ? { tokenType } : {})
-        .execute()
+        .where('userId = :userId', { userId })
+        .andWhere('status = :status', { status: TokenStatus.ACTIVE })
+        .andWhere(
+          tokenType ? 'tokenType = :tokenType' : '1=1',
+          tokenType ? { tokenType } : {},
+        )
+        .execute();
 
-      const revokedCount = updateResult.affected || 0
+      const revokedCount = updateResult.affected || 0;
 
       activeTokens.forEach((token) => {
-        revokedTokens.push(token.id)
-      })
+        revokedTokens.push(token.id);
+      });
 
-      this.logger.log(`Successfully revoked ${revokedCount} tokens for user: ${userId}`)
+      this.logger.log(
+        `Successfully revoked ${revokedCount} tokens for user: ${userId}`,
+      );
 
       return {
         success: true,
         revokedCount,
         errors,
         revokedTokens,
-      }
+      };
     } catch (error) {
-      this.logger.error(`Failed to revoke tokens for user ${userId}: ${error.message}`)
+      this.logger.error(
+        `Failed to revoke tokens for user ${userId}: ${error.message}`,
+      );
       return {
         success: false,
         revokedCount: 0,
         errors: [error.message],
         revokedTokens: [],
-      }
+      };
     }
   }
 
@@ -167,19 +194,21 @@ export class UserTokenHistoryService {
    * Check if a token is valid (not revoked or expired)
    */
   async isTokenValid(token: string): Promise<boolean> {
-    const tokenHash = this.generateTokenHash(token)
+    const tokenHash = this.generateTokenHash(token);
 
     const tokenHistory = await this.tokenHistoryRepository.findOne({
       where: { tokenHash },
-    })
+    });
 
     if (!tokenHistory) {
-      return false // Token not found in history
+      return false; // Token not found in history
     }
 
     // Check if token is active and not expired
-    const now = new Date()
-    return tokenHistory.status === TokenStatus.ACTIVE && tokenHistory.expiresAt > now
+    const now = new Date();
+    return (
+      tokenHistory.status === TokenStatus.ACTIVE && tokenHistory.expiresAt > now
+    );
   }
 
   /**
@@ -187,75 +216,89 @@ export class UserTokenHistoryService {
    */
   async getUserTokenHistory(
     userId: string,
-    filters?: Omit<TokenHistoryFilters, "userId">,
+    filters?: Omit<TokenHistoryFilters, 'userId'>,
     page = 1,
     limit = 50,
   ): Promise<{
-    tokens: TokenHistoryResponse[]
-    total: number
-    page: number
-    totalPages: number
+    tokens: TokenHistoryResponse[];
+    total: number;
+    page: number;
+    totalPages: number;
   }> {
-    this.logger.log(`Fetching token history for user: ${userId}`)
+    this.logger.log(`Fetching token history for user: ${userId}`);
 
     const queryBuilder = this.tokenHistoryRepository
-      .createQueryBuilder("token")
-      .where("token.userId = :userId", { userId })
+      .createQueryBuilder('token')
+      .where('token.userId = :userId', { userId });
 
     // Apply filters
     if (filters?.tokenType) {
-      queryBuilder.andWhere("token.tokenType = :tokenType", { tokenType: filters.tokenType })
+      queryBuilder.andWhere('token.tokenType = :tokenType', {
+        tokenType: filters.tokenType,
+      });
     }
 
     if (filters?.status) {
-      queryBuilder.andWhere("token.status = :status", { status: filters.status })
+      queryBuilder.andWhere('token.status = :status', {
+        status: filters.status,
+      });
     }
 
     if (filters?.issuedAfter) {
-      queryBuilder.andWhere("token.issuedAt >= :issuedAfter", { issuedAfter: filters.issuedAfter })
+      queryBuilder.andWhere('token.issuedAt >= :issuedAfter', {
+        issuedAfter: filters.issuedAfter,
+      });
     }
 
     if (filters?.issuedBefore) {
-      queryBuilder.andWhere("token.issuedAt <= :issuedBefore", { issuedBefore: filters.issuedBefore })
+      queryBuilder.andWhere('token.issuedAt <= :issuedBefore', {
+        issuedBefore: filters.issuedBefore,
+      });
     }
 
     if (filters?.issuer) {
-      queryBuilder.andWhere("token.issuer = :issuer", { issuer: filters.issuer })
+      queryBuilder.andWhere('token.issuer = :issuer', {
+        issuer: filters.issuer,
+      });
     }
 
     if (filters?.ipAddress) {
-      queryBuilder.andWhere("token.metadata->>'ipAddress' = :ipAddress", { ipAddress: filters.ipAddress })
+      queryBuilder.andWhere("token.metadata->>'ipAddress' = :ipAddress", {
+        ipAddress: filters.ipAddress,
+      });
     }
 
     if (filters?.sessionId) {
-      queryBuilder.andWhere("token.metadata->>'sessionId' = :sessionId", { sessionId: filters.sessionId })
+      queryBuilder.andWhere("token.metadata->>'sessionId' = :sessionId", {
+        sessionId: filters.sessionId,
+      });
     }
 
     // Get total count
-    const total = await queryBuilder.getCount()
+    const total = await queryBuilder.getCount();
 
     // Apply pagination and ordering
     const tokens = await queryBuilder
-      .orderBy("token.createdAt", "DESC")
+      .orderBy('token.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
-      .getMany()
+      .getMany();
 
-    const totalPages = Math.ceil(total / limit)
+    const totalPages = Math.ceil(total / limit);
 
     return {
       tokens: tokens.map((token) => this.mapToResponse(token)),
       total,
       page,
       totalPages,
-    }
+    };
   }
 
   /**
    * Get comprehensive token statistics
    */
   async getTokenHistoryStats(): Promise<TokenHistoryStats> {
-    this.logger.log("Calculating token history statistics")
+    this.logger.log('Calculating token history statistics');
 
     const [
       totalTokens,
@@ -272,40 +315,49 @@ export class UserTokenHistoryService {
       this.tokenHistoryRepository.count(),
 
       // Active tokens
-      this.tokenHistoryRepository.count({ where: { status: TokenStatus.ACTIVE } }),
+      this.tokenHistoryRepository.count({
+        where: { status: TokenStatus.ACTIVE },
+      }),
 
       // Expired tokens
-      this.tokenHistoryRepository.count({ where: { status: TokenStatus.EXPIRED } }),
+      this.tokenHistoryRepository.count({
+        where: { status: TokenStatus.EXPIRED },
+      }),
 
       // Revoked tokens
-      this.tokenHistoryRepository.count({ where: { status: TokenStatus.REVOKED } }),
+      this.tokenHistoryRepository.count({
+        where: { status: TokenStatus.REVOKED },
+      }),
 
       // Tokens by type
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("token.tokenType", "tokenType")
-        .addSelect("COUNT(*)", "count")
-        .groupBy("token.tokenType")
+        .createQueryBuilder('token')
+        .select('token.tokenType', 'tokenType')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('token.tokenType')
         .getRawMany(),
 
       // Tokens by status
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("token.status", "status")
-        .addSelect("COUNT(*)", "count")
-        .groupBy("token.status")
+        .createQueryBuilder('token')
+        .select('token.status', 'status')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('token.status')
         .getRawMany(),
 
       // Unique users
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("COUNT(DISTINCT token.userId)", "count")
+        .createQueryBuilder('token')
+        .select('COUNT(DISTINCT token.userId)', 'count')
         .getRawOne(),
 
       // Average token lifetime
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("AVG(EXTRACT(EPOCH FROM (token.expiresAt - token.issuedAt)) / 3600)", "average")
+        .createQueryBuilder('token')
+        .select(
+          'AVG(EXTRACT(EPOCH FROM (token.expiresAt - token.issuedAt)) / 3600)',
+          'average',
+        )
         .getRawOne(),
 
       // Recent activity
@@ -326,32 +378,32 @@ export class UserTokenHistoryService {
           },
         }),
       ]),
-    ])
+    ]);
 
     // Process results
     const typeDistribution = Object.values(TokenType).reduce(
       (acc, type) => {
-        acc[type] = 0
-        return acc
+        acc[type] = 0;
+        return acc;
       },
       {} as Record<TokenType, number>,
-    )
+    );
 
     tokensByType.forEach((item) => {
-      typeDistribution[item.tokenType] = Number.parseInt(item.count)
-    })
+      typeDistribution[item.tokenType] = Number.parseInt(item.count);
+    });
 
     const statusDistribution = Object.values(TokenStatus).reduce(
       (acc, status) => {
-        acc[status] = 0
-        return acc
+        acc[status] = 0;
+        return acc;
       },
       {} as Record<TokenStatus, number>,
-    )
+    );
 
     tokensByStatus.forEach((item) => {
-      statusDistribution[item.status] = Number.parseInt(item.count)
-    })
+      statusDistribution[item.status] = Number.parseInt(item.count);
+    });
 
     return {
       totalTokens,
@@ -360,100 +412,111 @@ export class UserTokenHistoryService {
       revokedTokens,
       tokensByType: typeDistribution,
       tokensByStatus: statusDistribution,
-      uniqueUsers: Number.parseInt(uniqueUsers?.count || "0"),
-      averageTokenLifetime: Number.parseFloat(averageLifetime?.average || "0"),
+      uniqueUsers: Number.parseInt(uniqueUsers?.count || '0'),
+      averageTokenLifetime: Number.parseFloat(averageLifetime?.average || '0'),
       recentActivity: {
         last24Hours: recentActivity[0],
         last7Days: recentActivity[1],
         last30Days: recentActivity[2],
       },
-    }
+    };
   }
 
   /**
    * Get user token summary
    */
   async getUserTokenSummary(userId: string): Promise<UserTokenSummary> {
-    this.logger.log(`Getting token summary for user: ${userId}`)
+    this.logger.log(`Getting token summary for user: ${userId}`);
 
-    const [totalTokens, activeTokens, lastToken, deviceInfo, sessionInfo, tokenTypes] = await Promise.all([
+    const [
+      totalTokens,
+      activeTokens,
+      lastToken,
+      deviceInfo,
+      sessionInfo,
+      tokenTypes,
+    ] = await Promise.all([
       // Total tokens for user
       this.tokenHistoryRepository.count({ where: { userId } }),
 
       // Active tokens for user
-      this.tokenHistoryRepository.count({ where: { userId, status: TokenStatus.ACTIVE } }),
+      this.tokenHistoryRepository.count({
+        where: { userId, status: TokenStatus.ACTIVE },
+      }),
 
       // Last token issued
       this.tokenHistoryRepository.findOne({
         where: { userId },
-        order: { createdAt: "DESC" },
+        order: { createdAt: 'DESC' },
       }),
 
       // Unique devices
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("COUNT(DISTINCT token.metadata->>'deviceInfo')", "count")
-        .where("token.userId = :userId", { userId })
+        .createQueryBuilder('token')
+        .select("COUNT(DISTINCT token.metadata->>'deviceInfo')", 'count')
+        .where('token.userId = :userId', { userId })
         .andWhere("token.metadata->>'deviceInfo' IS NOT NULL")
         .getRawOne(),
 
       // Unique sessions
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("COUNT(DISTINCT token.metadata->>'sessionId')", "count")
-        .where("token.userId = :userId", { userId })
+        .createQueryBuilder('token')
+        .select("COUNT(DISTINCT token.metadata->>'sessionId')", 'count')
+        .where('token.userId = :userId', { userId })
         .andWhere("token.metadata->>'sessionId' IS NOT NULL")
         .getRawOne(),
 
       // Token types used
       this.tokenHistoryRepository
-        .createQueryBuilder("token")
-        .select("DISTINCT token.tokenType", "tokenType")
-        .where("token.userId = :userId", { userId })
+        .createQueryBuilder('token')
+        .select('DISTINCT token.tokenType', 'tokenType')
+        .where('token.userId = :userId', { userId })
         .getRawMany(),
-    ])
+    ]);
 
     return {
       userId,
       totalTokens,
       activeTokens,
       lastTokenIssuedAt: lastToken?.createdAt,
-      lastActivity: lastToken?.metadata?.lastUsedAt ? new Date(lastToken.metadata.lastUsedAt) : lastToken?.createdAt,
-      deviceCount: Number.parseInt(deviceInfo?.count || "0"),
-      sessionCount: Number.parseInt(sessionInfo?.count || "0"),
+      lastActivity: lastToken?.metadata?.lastUsedAt
+        ? new Date(lastToken.metadata.lastUsedAt)
+        : lastToken?.createdAt,
+      deviceCount: Number.parseInt(deviceInfo?.count || '0'),
+      sessionCount: Number.parseInt(sessionInfo?.count || '0'),
       tokenTypes: tokenTypes.map((t) => t.tokenType),
-    }
+    };
   }
 
   /**
    * Clean up expired tokens
    */
   async cleanupExpiredTokens(): Promise<number> {
-    this.logger.log("Cleaning up expired tokens")
+    this.logger.log('Cleaning up expired tokens');
 
-    const now = new Date()
+    const now = new Date();
 
     // Update expired tokens that are still marked as active
     const updateResult = await this.tokenHistoryRepository
       .createQueryBuilder()
       .update(TokenHistory)
       .set({ status: TokenStatus.EXPIRED })
-      .where("status = :activeStatus", { activeStatus: TokenStatus.ACTIVE })
-      .andWhere("expiresAt < :now", { now })
-      .execute()
+      .where('status = :activeStatus', { activeStatus: TokenStatus.ACTIVE })
+      .andWhere('expiresAt < :now', { now })
+      .execute();
 
-    const updatedCount = updateResult.affected || 0
+    const updatedCount = updateResult.affected || 0;
 
-    this.logger.log(`Updated ${updatedCount} expired tokens`)
+    this.logger.log(`Updated ${updatedCount} expired tokens`);
 
-    return updatedCount
+    return updatedCount;
   }
 
   /**
    * Generate secure hash of token
    */
   private generateTokenHash(token: string): string {
-    return crypto.createHash("sha256").update(token).digest("hex")
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   /**
@@ -477,6 +540,6 @@ export class UserTokenHistoryService {
       scopes: tokenHistory.scopes,
       createdAt: tokenHistory.createdAt,
       updatedAt: tokenHistory.updatedAt,
-    }
+    };
   }
 }

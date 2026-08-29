@@ -10,7 +10,11 @@ export class ProgressController {
 
   @Get(':id/progress')
   @ApiOperation({ summary: 'Get user progress' })
-  @ApiResponse({ status: 200, description: 'Progress retrieved', type: ProgressResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Progress retrieved',
+    type: ProgressResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'User progress not found' })
   async getUserProgress(
     @Param('id', new ParseUUIDPipe()) userId: string,

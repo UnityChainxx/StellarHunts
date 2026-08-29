@@ -11,7 +11,7 @@ export class PuzzleForkService {
   constructor(
     @InjectRepository(ForkedPuzzle)
     private readonly forkedPuzzleRepository: Repository<ForkedPuzzle>,
-    
+
     @InjectRepository(PuzzleVersion)
     private readonly puzzleVersionRepository: Repository<PuzzleVersion>,
   ) {}
@@ -19,7 +19,6 @@ export class PuzzleForkService {
   async fork(dto: CreateForkDto): Promise<ForkedPuzzle> {
     const { originalPuzzleId, version, newTitle } = dto;
 
-    
     const puzzleToFork = await this.findSourcePuzzle(originalPuzzleId, version);
 
     if (!puzzleToFork) {
@@ -27,17 +26,16 @@ export class PuzzleForkService {
         `Puzzle with ID "${originalPuzzleId}" and version "${version || 'latest'}" not found.`,
       );
     }
-    
+
     const newFork = this.forkedPuzzleRepository.create({
       originalPuzzleId: puzzleToFork.puzzleId,
       forkedFromVersion: puzzleToFork.version,
-      title: newTitle || `Fork of: ${puzzleToFork.title}`, 
+      title: newTitle || `Fork of: ${puzzleToFork.title}`,
       content: puzzleToFork.content,
     });
 
     return this.forkedPuzzleRepository.save(newFork);
   }
-
 
   private async findSourcePuzzle(
     puzzleId: string,
@@ -46,7 +44,7 @@ export class PuzzleForkService {
     if (version) {
       return this.puzzleVersionRepository.findOneBy({ puzzleId, version });
     }
-    
+
     return this.puzzleVersionRepository.findOne({
       where: { puzzleId },
       order: { version: 'DESC' },

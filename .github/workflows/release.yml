@@ -72,6 +72,18 @@ jobs:
         working-directory: onchain
         run: cargo build --workspace --target wasm32-unknown-unknown --release --locked
 
+      - name: Run onchain tests
+        working-directory: onchain
+        run: cargo test --workspace --locked
+
+      - name: Verify wasm artifacts were produced
+        working-directory: onchain
+        run: |
+          for f in stellar_hunts stellar_hunts_nft stellar_hunts_receiver; do
+            test -s "target/wasm32-unknown-unknown/release/${f}.wasm" \
+              || { echo "::error::missing or empty artifact: ${f}.wasm"; exit 1; }
+          done
+
       # ── Generate changelog ────────────────────────────────
       - name: Generate changelog
         id: changelog
@@ -139,3 +151,4 @@ jobs:
             onchain/target/wasm32-unknown-unknown/release/stellar_hunts.wasm
             onchain/target/wasm32-unknown-unknown/release/stellar_hunts_nft.wasm
             onchain/target/wasm32-unknown-unknown/release/stellar_hunts_receiver.wasm
+          fail_on_unmatched_files: true

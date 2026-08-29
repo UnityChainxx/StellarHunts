@@ -18,8 +18,14 @@ describe('PuzzleForkService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PuzzleForkService,
-        { provide: getRepositoryToken(ForkedPuzzle), useValue: mockForkedPuzzleRepo },
-        { provide: getRepositoryToken(PuzzleVersion), useValue: mockPuzzleVersionRepo },
+        {
+          provide: getRepositoryToken(ForkedPuzzle),
+          useValue: mockForkedPuzzleRepo,
+        },
+        {
+          provide: getRepositoryToken(PuzzleVersion),
+          useValue: mockPuzzleVersionRepo,
+        },
       ],
     }).compile();
 
@@ -34,33 +40,59 @@ describe('PuzzleForkService', () => {
   });
 
   it('should fork the latest version of a puzzle', async () => {
-    const sourcePuzzle = { puzzleId: 'p1', version: 3, title: 'Original', content: {} };
+    const sourcePuzzle = {
+      puzzleId: 'p1',
+      version: 3,
+      title: 'Original',
+      content: {},
+    };
     mockPuzzleVersionRepo.findOne.mockResolvedValue(sourcePuzzle);
-    mockForkedPuzzleRepo.create.mockImplementation(p => p);
-    mockForkedPuzzleRepo.save.mockImplementation(p => Promise.resolve(p));
+    mockForkedPuzzleRepo.create.mockImplementation((p) => p);
+    mockForkedPuzzleRepo.save.mockImplementation((p) => Promise.resolve(p));
 
     const result = await service.fork({ originalPuzzleId: 'p1' });
 
-    expect(puzzleVersionRepo.findOne).toHaveBeenCalledWith({ where: { puzzleId: 'p1' }, order: { version: 'DESC' } });
-    expect(forkedPuzzleRepo.create).toHaveBeenCalledWith(expect.objectContaining({ forkedFromVersion: 3 }));
+    expect(puzzleVersionRepo.findOne).toHaveBeenCalledWith({
+      where: { puzzleId: 'p1' },
+      order: { version: 'DESC' },
+    });
+    expect(forkedPuzzleRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ forkedFromVersion: 3 }),
+    );
     expect(result.title).toBe('Fork of: Original');
   });
 
   it('should fork a specific version of a puzzle with a new title', async () => {
-    const sourcePuzzle = { puzzleId: 'p1', version: 1, title: 'Old Title', content: {} };
+    const sourcePuzzle = {
+      puzzleId: 'p1',
+      version: 1,
+      title: 'Old Title',
+      content: {},
+    };
     mockPuzzleVersionRepo.findOneBy.mockResolvedValue(sourcePuzzle);
-    mockForkedPuzzleRepo.create.mockImplementation(p => p);
-    mockForkedPuzzleRepo.save.mockImplementation(p => Promise.resolve(p));
+    mockForkedPuzzleRepo.create.mockImplementation((p) => p);
+    mockForkedPuzzleRepo.save.mockImplementation((p) => Promise.resolve(p));
 
-    const result = await service.fork({ originalPuzzleId: 'p1', version: 1, newTitle: 'My Fork' });
+    const result = await service.fork({
+      originalPuzzleId: 'p1',
+      version: 1,
+      newTitle: 'My Fork',
+    });
 
-    expect(puzzleVersionRepo.findOneBy).toHaveBeenCalledWith({ puzzleId: 'p1', version: 1 });
-    expect(forkedPuzzleRepo.create).toHaveBeenCalledWith(expect.objectContaining({ forkedFromVersion: 1 }));
+    expect(puzzleVersionRepo.findOneBy).toHaveBeenCalledWith({
+      puzzleId: 'p1',
+      version: 1,
+    });
+    expect(forkedPuzzleRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ forkedFromVersion: 1 }),
+    );
     expect(result.title).toBe('My Fork');
   });
 
   it('should throw NotFoundException if the source puzzle does not exist', async () => {
     mockPuzzleVersionRepo.findOne.mockResolvedValue(null);
-    await expect(service.fork({ originalPuzzleId: 'p-non-existent' })).rejects.toThrow(NotFoundException);
+    await expect(
+      service.fork({ originalPuzzleId: 'p-non-existent' }),
+    ).rejects.toThrow(NotFoundException);
   });
 });

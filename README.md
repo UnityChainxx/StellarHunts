@@ -22,6 +22,13 @@ This monorepo contains three primary components:
 - **`backend/`** — NestJS API server handling authentication, puzzle management, rewards, leaderboards, and user progression
 - **`onchain/`** — Soroban smart contracts deployed on the Stellar network for NFT badge minting, level progression, and game logic
 
+## API Versioning Strategy
+
+StellarHunts uses URI versioning for API routes configured via `API_VERSION` in `app.config.ts`:
+- Default prefix: `/api/v1`
+- Breaking changes introduce non-overlapping version prefixes (e.g. `/api/v2`)
+- OpenAPI / Swagger documentation is exposed at `/api/docs`
+
 ## Features
 
 - **Puzzle-based gameplay** — Cryptographic riddles that test blockchain knowledge across multiple difficulty tiers
@@ -45,7 +52,7 @@ This monorepo contains three primary components:
 
 ```bash
 # Clone the repository
-git clone https://github.com/UnityChainx/StellarHunts.git
+git clone https://github.com/UnityChainxx/StellarHunts.git
 cd StellarHunts
 
 # Install frontend dependencies

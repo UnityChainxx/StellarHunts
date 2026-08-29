@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindManyOptions } from 'typeorm';
 import { Inventory, AssetType } from './entities/inventory';
@@ -20,7 +25,12 @@ const DEFAULT_PAGE_LIMIT = 20;
 const MAX_PAGE_LIMIT = 100;
 const MAX_PAGE = 10_000;
 
-const clampInt = (value: number, min: number, max: number, fallback: number) => {
+const clampInt = (
+  value: number,
+  min: number,
+  max: number,
+  fallback: number,
+) => {
   if (!Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(value)));
 };
@@ -56,22 +66,31 @@ export class UserInventoryService {
 
     const { safePage, safeLimit, offset } = buildOffsetLimit(page, limit);
 
-    const [inventoryItems, total] = await this.inventoryRepository.findAndCount({
-      where: { userId },
-      order: { acquiredAt: 'DESC' },
-      skip: offset,
-      take: safeLimit,
-    } as FindManyOptions<Inventory>);
+    const [inventoryItems, total] = await this.inventoryRepository.findAndCount(
+      {
+        where: { userId },
+        order: { acquiredAt: 'DESC' },
+        skip: offset,
+        take: safeLimit,
+      } as FindManyOptions<Inventory>,
+    );
 
     const enrichedInventory = await Promise.all(
       inventoryItems.map(async (item) => {
-        const assetDetails = await this.getAssetDetails(item.assetId, item.assetType);
+        const assetDetails = await this.getAssetDetails(
+          item.assetId,
+          item.assetType,
+        );
         return this.mapToInventoryItemDto(item, assetDetails);
       }),
     );
 
-    const nftCount = enrichedInventory.filter((item) => item.assetType === AssetType.NFT).length;
-    const badgeCount = enrichedInventory.filter((item) => item.assetType === AssetType.BADGE).length;
+    const nftCount = enrichedInventory.filter(
+      (item) => item.assetType === AssetType.NFT,
+    ).length;
+    const badgeCount = enrichedInventory.filter(
+      (item) => item.assetType === AssetType.BADGE,
+    ).length;
 
     if (safePage === 1 && total <= safeLimit) {
       // Backwards-compatible response for callers that expect the full payload
@@ -81,8 +100,10 @@ export class UserInventoryService {
         username: user.username,
         inventory: enrichedInventory,
         totalItems: total,
-        nftCount: total === 0 ? 0 : await this.countByType(userId, AssetType.NFT),
-        badgeCount: total === 0 ? 0 : await this.countByType(userId, AssetType.BADGE),
+        nftCount:
+          total === 0 ? 0 : await this.countByType(userId, AssetType.NFT),
+        badgeCount:
+          total === 0 ? 0 : await this.countByType(userId, AssetType.BADGE),
       };
     }
 
@@ -98,11 +119,17 @@ export class UserInventoryService {
     };
   }
 
-  private async countByType(userId: string, assetType: AssetType): Promise<number> {
+  private async countByType(
+    userId: string,
+    assetType: AssetType,
+  ): Promise<number> {
     return this.inventoryRepository.count({ where: { userId, assetType } });
   }
 
-  async getInventoryItemDetails(userId: string, inventoryItemId: string): Promise<InventoryItemDto> {
+  async getInventoryItemDetails(
+    userId: string,
+    inventoryItemId: string,
+  ): Promise<InventoryItemDto> {
     const inventoryItem = await this.inventoryRepository.findOne({
       where: { id: inventoryItemId, userId },
     });
@@ -111,11 +138,16 @@ export class UserInventoryService {
       throw new NotFoundException('Inventory item not found');
     }
 
-    const assetDetails = await this.getAssetDetails(inventoryItem.assetId, inventoryItem.assetType);
+    const assetDetails = await this.getAssetDetails(
+      inventoryItem.assetId,
+      inventoryItem.assetType,
+    );
     return this.mapToInventoryItemDto(inventoryItem, assetDetails);
   }
 
-  async addInventoryItem(addItemDto: AddInventoryItemDto): Promise<InventoryItemDto> {
+  async addInventoryItem(
+    addItemDto: AddInventoryItemDto,
+  ): Promise<InventoryItemDto> {
     const { userId, assetId, assetType, acquisitionContext } = addItemDto;
 
     // Verify user exists
@@ -169,7 +201,10 @@ export class UserInventoryService {
 
     const items = await Promise.all(
       nftItems.map(async (item) => {
-        const assetDetails = await this.getAssetDetails(item.assetId, item.assetType);
+        const assetDetails = await this.getAssetDetails(
+          item.assetId,
+          item.assetType,
+        );
         return this.mapToInventoryItemDto(item, assetDetails);
       }),
     );
@@ -205,7 +240,10 @@ export class UserInventoryService {
 
     const items = await Promise.all(
       badgeItems.map(async (item) => {
-        const assetDetails = await this.getAssetDetails(item.assetId, item.assetType);
+        const assetDetails = await this.getAssetDetails(
+          item.assetId,
+          item.assetType,
+        );
         return this.mapToInventoryItemDto(item, assetDetails);
       }),
     );
@@ -225,11 +263,14 @@ export class UserInventoryService {
     };
   }
 
-  private async getAssetDetails(assetId: string, assetType: AssetType): Promise<AssetDetailDto> {
+  private async getAssetDetails(
+    assetId: string,
+    assetType: AssetType,
+  ): Promise<AssetDetailDto> {
     if (assetType === AssetType.NFT) {
       const nft = await this.nftRepository.findOne({ where: { id: assetId } });
       if (!nft) throw new NotFoundException('NFT not found');
-      
+
       return {
         id: nft.id,
         name: nft.name,
@@ -239,9 +280,11 @@ export class UserInventoryService {
         metadata: nft.metadata,
       };
     } else {
-      const badge = await this.badgeRepository.findOne({ where: { id: assetId } });
+      const badge = await this.badgeRepository.findOne({
+        where: { id: assetId },
+      });
       if (!badge) throw new NotFoundException('Badge not found');
-      
+
       return {
         id: badge.id,
         name: badge.name,
@@ -252,17 +295,25 @@ export class UserInventoryService {
     }
   }
 
-  private async verifyAssetExists(assetId: string, assetType: AssetType): Promise<boolean> {
+  private async verifyAssetExists(
+    assetId: string,
+    assetType: AssetType,
+  ): Promise<boolean> {
     if (assetType === AssetType.NFT) {
       const nft = await this.nftRepository.findOne({ where: { id: assetId } });
       return !!nft;
     } else {
-      const badge = await this.badgeRepository.findOne({ where: { id: assetId } });
+      const badge = await this.badgeRepository.findOne({
+        where: { id: assetId },
+      });
       return !!badge;
     }
   }
 
-  private mapToInventoryItemDto(inventory: Inventory, assetDetails: AssetDetailDto): InventoryItemDto {
+  private mapToInventoryItemDto(
+    inventory: Inventory,
+    assetDetails: AssetDetailDto,
+  ): InventoryItemDto {
     return {
       id: inventory.id,
       assetType: inventory.assetType,

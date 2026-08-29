@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum InAppNotificationType {
@@ -6,7 +13,7 @@ export enum InAppNotificationType {
   PUZZLE = 'puzzle',
   ANNOUNCEMENT = 'announcement',
   GENERAL = 'general',
-  SYSTEM = 'system'
+  SYSTEM = 'system',
 }
 
 @Entity('in_app_notifications')
@@ -25,11 +32,14 @@ export class InAppNotification {
   @Column({ type: 'text' })
   message: string;
 
-  @ApiProperty({ description: 'Type of notification', enum: InAppNotificationType })
+  @ApiProperty({
+    description: 'Type of notification',
+    enum: InAppNotificationType,
+  })
   @Column({
     type: 'enum',
     enum: InAppNotificationType,
-    default: InAppNotificationType.GENERAL
+    default: InAppNotificationType.GENERAL,
   })
   type: InAppNotificationType;
 
@@ -37,7 +47,10 @@ export class InAppNotification {
   @Column({ default: false })
   isRead: boolean;
 
-  @ApiProperty({ description: 'ID of the user who should receive this notification. Null for system-wide notifications' })
+  @ApiProperty({
+    description:
+      'ID of the user who should receive this notification. Null for system-wide notifications',
+  })
   @Column({ nullable: true })
   recipientUserId: number;
 

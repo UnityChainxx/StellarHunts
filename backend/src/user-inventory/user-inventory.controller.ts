@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Get,
@@ -10,7 +9,13 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { UserInventoryService } from './user-inventory.service';
 import {
   UserInventoryResponseDto,
@@ -32,7 +37,10 @@ export class UserInventoryController {
   @ApiOperation({ summary: 'Get user complete digital inventory' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
-  @ApiResponse({ status: 200, description: 'User inventory retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'User inventory retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserInventory(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -61,7 +69,10 @@ export class UserInventoryController {
   @ApiOperation({ summary: 'Get user badges only' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
-  @ApiResponse({ status: 200, description: 'User badges retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'User badges retrieved successfully',
+  })
   async getUserBadges(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
@@ -73,7 +84,11 @@ export class UserInventoryController {
   @Auth(AuthType.Bearer)
   @Get('items/:itemId')
   @ApiOperation({ summary: 'Get individual asset details' })
-  @ApiResponse({ status: 200, description: 'Inventory item details retrieved successfully', type: InventoryItemDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory item details retrieved successfully',
+    type: InventoryItemDto,
+  })
   @ApiResponse({ status: 404, description: 'Inventory item not found' })
   async getInventoryItemDetails(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -85,7 +100,11 @@ export class UserInventoryController {
   @Auth(AuthType.Bearer)
   @Post('items')
   @ApiOperation({ summary: 'Add item to user inventory' })
-  @ApiResponse({ status: 201, description: 'Item added to inventory successfully', type: InventoryItemDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Item added to inventory successfully',
+    type: InventoryItemDto,
+  })
   @ApiResponse({ status: 404, description: 'User or asset not found' })
   @ApiResponse({ status: 409, description: 'User already owns this item' })
   async addInventoryItem(

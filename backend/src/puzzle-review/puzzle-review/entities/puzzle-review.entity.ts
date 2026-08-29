@@ -26,7 +26,7 @@ export class PuzzleReview {
   @Column({ type: "uuid" })
   puzzleId: string
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "uuid", nullable: true, length: 128 })
   userId: string // null for anonymous reviews
 
   @Column({ type: "varchar", length: 100, nullable: true })

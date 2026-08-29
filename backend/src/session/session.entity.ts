@@ -6,7 +6,7 @@ export class Session {
   @PrimaryGeneratedColumn('uuid')
   sessionId: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', length: 128 })
   @Index()
   userId: string;
 

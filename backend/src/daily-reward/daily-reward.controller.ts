@@ -1,4 +1,10 @@
-import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { DailyRewardService } from './daily-reward.service';
 import { DailyCheckinDto } from './dto/daily-checkin.dto';
 

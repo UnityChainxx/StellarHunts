@@ -10,17 +10,18 @@ import { LoginDto } from "../dto/login.dto"
 import { JwtAuthGuard } from "../guards/jwt-auth.guard"
 import { User } from "../entities/user.entity"
 
-@ApiTags("Authentication")
-@Controller("auth")
+@ApiTags('Authentication')
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post("register")
-  @Auth(AuthType.None) 
+  @Post('register')
+  @Auth(AuthType.None)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: "Register a new user",
-    description: "Create a new user account with email and password. Password will be securely hashed.",
+    summary: 'Register a new user',
+    description:
+      'Create a new user account with email and password. Password will be securely hashed.',
   })
   @ApiResponse({
     status: 201,
@@ -30,56 +31,58 @@ export class AuthController {
   })
   @ApiResponse({
     status: 400,
-    description: "Bad request - validation failed",
+    description: 'Bad request - validation failed',
   })
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto | GenericAuthMessageDto> {
     try {
-      return await this.authService.register(registerDto)
+      return await this.authService.register(registerDto);
     } catch (error) {
-      console.error("Registration controller error:", error)
-      throw error
+      console.error('Registration controller error:', error);
+      throw error;
     }
   }
 
-  @Post("login")
+  @Post('login')
   @Auth(AuthType.None) // Public route
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: "User login",
-    description: "Authenticate user with email and password, returns JWT access token",
+    summary: 'User login',
+    description:
+      'Authenticate user with email and password, returns JWT access token',
   })
   @ApiResponse({
     status: 200,
-    description: "Login successful",
+    description: 'Login successful',
     type: AuthResponseDto,
   })
   @ApiResponse({
     status: 401,
-    description: "Unauthorized - invalid credentials",
+    description: 'Unauthorized - invalid credentials',
   })
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     try {
-      return await this.authService.login(loginDto)
+      return await this.authService.login(loginDto);
     } catch (error) {
-      console.error("Login controller error:", error)
-      throw error
+      console.error('Login controller error:', error);
+      throw error;
     }
   }
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Retrieve the profile information of the currently authenticated user'
+    description:
+      'Retrieve the profile information of the currently authenticated user',
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Profile retrieved successfully' 
+  @ApiResponse({
+    status: 200,
+    description: 'Profile retrieved successfully',
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - invalid or expired token' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or expired token',
   })
   async getProfile(@Request() req: { user: User }) {
     const { password, ...userProfile } = req.user;
@@ -93,17 +96,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Validate JWT token',
-    description: 'Check if the provided JWT token is valid and not expired'
+    description: 'Check if the provided JWT token is valid and not expired',
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Token is valid' 
+  @ApiResponse({
+    status: 200,
+    description: 'Token is valid',
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Token is invalid or expired' 
+  @ApiResponse({
+    status: 401,
+    description: 'Token is invalid or expired',
   })
   async validateToken(@Request() req: { user: User }) {
     return {
