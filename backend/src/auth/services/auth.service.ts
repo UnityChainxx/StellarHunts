@@ -13,6 +13,17 @@ import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LoginDto } from '../dto/login.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 
+const BREACHED_PASSWORDS = new Set([
+  'password',
+  'password123!',
+  '12345678',
+  'qwerty123!',
+  'letmein123!',
+  'welcome123!',
+  'iloveyou123!',
+  'admin123!',
+]);
+
 export interface JwtPayload {
   sub: string; // user id
   email: string;
@@ -35,6 +46,8 @@ export class AuthService {
     const { name, username, email, password } = registerDto;
 
     try {
+      this.assertPasswordPolicy(password, email, username);
+
       // Check if user already exists
       const existingUser = await this.userRepository.findOne({
         where: { email: email.toLowerCase() },
@@ -79,6 +92,10 @@ export class AuthService {
       console.error('Registration error:', error); // Add logging
 
       if (error instanceof ConflictException) {
+        throw error;
+      }
+
+      if (error instanceof BadRequestException) {
         throw error;
       }
 
@@ -201,5 +218,31 @@ export class AuthService {
     }
 
     return typeof expiresIn === 'number' ? expiresIn : 900;
+  }
+
+  private assertPasswordPolicy(
+    password: string,
+    email: string,
+    username: string,
+  ): void {
+    const normalized = password.trim().toLowerCase();
+    const localPart = email.split('@')[0]?.toLowerCase() ?? '';
+    const userName = username.toLowerCase();
+
+    if (BREACHED_PASSWORDS.has(normalized)) {
+      throw new BadRequestException(
+        'Choose a stronger password that is not widely compromised',
+      );
+    }
+
+    if (
+      normalized.includes(localPart) ||
+      normalized.includes(userName) ||
+      normalized.includes('password')
+    ) {
+      throw new BadRequestException(
+        'Choose a password that does not contain your personal identifiers',
+      );
+    }
   }
 }
