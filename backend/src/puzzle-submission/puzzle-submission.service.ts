@@ -29,11 +29,11 @@ export class PuzzleSubmissionService {
     const correctAnswer = puzzle.solution;
 
     // Find last submission for this player and puzzle
-    let submission = await this.submissionRepo.findOne({
+    const submission = await this.submissionRepo.findOne({
       where: { playerId, puzzleId },
       order: { attemptCount: 'DESC' },
     });
-    let attemptCount = submission ? submission.attemptCount + 1 : 1;
+    const attemptCount = submission ? submission.attemptCount + 1 : 1;
     const isCorrect =
       answer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
     const newSubmission = this.submissionRepo.create({

@@ -233,14 +233,23 @@ export class StreakService {
     };
   }
 
-  async getLeaderboard(limit = 10): Promise<StreakLeaderboardDto[]> {
+  async getLeaderboard(
+    limit = 10,
+    page = 1,
+  ): Promise<StreakLeaderboardDto[]> {
+    const normalizedLimit = Math.max(1, Math.min(limit, 100));
+    const normalizedPage = Math.max(1, page);
+
     const compute = async (): Promise<StreakLeaderboardDto[]> => {
       const streaks = await this.streakRepository
         .createQueryBuilder('streak')
         .where('streak.isActive = :isActive', { isActive: true })
         .orderBy('streak.currentStreak', 'DESC')
         .addOrderBy('streak.longestStreak', 'DESC')
-        .limit(limit)
+        .addOrderBy('streak.totalActiveDays', 'DESC')
+        .addOrderBy('streak.userId', 'ASC')
+        .skip((normalizedPage - 1) * normalizedLimit)
+        .take(normalizedLimit)
         .getMany();
 
       return streaks.map((streak, index) => ({
@@ -257,7 +266,7 @@ export class StreakService {
     // codebase used before this PR (#107).
     if (this.cacheService) {
       return this.cacheService.getOrSet(
-        `streak:leaderboard:limit:${limit}`,
+        `streak:leaderboard:page:${normalizedPage}:limit:${normalizedLimit}`,
         LEADERBOARD_TTL_SECONDS,
         compute,
       );
