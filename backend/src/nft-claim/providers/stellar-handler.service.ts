@@ -5,6 +5,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ClaimNFTDto } from '../dto/claim-nft.dto';
+import { assertSafeHttpUrl } from '../../common/security/safe-url';
+
+/** Approved Stellar RPC host suffixes (issue #318). */
+const APPROVED_RPC_HOST_SUFFIXES = ['.stellar.org'];
+/** Explicit allowances for local development against a local Soroban RPC. */
+const DEV_RPC_HOSTS = ['localhost', '127.0.0.1', '::1'];
 
 /**
  * Talks to the Stellar / Soroban blockchain on behalf of the backend.
@@ -25,9 +31,44 @@ export class StellarHandlerService {
 
   constructor() {
     this.isMockMode = process.env.STELLAR_MODE === 'mock';
+    this.validateRpcUrl();
     this.logger.log(
       `Stellar handler initialized in ${this.isMockMode ? 'mock' : 'live'} mode`,
     );
+  }
+
+  /**
+   * Validate `SOROBAN_RPC_URL` against the SSRF policy (issue #318): https
+   * only, host must be an approved Stellar endpoint (or an explicit local
+   * development allowance). Misconfiguration fails fast in live mode and is
+   * logged as a warning in mock mode.
+   */
+  private validateRpcUrl(): void {
+    const rpcUrl = process.env.SOROBAN_RPC_URL;
+    if (!rpcUrl) {
+      return;
+    }
+
+    try {
+      assertSafeHttpUrl(rpcUrl, 'SOROBAN_RPC_URL');
+      const hostname = new URL(rpcUrl).hostname.toLowerCase();
+      const approved = APPROVED_RPC_HOST_SUFFIXES.some((suffix) =>
+        hostname.endsWith(suffix),
+      );
+      const isDevAllowance = DEV_RPC_HOSTS.includes(hostname);
+      if (!approved && !isDevAllowance) {
+        throw new Error(
+          `host "${hostname}" is not an approved Stellar RPC endpoint`,
+        );
+      }
+    } catch (error) {
+      if (!this.isMockMode) {
+        throw new Error(`Invalid SOROBAN_RPC_URL: ${error.message}`);
+      }
+      this.logger.warn(
+        `Invalid SOROBAN_RPC_URL ignored in mock mode: ${error.message}`,
+      );
+    }
   }
 
   async claimNFT(claimNFTDto: ClaimNFTDto): Promise<any> {

@@ -234,4 +234,11 @@ describe("UserSettingsService", () => {
       const result = await service.resetUserSettings(userId)
 
       expect(result.language).toBe(Language.ENGLISH)
-      expect(result.\
+      expect(result.theme).toBe(Theme.AUTO)
+      expect(result.darkMode).toBe(false)
+      expect(result.notificationsEnabled).toBe(true)
+      expect(result.masterVolume).toBe(SoundVolume.MEDIUM)
+      expect(result.difficulty).toBe("normal")
+    })
+  })
+})

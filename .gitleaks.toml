@@ -1,0 +1,15 @@
+# Gitleaks configuration for the repository-wide secret scan
+# (.github/workflows/security.yml → secret-scan job).
+#
+# The generic-api-key rule flags the placeholder CircleCI badge token
+# (`token=abc123def456`) from the original NestJS scaffold README
+# (backend/README.md) in the two commits below. It is the well-known
+# example value from the NestJS starter template, not a real credential,
+# and the current README no longer contains it. We allowlist those exact
+# commits rather than rewriting history; any *new* secret still fails the
+# scan.
+[allowlist]
+  commits = [
+    "0eb864ac0c3c1d080e052cb1a21c7d9ce9f5e044",
+    "ab7062f619b04ff9fba2ba3df577c25115c8fc9f",
+  ]

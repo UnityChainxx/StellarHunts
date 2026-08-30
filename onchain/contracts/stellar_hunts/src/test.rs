@@ -557,6 +557,8 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
         !lp_final.nft_minted,
         "nft_minted must remain false so claim_level_completion_nft is retry-safe"
     );
+}
+
 // ---------------------------------------------------------------------
 // Summary of negative-auth coverage added:
 //   • test_set_question_per_level_unauthorized
