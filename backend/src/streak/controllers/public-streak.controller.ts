@@ -39,8 +39,12 @@ export class PublicStreakController {
   @Get('leaderboard')
   async getPublicLeaderboard(
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
-    return this.streakService.getLeaderboard(Math.min(limit, 100)); // Cap at 100
+    return this.streakService.getLeaderboard(
+      Math.min(limit, 100),
+      Math.max(page, 1),
+    );
   }
 
   @Get('user/:userId/history')

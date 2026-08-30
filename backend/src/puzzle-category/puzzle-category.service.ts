@@ -10,6 +10,7 @@ import {
   PuzzlesByCategoryResponseDto,
 } from './dto/puzzle-category.dto';
 import { InjectRepository } from '@nestjs/typeorm';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 export class PuzzleCategoryService {
@@ -158,7 +159,11 @@ export class PuzzleCategoryService {
   async createPuzzle(
     createPuzzleDto: CreatePuzzleDto,
   ): Promise<CategoryPuzzle> {
-    const puzzle = this.puzzleRepository.create(createPuzzleDto);
+    const puzzle = this.puzzleRepository.create({
+      ...createPuzzleDto,
+      title: sanitizeText(createPuzzleDto.title),
+      description: sanitizeText(createPuzzleDto.description),
+    });
 
     // Handle category relationships if categoryIds are provided
     if (createPuzzleDto.categoryIds && createPuzzleDto.categoryIds.length > 0) {
@@ -181,6 +186,8 @@ export class PuzzleCategoryService {
     // Changed parameter type
     const puzzle = await this.getPuzzleById(id);
     Object.assign(puzzle, updatePuzzleDto);
+    puzzle.title = sanitizeText(puzzle.title);
+    puzzle.description = sanitizeText(puzzle.description);
 
     // Handle category relationships if categoryIds are provided
     if (updatePuzzleDto.categoryIds) {

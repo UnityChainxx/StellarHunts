@@ -5,6 +5,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { Puzzle } from './puzzle.entity';
 import { CreatePuzzleDto } from './dto/create-puzzle.dto';
 import { UpdatePuzzleDto } from './dto/update-puzzle.dto';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 export class PuzzleService {
@@ -16,6 +17,10 @@ export class PuzzleService {
 
   async create(createPuzzleDto: CreatePuzzleDto): Promise<Puzzle> {
     const puzzle = this.puzzleRepository.create(createPuzzleDto);
+    puzzle.title = sanitizeText(puzzle.title);
+    puzzle.description = sanitizeText(puzzle.description);
+    puzzle.hint = puzzle.hint ? sanitizeText(puzzle.hint) : puzzle.hint;
+    puzzle.solution = sanitizeText(puzzle.solution);
     return this.puzzleRepository.save(puzzle);
   }
 

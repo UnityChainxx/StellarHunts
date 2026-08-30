@@ -1,7 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
 
-import StoreProvider from "@/store/StoreProvider";
 import Providers from "@/lib/Providers";
 import Navbar from "@/components/Navbar";
 
@@ -28,10 +27,8 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <StoreProvider>
-            <Navbar />
-            {children}
-          </StoreProvider>
+          <Navbar />
+          {children}
         </Providers>
       </body>
     </html>

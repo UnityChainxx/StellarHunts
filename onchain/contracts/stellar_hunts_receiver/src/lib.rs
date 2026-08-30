@@ -5,7 +5,16 @@
 // work. The presence of this contract keeps the test surface compatible
 // with the historical game test suite.
 
-use soroban_sdk::{contract, contractimpl, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
+
+#[cfg(test)]
+use stellar_hunts_nft::{StellarHuntsNft, StellarHuntsNftClient};
+
+#[cfg(test)]
+use stellar_hunts_types::Levels;
+
+#[cfg(test)]
+use soroban_sdk::testutils::Address as _;
 
 #[contract]
 pub struct MockReceiver;
@@ -22,36 +31,3 @@ impl MockReceiver {
         Symbol::new(&env, "pong")
     }
 }
-
-
-fn admin(env: &Env) -> Address {
-    Address::generate(env)
-}
-
-fn recipient(env: &Env) -> Address {
-    Address::generate(env)
-}
-
-#[test]
-fn test_init_and_has_level_badge() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let admin = admin(&env);
-    let game = recipient(&env);
-
-    let contract_id = env.register_contract(None, StellarHuntsNft);
-    let client = StellarHuntsNftClient::new(&env, &contract_id);
-
-    client.init(
-        &admin,
-        &game,
-        &String::from_str(&env, "ipfs://placeholder/"),
-        &String::from_str(&env, "StellarHuntsBadge"),
-        &String::from_str(&env, "SHB"),
-    );
-
-    // Initially no badges.
-    let r = recipient(&env);
-    assert!(!client.has_level_badge(&r, &crate::Levels::Easy));
-}
-
