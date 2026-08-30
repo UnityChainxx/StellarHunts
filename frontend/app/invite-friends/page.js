@@ -14,6 +14,13 @@ import ReferralCard from "@/components/ReferralCard";
 
 export default function InviteFriendsPage() {
   const [referralLink] = useState("https://nft-hunt.com/ref/user123");
+  const shareReferral = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+    } catch (error) {
+      console.error("Failed to copy referral link", error);
+    }
+  };
 
   // Mock data for invited users
   const invitedUsers = [
@@ -151,7 +158,7 @@ export default function InviteFriendsPage() {
             </h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
               Invite your friends to join StellarHunts and unlock exclusive rewards together. 
-              The more friends you invite, the more rewards you'll earn!
+              The more friends you invite, the more rewards you&apos;ll earn!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button

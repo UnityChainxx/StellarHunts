@@ -57,6 +57,14 @@ export class PuzzleService {
   ): Promise<PuzzleSubmissionResult> {
     const { challengeId, answer, timeTaken } = submitPuzzleDto;
 
+    if (!answer || answer.trim().length === 0) {
+      throw new BadRequestException('Answer cannot be empty');
+    }
+
+    if (timeTaken !== undefined && (timeTaken <= 0 || timeTaken > 86400)) {
+      throw new BadRequestException('Invalid submission timing');
+    }
+
     // Get challenge and validate availability
     const challenge = await this.challengeService.findOneForUser(challengeId);
 
@@ -79,6 +87,14 @@ export class PuzzleService {
     }
 
     // Evaluate answer
+    if (
+      typeof timeTaken === 'number' &&
+      timeTaken < 2 &&
+      challenge.type !== ChallengeType.MULTIPLE_CHOICE
+    ) {
+      throw new BadRequestException('Submission completed too quickly');
+    }
+
     const isCorrect = this.evaluateAnswer(challenge, answer);
 
     // Create submission record
