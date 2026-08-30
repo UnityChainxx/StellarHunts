@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import axios from "axios";
+import { apiUrl } from "@/lib/api";
 
 /**
  * Returns a storage adapter that debounces `setItem` so that the
@@ -103,7 +104,7 @@ const useGameStore = create(
       register: async (username, password) => {
         try {
           const response = await axios.post(
-            "http://localhost:3001/auth/register",
+            apiUrl("/auth/register"),
             { username, password },
             { withCredentials: true },
           );
@@ -119,7 +120,7 @@ const useGameStore = create(
       login: async (username, password) => {
         try {
           const response = await axios.post(
-            "http://localhost:3001/auth/login",
+            apiUrl("/auth/login"),
             { username, password },
             { withCredentials: true },
           );
@@ -135,7 +136,7 @@ const useGameStore = create(
       logout: async () => {
         try {
           await axios.post(
-            "http://localhost:3001/auth/logout",
+            apiUrl("/auth/logout"),
             {},
             { withCredentials: true },
           );
@@ -157,7 +158,7 @@ const useGameStore = create(
       fetchDifficultyConfig: async () => {
         try {
           const response = await axios.get(
-            "http://localhost:3001/api/game/difficulty-config",
+            apiUrl("/game/difficulty-config"),
           );
           set({ difficultyConfig: response.data });
         } catch (error) {
@@ -207,7 +208,7 @@ const useGameStore = create(
         // Update the backend
         try {
           await axios.post(
-            "http://localhost:3001/game/update",
+            apiUrl("/game/update"),
             {
               userId: user.id,
               completedPuzzles: newCompletedPuzzles,
@@ -238,7 +239,7 @@ const useGameStore = create(
 
         try {
           await axios.post(
-            "http://localhost:3001/nft/add",
+            apiUrl("/nft/add"),
             {
               userId: user.id,
               nft,
@@ -262,7 +263,7 @@ const useGameStore = create(
 
         try {
           const response = await axios.get(
-            `http://localhost:3001/users/${user.id}/inventory/nfts`,
+            apiUrl(`/users/${user.id}/inventory/nfts`),
             {
               params: { page, limit },
               withCredentials: true,
@@ -300,7 +301,7 @@ const useGameStore = create(
 
         try {
           const response = await axios.get(
-            `http://localhost:3001/user/${user.id}`,
+            apiUrl(`/users/${user.id}`),
             { withCredentials: true },
           );
           set(response.data);
@@ -317,7 +318,7 @@ const useGameStore = create(
 
         try {
           await axios.post(
-            `http://localhost:3001/game/reset`,
+            apiUrl("/game/reset"),
             { userId: user.id },
             { withCredentials: true },
           );

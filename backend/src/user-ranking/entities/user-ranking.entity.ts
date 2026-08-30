@@ -1,6 +1,15 @@
-import { Entity, PrimaryGeneratedColumn, Column, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  Index,
+  Check,
+} from 'typeorm';
 
 @Entity()
+@Check('"score" >= 0')
+@Check('"achievements" >= 0')
+@Check('"activityPoints" >= 0')
 export class UserRank {
   @PrimaryGeneratedColumn('uuid')
   id: string;
