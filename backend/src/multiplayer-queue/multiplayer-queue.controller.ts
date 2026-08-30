@@ -6,7 +6,11 @@ import {
   Param,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import type { MultiplayerQueueService } from './multiplayer-queue.service';
 import type { JoinQueueDto } from './dto/join-queue.dto';
@@ -38,6 +42,8 @@ export class MultiplayerQueueController {
 
   @Delete('leave/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Leave the multiplayer queue' })
   @ApiParam({ name: 'userId', description: 'User ID to remove from queue' })
   @ApiResponse({ status: 204, description: 'Successfully left queue' })
@@ -47,6 +53,8 @@ export class MultiplayerQueueController {
   }
 
   @Get('status/:userId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get queue status for a user' })
   @ApiParam({ name: 'userId', description: 'User ID to check status' })
   @ApiResponse({
