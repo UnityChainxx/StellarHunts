@@ -19,16 +19,18 @@ import {
 } from '@nestjs/swagger';
 import type { JsonParserService } from '../services/json-parser.service';
 import type { MigrationService } from '../services/migration.service';
-import { AdminGuard } from '../guards/admin.guard';
 import type { MigrationResult } from '../interfaces/puzzle.interface';
 import { unlinkSync } from 'fs';
 import type { Express } from 'express';
+import { JwtAuthGuard } from '../../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../../admin/guards/roles.guard';
+import { Roles } from '../../admin/roles.decorator';
+import { AdminRole } from '../../admin/admin-role.enum';
 
 @ApiTags('Migration')
 @ApiBearerAuth()
 @ApiSecurity('bearer')
 @Controller('migration')
-@UseGuards(AdminGuard)
 export class MigrationController {
   private readonly logger = new Logger(MigrationController.name);
 
@@ -38,6 +40,8 @@ export class MigrationController {
   ) {}
 
   @Post('upload')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary: 'Upload and migrate puzzle data from JSON file',
@@ -165,6 +169,8 @@ export class MigrationController {
   }
 
   @Post('parse-json')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @ApiOperation({
     summary: 'Parse JSON string without uploading file',
     description:
@@ -193,6 +199,8 @@ export class MigrationController {
   }
 
   @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @ApiOperation({
     summary: 'Get migration statistics',
     description: 'Retrieve statistics about puzzles in the database',
@@ -214,6 +222,8 @@ export class MigrationController {
   }
 
   @Get('sample')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @ApiOperation({
     summary: 'Get sample JSON structure',
     description: 'Retrieve a sample JSON structure for puzzle data format',

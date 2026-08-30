@@ -17,6 +17,7 @@ export enum BonusStatus {
 @Entity("referral_bonuses")
 @Index(["userId"])
 @Index(["referralInviteId"])
+@Index(["referralInviteId", "type"], { unique: true })
 export class ReferralBonus {
   @PrimaryGeneratedColumn("uuid")
   id: string

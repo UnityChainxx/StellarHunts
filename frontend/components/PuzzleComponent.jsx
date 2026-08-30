@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePuzzleContract } from "@/hooks/usePuzzleContract";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   CheckCircle2,
   XCircle,
@@ -54,7 +55,7 @@ const LEVEL_CONFIG = {
 // ───────────────────────────────────────────────────────────────
 // Feedback toast component
 // ───────────────────────────────────────────────────────────────
-const FeedbackToast = ({ feedback, onClose }) => {
+const FeedbackToast = ({ feedback, onClose, prefersReducedMotion }) => {
   if (!feedback) return null;
 
   const isCorrect = feedback.correct;
@@ -69,10 +70,13 @@ const FeedbackToast = ({ feedback, onClose }) => {
   const glowColor = isCorrect
     ? "shadow-emerald-500/20"
     : "shadow-red-500/20";
+  const animationClass = prefersReducedMotion
+    ? ""
+    : "animate-in slide-in-from-bottom-2 fade-in duration-300";
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border ${borderColor} bg-gradient-to-br ${bgGradient} p-4 shadow-lg ${glowColor} animate-in slide-in-from-bottom-2 fade-in duration-300`}
+      className={`relative overflow-hidden rounded-xl border ${borderColor} bg-gradient-to-br ${bgGradient} p-4 shadow-lg ${glowColor} ${animationClass}`}
     >
       <div className="flex items-start gap-3">
         <div
@@ -89,7 +93,7 @@ const FeedbackToast = ({ feedback, onClose }) => {
           <p className="mt-0.5 text-sm text-gray-400">{feedback.message}</p>
         </div>
         {isCorrect && (
-          <Sparkles className="h-5 w-5 text-emerald-400/60 flex-shrink-0 animate-pulse" />
+          <Sparkles className={`h-5 w-5 text-emerald-400/60 flex-shrink-0 ${prefersReducedMotion ? "" : "animate-pulse"}`} />
         )}
       </div>
 
@@ -108,6 +112,7 @@ const FeedbackToast = ({ feedback, onClose }) => {
 // ───────────────────────────────────────────────────────────────
 const LevelProgressBar = ({ current, total }) => {
   const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+  const prefersReducedMotion = useReducedMotion();
 
   return (
     <div className="space-y-1.5">
@@ -126,7 +131,7 @@ const LevelProgressBar = ({ current, total }) => {
           className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-700 ease-out"
           style={{ width: `${percentage}%` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+          <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent ${prefersReducedMotion ? "" : "animate-shimmer"}`} />
         </div>
       </div>
       <p className="text-right text-[10px] text-gray-500">{percentage}% complete</p>
@@ -147,6 +152,7 @@ const PuzzleComponent = ({
   // Merge external data with fallback defaults
   const puzzle = externalPuzzle || DEFAULT_PUZZLE;
   const qId = questionId ?? puzzle.id ?? 0;
+  const prefersReducedMotion = useReducedMotion();
 
   // ── Local state ───────────────────────────────────────────
   const [answer, setAnswer] = useState("");
@@ -339,7 +345,7 @@ const PuzzleComponent = ({
               <span className="flex items-center justify-center gap-2">
                 {submitting ? (
                   <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <Loader2 className={`h-5 w-5 ${prefersReducedMotion ? "" : "animate-spin"}`} />
                     Verifying on-chain…
                   </>
                 ) : isCorrect ? (
@@ -364,7 +370,7 @@ const PuzzleComponent = ({
         {/* ── Feedback ─────────────────────────────────────── */}
         <div className="min-h-[4rem]">
           {feedback && (
-            <FeedbackToast feedback={feedback} />
+            <FeedbackToast feedback={feedback} prefersReducedMotion={prefersReducedMotion} />
           )}
           {contractError && !feedback && (
             <Alert
@@ -391,7 +397,7 @@ const PuzzleComponent = ({
           >
             <span className="flex items-center gap-2">
               {hintLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className={`h-4 w-4 ${prefersReducedMotion ? "" : "animate-spin"}`} />
               ) : (
                 <Lightbulb className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
               )}
@@ -401,7 +407,7 @@ const PuzzleComponent = ({
 
           {/* Show hint text */}
           {showHint && (
-            <div className="animate-in slide-in-from-top-2 fade-in duration-300">
+            <div className={`${prefersReducedMotion ? "" : "animate-in slide-in-from-top-2 fade-in duration-300"}`}>
               <div className="rounded-xl border border-amber-400/20 bg-gradient-to-r from-amber-500/10 to-orange-500/5 p-3">
                 <div className="flex items-start gap-2">
                   <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-400" />

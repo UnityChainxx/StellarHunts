@@ -1,11 +1,25 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { devtools } from "zustand/middleware";
+import { apiUrl } from "@/lib/api";
 
 const ENCRYPTION_KEY_NAME = "stellar-hunts-ek";
 
+const safeSessionStorage = () => {
+	if (typeof window === "undefined") {
+		return {
+			getItem: () => null,
+			setItem: () => {},
+			removeItem: () => {},
+		};
+	}
+
+	return window.sessionStorage;
+};
+
 async function getOrCreateEncryptionKey() {
-	const stored = sessionStorage.getItem(ENCRYPTION_KEY_NAME);
+	const storage = safeSessionStorage();
+	const stored = storage.getItem(ENCRYPTION_KEY_NAME);
 	if (stored) {
 		const raw = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
 		return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, true, [
@@ -19,7 +33,7 @@ async function getOrCreateEncryptionKey() {
 		["encrypt", "decrypt"]
 	);
 	const exported = await crypto.subtle.exportKey("raw", key);
-	sessionStorage.setItem(
+	storage.setItem(
 		ENCRYPTION_KEY_NAME,
 		btoa(String.fromCharCode(...new Uint8Array(exported)))
 	);
@@ -70,7 +84,7 @@ const useAuthStore = create(
 
 				register: async (userData) => {
 					try {
-						const response = await fetch("/api/register", {
+						const response = await fetch(apiUrl("/auth/register"), {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify(userData),
@@ -89,7 +103,7 @@ const useAuthStore = create(
 
 				login: async (credentials) => {
 					try {
-						const response = await fetch("/api/login", {
+						const response = await fetch(apiUrl("/auth/login"), {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify(credentials),
@@ -118,7 +132,10 @@ const useAuthStore = create(
 				fetchUser: async () => {
 					try {
 						const decryptedToken = await get().getDecryptedToken();
-						const response = await fetch("/api/user", {
+						// GET /auth/profile is the backend route for the authenticated
+						// user; it returns { message, user }. Older code called a
+						// non-existent /auth/user path — see docs/api-conventions.md.
+						const response = await fetch(apiUrl("/auth/profile"), {
 							method: "GET",
 							headers: {
 								"Content-Type": "application/json",
@@ -130,8 +147,8 @@ const useAuthStore = create(
 
 						if (!response.ok) throw new Error("Fetching user failed");
 
-						const user = await response.json();
-						set({ user, isAuthenticated: true });
+						const data = await response.json();
+						set({ user: data.user ?? data, isAuthenticated: true });
 					} catch (error) {
 						console.error("Fetching user error:", error);
 					}
@@ -139,7 +156,7 @@ const useAuthStore = create(
 			}),
 			{
 				name: "auth-storage",
-				getStorage: () => localStorage,
+				getStorage: () => safeSessionStorage(),
 			}
 		),
 		{ name: "AuthStore" }
