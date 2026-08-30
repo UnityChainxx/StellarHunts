@@ -23,6 +23,9 @@ export class DraftPuzzle {
   @Column()
   createdBy: string;
 
+  @Column({ default: 'draft' })
+  status: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

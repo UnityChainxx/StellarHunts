@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { CsrfMiddleware } from './common/security/csrf.middleware';
+import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -147,4 +148,8 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
   controllers: [AppController],
   providers: [AppService, GracefulShutdownService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}
