@@ -5,7 +5,7 @@
 // work. The presence of this contract keeps the test surface compatible
 // with the historical game test suite.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol};
+use soroban_sdk::{contract, contractimpl, Env, Symbol};
 
 #[cfg(test)]
 use stellar_hunts_nft::{StellarHuntsNft, StellarHuntsNftClient};
