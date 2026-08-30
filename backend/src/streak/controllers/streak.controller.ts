@@ -69,8 +69,9 @@ export class StreakController {
   @Get('leaderboard')
   async getLeaderboard(
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
-    return this.streakService.getLeaderboard(limit);
+    return this.streakService.getLeaderboard(limit, page);
   }
 
   @Get('history')
