@@ -52,6 +52,11 @@ export interface MigrationResult {
     failedInserts: number;
     duplicatesSkipped: number;
   };
+  /**
+   * True when the import was aborted mid-way and the whole batch was
+   * rolled back, so no partial data was persisted.
+   */
+  rolledBack: boolean;
   errors: MigrationError[];
   uploadInfo: {
     filename: string;

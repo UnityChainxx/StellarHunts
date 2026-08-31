@@ -9,6 +9,9 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -120,6 +123,8 @@ export class RewardController {
   }
 
   @Get('user/:userId/claims')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get all claims for a user' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({

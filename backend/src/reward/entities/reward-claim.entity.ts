@@ -13,6 +13,8 @@ import { Reward } from './reward.entity';
 @Entity('reward_claims')
 @Index(['userId', 'rewardId'], { unique: true })
 export class RewardClaim {
+  @Column({ unique: true, nullable: true })
+  claimKey?: string;
   @ApiProperty({ description: 'Unique identifier for the reward claim' })
   @PrimaryGeneratedColumn('uuid')
   id: string;

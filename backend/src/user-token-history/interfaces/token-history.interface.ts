@@ -10,6 +10,7 @@ export interface CreateTokenHistoryDto {
   issuer?: string;
   scopes?: string[];
   jti?: string;
+  familyId?: string;
 }
 
 export interface TokenMetadata {
@@ -26,6 +27,7 @@ export interface TokenMetadata {
 export interface TokenHistoryResponse {
   id: string;
   userId: string;
+  familyId?: string;
   tokenHash: string;
   jti?: string;
   tokenType: TokenType;

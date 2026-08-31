@@ -18,7 +18,7 @@ const getRarityColor = (rarity) =>
   RARITY_GRADIENTS[rarity] || "from-gray-400 to-gray-600";
 
 // Wrapped in React.memo so unchanged cards avoid unnecessary reconciliation.
-const NFTCard = ({ nft, onClaim }) => {
+const NFTCard = ({ nft, onClaim = undefined }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClaim = useCallback(() => {

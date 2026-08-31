@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { User } from '../auth/entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { LinkWalletDto } from './dto/link-wallet.dto';
@@ -33,7 +33,19 @@ export class UserService {
 
   async linkWallet(id: string, dto: LinkWalletDto): Promise<User> {
     const user = await this.getUserById(id);
+    const existing = await this.usersRepo.findOne({
+      where: { walletAddress: dto.walletAddress },
+    });
+    if (existing && existing.id !== id) {
+      throw new ConflictException('Wallet already linked to another account');
+    }
     user.walletAddress = dto.walletAddress;
+    return this.usersRepo.save(user);
+  }
+
+  async unlinkWallet(id: string): Promise<User> {
+    const user = await this.getUserById(id);
+    user.walletAddress = null;
     return this.usersRepo.save(user);
   }
 

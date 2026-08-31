@@ -8,7 +8,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { User } from '../../user/entities/user.entity'; // Adjust path as needed
+import { User } from '../../auth/entities/user.entity';
 import { ReferralCode } from './referral-code.entity';
 
 export enum InviteStatus {

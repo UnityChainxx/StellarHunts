@@ -10,6 +10,9 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import { RewardShopService, ShopItem, Purchase } from './reward-shop.service';
 import {
   IsString,
@@ -81,6 +84,8 @@ export class RewardShopController {
 
   @Post('purchase')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ body: 'userId' })
   purchaseItem(@Body() purchaseDto: PurchaseItemDto): Purchase {
     this.logger.log(
       `Received purchase request: ${JSON.stringify(purchaseDto)}`,
@@ -90,6 +95,8 @@ export class RewardShopController {
   }
 
   @Get('users/:userId/points')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   getUserPoints(@Param('userId') userId: string): {
     userId: string;
     points: number;
@@ -101,6 +108,8 @@ export class RewardShopController {
 
   @Post('users/:userId/add-points')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   addPoints(
     @Param('userId') userId: string,
     @Body('amount') amount: number,
