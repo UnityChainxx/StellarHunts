@@ -3,7 +3,6 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-
 import { AppModule } from './app.module';
 
 /**
@@ -19,6 +18,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
 
+  app.setGlobalPrefix('api', { exclude: [/^docs/] });
   // Every route is served under the `/api/<version>` prefix. The version
   // comes from `appConfig.apiVersion` (backend/config/app.config.ts,
   // env `API_VERSION`), which defaults to `v1`, so the browser talks to
@@ -97,7 +97,6 @@ async function bootstrap(): Promise<void> {
     )
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  // Excluded from the global prefix above, so this resolves to /docs.
   SwaggerModule.setup('docs', app, document);
 
   const port = parseInt(process.env.PORT, 10) || 3001;
