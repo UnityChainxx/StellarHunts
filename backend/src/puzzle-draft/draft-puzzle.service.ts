@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DraftPuzzle } from './entities/draft-puzzle.entity';
@@ -29,6 +29,23 @@ export class DraftPuzzleService {
 
   async update(id: string, updateDto: UpdateDraftDto) {
     const draft = await this.findOne(id);
+    if (draft.status === 'published') {
+      throw new BadRequestException('Cannot edit a published draft.');
+    }
+    
+    if (updateDto.status) {
+      const allowedTransitions: Record<string, string[]> = {
+        draft: ['review'],
+        review: ['draft', 'approved'],
+        approved: ['review', 'published'],
+        published: []
+      };
+      const allowed = allowedTransitions[draft.status] || [];
+      if (!allowed.includes(updateDto.status)) {
+        throw new BadRequestException(`Invalid status transition from ${draft.status} to ${updateDto.status}`);
+      }
+    }
+
     Object.assign(draft, updateDto);
     return this.draftRepo.save(draft);
   }
@@ -40,7 +57,11 @@ export class DraftPuzzleService {
 
   async publish(id: string) {
     const draft = await this.findOne(id);
-    // Emit event or return structured data for publishing module to handle
+    if (draft.status !== 'approved') {
+      throw new BadRequestException('Only approved drafts can be published.');
+    }
+    draft.status = 'published';
+    await this.draftRepo.save(draft);
     return {
       event: 'PUZZLE_DRAFT_PUBLISHED',
       data: draft,
