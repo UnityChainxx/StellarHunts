@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, IsEnum, IsOptional, IsInt, Min, Max, IsArray } from "class-validator"
+import { IsString, IsNotEmpty, IsUUID, IsEnum, IsOptional, IsInt, Min, Max, IsArray, ArrayMaxSize, MaxLength } from "class-validator"
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
 import { SkillLevel } from "../entities/queue.entity"
 
@@ -17,6 +17,7 @@ export class JoinQueueDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100, { message: 'Username must be 100 characters or fewer' })
   username: string
 
   @ApiProperty({
@@ -34,6 +35,7 @@ export class JoinQueueDto {
   })
   @IsString()
   @IsOptional()
+  @MaxLength(50, { message: 'Game mode must be 50 characters or fewer' })
   gameMode?: string = "classic"
 
   @ApiPropertyOptional({
@@ -54,6 +56,7 @@ export class JoinQueueDto {
   })
   @IsArray()
   @IsUUID(4, { each: true })
+  @ArrayMaxSize(10, { message: 'Preferred opponents list must contain 10 or fewer entries' })
   @IsOptional()
   preferredOpponents?: string[]
 
@@ -63,6 +66,7 @@ export class JoinQueueDto {
   })
   @IsArray()
   @IsUUID(4, { each: true })
+  @ArrayMaxSize(10, { message: 'Avoid opponents list must contain 10 or fewer entries' })
   @IsOptional()
   avoidOpponents?: string[]
 }
