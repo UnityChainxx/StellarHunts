@@ -33,8 +33,17 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ nullable: true })
+  @Column({ unique: true, nullable: true })
   lastLoginAt: Date;
+
+  @Column({ nullable: true })
+  walletAddress?: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
 
   @CreateDateColumn()
   createdAt: Date;

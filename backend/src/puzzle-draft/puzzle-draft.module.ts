@@ -1,11 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdminAuthModule } from '../admin/admin-auth.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 import { DraftPuzzle } from './entities/draft-puzzle.entity';
 import { DraftPuzzleService } from './draft-puzzle.service';
 import { DraftPuzzleController } from './draft-puzzle.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DraftPuzzle])],
+  imports: [
+    TypeOrmModule.forFeature([DraftPuzzle]),
+    AuditLogModule,
+    AdminAuthModule,
+  ],
   controllers: [DraftPuzzleController],
   providers: [DraftPuzzleService],
   exports: [],

@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import {
   TokenHistory,
   TokenType,
@@ -21,6 +22,7 @@ export class UserTokenHistoryService {
   private readonly logger = new Logger(UserTokenHistoryService.name);
 
   constructor(
+    @InjectRepository(TokenHistory)
     private readonly tokenHistoryRepository: Repository<TokenHistory>,
     private readonly jwtService: JwtService,
   ) {}
@@ -44,6 +46,7 @@ export class UserTokenHistoryService {
         userId: tokenData.userId,
         tokenHash,
         jti: tokenData.jti || decodedToken?.jti || crypto.randomUUID(),
+        familyId: tokenData.familyId || null,
         tokenType: tokenData.tokenType || TokenType.ACCESS,
         status: TokenStatus.ACTIVE,
         issuedAt:
@@ -209,6 +212,145 @@ export class UserTokenHistoryService {
     return (
       tokenHistory.status === TokenStatus.ACTIVE && tokenHistory.expiresAt > now
     );
+  }
+
+  /**
+   * Check whether a recorded token has been revoked or has expired.
+   *
+   * Unlike `isTokenValid`, tokens with no history record are treated as
+   * valid so that tokens issued before the token-history feature shipped are
+   * not rejected.
+   */
+  async isTokenRevoked(token: string): Promise<boolean> {
+    const tokenHash = this.generateTokenHash(token);
+
+    const tokenHistory = await this.tokenHistoryRepository.findOne({
+      where: { tokenHash },
+    });
+
+    if (!tokenHistory) {
+      return false; // No history record -> never revoked
+    }
+
+    const now = new Date();
+    return (
+      tokenHistory.status === TokenStatus.REVOKED ||
+      tokenHistory.status === TokenStatus.EXPIRED ||
+      tokenHistory.expiresAt <= now
+    );
+  }
+
+  /**
+   * Revoke a token by its raw (JWT) value. Computes the SHA-256 hash and
+   * marks the matching active record as revoked.
+   */
+  async revokeTokenByValue(
+    token: string,
+    revokedBy: string,
+    reason = 'Token revoked',
+  ): Promise<TokenHistoryResponse | null> {
+    const tokenHash = this.generateTokenHash(token);
+
+    const tokenHistory = await this.tokenHistoryRepository.findOne({
+      where: { tokenHash, status: TokenStatus.ACTIVE },
+    });
+
+    if (!tokenHistory) {
+      return null;
+    }
+
+    tokenHistory.status = TokenStatus.REVOKED;
+    tokenHistory.revokedAt = new Date();
+    tokenHistory.revokedBy = revokedBy;
+    tokenHistory.revocationReason = reason;
+
+    const updatedToken = await this.tokenHistoryRepository.save(tokenHistory);
+
+    this.logger.log(`Token revoked by value: ${updatedToken.id}`);
+
+    return this.mapToResponse(updatedToken);
+  }
+
+  /**
+   * Detect a refresh-token reuse (a stolen, already-rotated refresh token
+   * being replayed). Returns the token's history record if it exists in a
+   * non-active state, or null when the record is absent / still active.
+   *
+   * A refresh token that is `REVOKED`, `EXPIRED` or `USED` but was submitted
+   * again is treated as a potential theft: the caller should revoke the whole
+   * family and the user's remaining sessions.
+   */
+  async findTokenReuse(
+    token: string,
+  ): Promise<TokenHistory | null> {
+    const tokenHash = this.generateTokenHash(token);
+
+    const tokenHistory = await this.tokenHistoryRepository.findOne({
+      where: { tokenHash },
+    });
+
+    if (!tokenHistory) {
+      return null;
+    }
+
+    if (tokenHistory.status !== TokenStatus.ACTIVE) {
+      return tokenHistory;
+    }
+
+    return null;
+  }
+
+  /**
+   * Revoke every still-active token belonging to the same token family. Used
+   * to invalidate an entire session lineage when a refresh-token reuse (theft)
+   * is detected.
+   */
+  async revokeTokenFamily(
+    familyId: string,
+    revokedBy: string,
+    reason = 'Stolen token reuse detected',
+  ): Promise<TokenRevocationResult> {
+    this.logger.warn(
+      `Revoking token family ${familyId} (reason: ${reason})`,
+    );
+
+    try {
+      let updatedCount = 0;
+      await this.tokenHistoryRepository.manager.transaction(
+        async (manager) => {
+          const result = await manager
+            .createQueryBuilder()
+            .update(TokenHistory)
+            .set({
+              status: TokenStatus.REVOKED,
+              revokedAt: new Date(),
+              revokedBy,
+              revocationReason: reason,
+            })
+            .where('familyId = :familyId', { familyId })
+            .andWhere('status = :status', { status: TokenStatus.ACTIVE })
+            .execute();
+          updatedCount = result.affected || 0;
+        },
+      );
+
+      return {
+        success: true,
+        revokedCount: updatedCount,
+        errors: [],
+        revokedTokens: [],
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to revoke token family ${familyId}: ${error.message}`,
+      );
+      return {
+        success: false,
+        revokedCount: 0,
+        errors: [error.message],
+        revokedTokens: [],
+      };
+    }
   }
 
   /**
@@ -526,6 +668,7 @@ export class UserTokenHistoryService {
     return {
       id: tokenHistory.id,
       userId: tokenHistory.userId,
+      familyId: tokenHistory.familyId,
       tokenHash: tokenHistory.tokenHash,
       jti: tokenHistory.jti,
       tokenType: tokenHistory.tokenType,

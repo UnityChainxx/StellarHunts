@@ -18,6 +18,7 @@ import type {
   ModerationRequest,
   ModerationResponse,
 } from '../interfaces/review.interface';
+import { AuditLogService } from '../../../audit-log/audit-log.service';
 
 @Injectable()
 export class ModerationService {
@@ -26,6 +27,7 @@ export class ModerationService {
   constructor(
     private readonly reviewRepository: Repository<PuzzleReview>,
     private readonly moderationRepository: Repository<ReviewModeration>,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -84,6 +86,21 @@ export class ModerationService {
 
     const savedModeration =
       await this.moderationRepository.save(moderationRecord);
+
+    // Write an immutable audit record for the moderation action. Audit logs
+    // are insert-only (no update/delete endpoints), so every action keeps a
+    // permanent trace of who did what, when, and to what previous state.
+    await this.auditLogService.createLog(
+      moderationRequest.moderatorId,
+      `moderation.${moderationRequest.action}`,
+      {
+        reviewId: moderationRequest.reviewId,
+        previousStatus,
+        newStatus,
+        reason: moderationRequest.reason,
+        notes: moderationRequest.notes,
+      },
+    );
 
     this.logger.log(
       `Review moderated successfully: ${moderationRequest.reviewId} - ${previousStatus} -> ${newStatus}`,

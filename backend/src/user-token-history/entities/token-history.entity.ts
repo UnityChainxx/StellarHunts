@@ -19,12 +19,16 @@ export enum TokenStatus {
 @Index(["userId", "status"])
 @Index(["tokenHash"])
 @Index(["expiresAt"])
+@Index(["familyId", "status"])
 export class TokenHistory {
   @PrimaryGeneratedColumn("uuid")
   id: string
 
   @Column({ type: "uuid", length: 128 })
   userId: string
+
+  @Column({ type: "uuid", length: 128, nullable: true })
+  familyId: string // groups every token issued from one login session
 
   @Column({ type: "varchar", length: 64, unique: true })
   tokenHash: string // SHA-256 hash of the token for security

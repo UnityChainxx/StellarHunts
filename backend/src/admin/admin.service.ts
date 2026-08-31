@@ -30,6 +30,10 @@ export class AdminService {
     return this.adminRepository.findOne({ where: { email } });
   }
 
+  async findById(id: string): Promise<Admin | undefined> {
+    return this.adminRepository.findOne({ where: { id } });
+  }
+
   async validateAdmin(email: string, password: string): Promise<Admin | null> {
     const admin = await this.findByEmail(email);
     if (!admin) return null;

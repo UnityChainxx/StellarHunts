@@ -10,7 +10,6 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
-  ValidationPipe,
 } from '@nestjs/common';
 import { QuizService } from '../services/quiz.service';
 import { CreateQuizDto } from '../dto/create-quiz.dto';
@@ -25,9 +24,7 @@ export class QuizController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createQuiz(
-    @Body(ValidationPipe) createQuizDto: CreateQuizDto,
-  ): Promise<Quiz> {
+  async createQuiz(@Body() createQuizDto: CreateQuizDto): Promise<Quiz> {
     return this.quizService.createQuiz(createQuizDto);
   }
 
@@ -67,9 +64,8 @@ export class QuizController {
 
   @Post('submit')
   @HttpCode(HttpStatus.OK)
-  async submitQuiz(
-    @Body(ValidationPipe) submitQuizDto: SubmitQuizDto,
-  ): Promise<QuizResultDto> {
+  // Relies on the global validation pipe (issue #340).
+  async submitQuiz(@Body() submitQuizDto: SubmitQuizDto): Promise<QuizResultDto> {
     return this.quizService.submitQuiz(submitQuizDto);
   }
 

@@ -24,6 +24,7 @@ pub use stellar_hunts_types::Levels;
 #[derive(Clone)]
 pub enum NftDataKey {
     Admin,
+    Paused,
     Minters(Address),
     Badge(Address, Levels),
     BadgeData(Address, Levels),
@@ -52,6 +53,8 @@ pub enum Error {
     AlreadyInitialized = 3,
     InvalidBaseUri = 4,
     MetadataTooLarge = 5,
+    NotInitialized = 6,
+    ContractPaused = 6,
 }
 
 const MAX_BASE_URI_LEN: usize = 200;
@@ -120,12 +123,43 @@ impl StellarHuntsNft {
     /// authorises the mint. This is the v22 replacement for the previous
     /// `env.invoker()`-based check: in normal operation the StellarHunts
     /// game contract passes its own contract address as `minter`.
+    pub fn pause(env: Env) {
+        let admin: Address = env.storage().instance().get(&NftDataKey::Admin).unwrap();
+        admin.require_auth();
+        env.storage().instance().set(&NftDataKey::Paused, &true);
+    }
+
+    pub fn unpause(env: Env) {
+        let admin: Address = env.storage().instance().get(&NftDataKey::Admin).unwrap();
+        admin.require_auth();
+        env.storage().instance().set(&NftDataKey::Paused, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false)
+    }
+
     pub fn mint_level_badge(env: Env, minter: Address, recipient: Address, level: Levels) {
         minter.require_auth();
+        if env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
 
         if !Self::has_minter_role(env.clone(), minter.clone()) {
             panic_with_error!(&env, Error::NotAuthorized);
         }
+
+        // Resolve the admin up front so a misconfigured (uninitialized)
+        // NFT contract surfaces a structured `NotInitialized` error before
+        // any badge state is written. Reading it here also ensures the
+        // badge/badge_data writes below can never be left as a partial
+        // state change if the contract was never configured.
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Admin)
+            .ok_or(Error::NotInitialized)
+            .unwrap();
 
         let badge_key = NftDataKey::Badge(recipient.clone(), level.clone());
         if env.storage().persistent().has(&badge_key) {
@@ -139,11 +173,6 @@ impl StellarHuntsNft {
         };
         let badge_data_key = NftDataKey::BadgeData(recipient.clone(), level.clone());
         env.storage().persistent().set(&badge_data_key, &badge_data);
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&NftDataKey::Admin)
-            .expect("admin not set");
 
         env.events().publish(
             (Symbol::new(&env, "level_badge_minted"),),
