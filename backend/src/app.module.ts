@@ -1,5 +1,7 @@
-import { CsrfMiddleware } from './common/security/csrf.middleware';
-import { NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { OutboxEvent } from "./outbox/entities/outbox-event.entity";
+import { OutboxModule } from "./outbox/outbox.module";
+import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -84,6 +86,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
@@ -136,7 +139,8 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
       }),
     }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [
+    ScheduleModule.forRoot(),ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
@@ -145,21 +149,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         username: configService.get('database.user'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
-        entities: [
-          User,
-          TimeTrial,
-          Puzzle,
-          Category,
-          Report,
-          Wallet,
-          ConsumedWalletNonce,
-          TokenHistory,
-          AuditLog,
-          Admin,
-          PuzzleReview,
-          ReviewModeration,
-          DraftPuzzle,
-        ],
+        entities: [User, TimeTrial, Puzzle, Category, Report, OutboxEvent],
         migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
         synchronize: configService.get('database.synchronize') === true,
         autoLoadEntities: configService.get('database.autoload') === true,
@@ -216,9 +206,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     UserReactionModule,
     UserReportCardModule,
     MaintenanceModeModule,
-    UserSettingsModule,
-    UserTokenHistoryModule,
-    WalletModule,
+    OutboxModule,
   ],
   controllers: [AppController],
   providers: [AppService, GracefulShutdownService],
