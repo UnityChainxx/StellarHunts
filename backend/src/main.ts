@@ -1,6 +1,6 @@
-import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -31,13 +31,13 @@ async function bootstrap(): Promise<void> {
   //
   // Swagger UI is excluded so /docs, its JSON sibling /docs-json, and its
   // nested asset routes (e.g. /docs/swagger-ui-init.js) stay at canonical
-  // paths instead of being double-prefixed to /api/v1. The exclude entries
-  // are string route patterns (Nest 11 accepts strings or
-  // { path, method } objects — not RegExps); `docs/(.*)` is converted to
-  // the path-to-regexp v8 wildcard by Nest's legacy route converter.
-  const apiVersion = configService.get<string>('appConfig.apiVersion') ?? 'v1';
-  app.setGlobalPrefix(`api/${apiVersion}`, {
-    exclude: ['docs', 'docs-json', 'docs/(.*)'],
+  // paths instead of being double-prefixed to /api.
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'docs', method: RequestMethod.ALL },
+      { path: 'docs-json', method: RequestMethod.ALL },
+      { path: 'docs/(.*)', method: RequestMethod.ALL },
+    ],
   });
 
   const corsOrigin = configService.get<string>('appConfig.cors.origin') ?? '*';

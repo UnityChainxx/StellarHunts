@@ -74,9 +74,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
 import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
-import { UserSettingsModule } from './user-settings/user-settings.module';
-import { UserTokenHistoryModule } from './user-token-history/user-token-history.module';
-import { WalletModule } from './wallet/wallet.module';
+import { HealthModule } from './health/health.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
 import { GracefulShutdownService } from './graceful-shutdown.service';
 
@@ -162,7 +160,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     ActivityModule,
     AnalyticsModule,
     ApiKeyModule,
-    AuditLogModule,
+    HealthModule,
     AuthModule,
     BadgeModule,
     CacheModule,
