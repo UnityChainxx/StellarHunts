@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { DataSource, EntityManager, Repository } from 'typeorm';
-import { Streak } from '../entities/streak.entity';
 import {
-  StreakActivity,
-  type ActivityType,
-} from '../entities/streak-activity.entity';
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Repository } from 'typeorm';
+import { Streak } from '../entities/streak.entity';
+import { StreakActivity } from '../entities/streak-activity.entity';
+import type { ActivityType } from '../entities/streak-activity.entity';
 import type {
   StreakCalculationService,
   StreakCalculationConfig,
@@ -51,85 +54,77 @@ export class StreakService {
     recordDto: RecordActivityDto,
     config: Partial<StreakCalculationConfig> = {},
   ): Promise<Streak> {
-    // The streak row, the activity row and the recalculation are a single
-    // unit of work (issue #302). When a DataSource is available they commit
-    // atomically; otherwise fall back to the direct repositories so the
-    // existing manual-DI call sites keep working.
-    if (this.dataSource) {
-      return this.dataSource.transaction((manager) =>
-        this.recordActivityWithManager(manager, userId, recordDto, config),
-      );
+    // The server clock is the source of truth for "today". Client-supplied
+    // dates are only accepted for backfilling past activity — future dates
+    // are rejected so the streak cannot be gamed by clock manipulation.
+    const now = new Date();
+    let activityDate: Date = now;
+
+    if (recordDto.activityDate) {
+      const parsed = new Date(recordDto.activityDate);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException('activityDate must be a valid date');
+      }
+      if (parsed.getTime() > now.getTime()) {
+        throw new BadRequestException('activityDate cannot be in the future');
+      }
+      activityDate = parsed;
     }
-    return this.recordActivityWithManager(undefined, userId, recordDto, config);
-  }
-
-  private async recordActivityWithManager(
-    manager: EntityManager | undefined,
-    userId: string,
-    recordDto: RecordActivityDto,
-    config: Partial<StreakCalculationConfig>,
-  ): Promise<Streak> {
-    const streakRepo = manager?.getRepository(Streak) ?? this.streakRepository;
-    const activityRepo =
-      manager?.getRepository(StreakActivity) ?? this.activityRepository;
-
-    const activityDate = recordDto.activityDate
-      ? new Date(recordDto.activityDate)
-      : new Date();
 
     // Normalize to date only (remove time)
     const normalizedDate = new Date(activityDate.toDateString());
 
-    // Get or create streak record
-    let streak = await streakRepo.findOne({
+    // Get or create the streak record. The unique constraint on `userId`
+    // makes the create safe under concurrent writes: a racing insert is
+    // ignored and the existing row is reused.
+    let streak = await this.streakRepository.findOne({
       where: { userId },
     });
 
     if (!streak) {
-      streak = streakRepo.create({
-        userId,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalActiveDays: 0,
-        isActive: true,
+      await this.streakRepository
+        .createQueryBuilder()
+        .insert()
+        .into(Streak)
+        .values({
+          userId,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalActiveDays: 0,
+          isActive: true,
+        })
+        .orIgnore()
+        .execute();
+      streak = await this.streakRepository.findOne({
+        where: { userId },
       });
-      streak = await streakRepo.save(streak);
+      if (!streak) {
+        throw new InternalServerErrorException(
+          'Failed to initialize streak record',
+        );
+      }
     }
 
-    // Check if activity already recorded for this date and type
-    const existingActivity = await activityRepo.findOne({
-      where: {
-        streakId: streak.id,
-        userId,
-        activityDate: normalizedDate,
-        activityType: recordDto.activityType,
-      },
-    });
-
-    if (existingActivity) {
-      // Update existing activity count
-      existingActivity.activityCount += recordDto.activityCount || 1;
-      existingActivity.description =
-        recordDto.description || existingActivity.description;
-      existingActivity.metadata = recordDto.metadata
-        ? JSON.stringify(recordDto.metadata)
-        : existingActivity.metadata;
-      await activityRepo.save(existingActivity);
-    } else {
-      // Create new activity record
-      const activity = activityRepo.create({
+    // Idempotent activity insert: (userId, activityDate, activityType) is
+    // unique, so retries and concurrent duplicate writes collapse into a
+    // single row instead of inflating activityCount or creating duplicates.
+    await this.activityRepository
+      .createQueryBuilder()
+      .insert()
+      .into(StreakActivity)
+      .values({
         streakId: streak.id,
         userId,
         activityDate: normalizedDate,
         activityType: recordDto.activityType,
         activityCount: recordDto.activityCount || 1,
-        description: recordDto.description,
+        description: recordDto.description ?? null,
         metadata: recordDto.metadata
           ? JSON.stringify(recordDto.metadata)
           : null,
-      });
-      await activityRepo.save(activity);
-    }
+      })
+      .orIgnore()
+      .execute();
 
     // Recalculate streak inside the same unit of work
     return this.recalculateStreak(userId, config, manager);

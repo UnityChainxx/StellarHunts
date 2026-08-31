@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-
 import { AppModule } from './app.module';
+import { securityHeadersConfig } from './security-headers';
 
 /**
  * Hard limit (ms) we allow the graceful shutdown sequence to take before
@@ -19,6 +19,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
 
+  app.setGlobalPrefix('api', { exclude: [/^docs/] });
   // Every route is served under the `/api/<version>` prefix. The version
   // comes from `appConfig.apiVersion` (backend/config/app.config.ts,
   // env `API_VERSION`), which defaults to `v1`, so the browser talks to
@@ -39,8 +40,31 @@ async function bootstrap(): Promise<void> {
     ],
   });
 
+  const corsOrigin = configService.get<string>('appConfig.cors.origin') ?? '*';
+  const credentials = configService.get<boolean>('appConfig.cors.credentials') ?? true;
+
   app.enableCors({
-    origin: configService.get<string>('appConfig.cors.origin') ?? '*',
+    origin: (origin, callback) => {
+      if (credentials && corsOrigin === '*') {
+        const allowlist = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [];
+        if (!origin || allowlist.includes(origin) || origin === 'http://localhost:3000') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      } else {
+        if (corsOrigin === '*') {
+          callback(null, true);
+        } else {
+          const allowlist = corsOrigin.split(',');
+          if (!origin || allowlist.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        }
+      }
+    },
     methods: configService.get<string[]>('appConfig.cors.methods') ?? [
       'GET',
       'POST',
@@ -51,34 +75,13 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: configService.get<string[]>(
       'appConfig.cors.allowedHeaders',
     ) ?? ['Content-Type', 'Authorization'],
-    credentials:
-      configService.get<boolean>('appConfig.cors.credentials') ?? true,
+    credentials,
   });
 
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:", "https:"],
-        fontSrc: ["'self'"],
-        connectSrc: ["'self'", "https://soroban-testnet.stellar.org"],
-        frameAncestors: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-      },
-    },
-    hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  }));
+  app.use(helmet(securityHeadersConfig));
 
-  // Global request validation (#335). `whitelist` strips properties that are
-  // not declared on the request DTO, and `forbidNonWhitelisted` turns any
-  // remaining unknown property into a 400 so public APIs reject unexpected
-  // fields instead of silently ignoring them. Exception: handlers that must
-  // accept extra fields (e.g. third-party webhooks) can opt out with a local
-  // pipe, e.g. `@UsePipes(new ValidationPipe({ forbidNonWhitelisted: false }))`.
+  // Global validation policy (issue #340): unknown properties are stripped,
+  // DTOs are transformed, and all controllers share the same defaults.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -97,7 +100,6 @@ async function bootstrap(): Promise<void> {
     )
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  // Excluded from the global prefix above, so this resolves to /docs.
   SwaggerModule.setup('docs', app, document);
 
   const port = parseInt(process.env.PORT, 10) || 3001;
