@@ -84,15 +84,36 @@ fn test_double_mint_rejected() {
     game.mint(&nft_id, &r, &crate::Levels::Easy);
     // Second mint must fail (already-has-badge error).
     let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.init(
-            &admin,
-            &game,
-            &String::from_str(&env, &long_uri),
-            &String::from_str(&env, "StellarHuntsBadge"),
-            &String::from_str(&env, "SHB"),
-        );
+        game.mint(&nft_id, &r, &crate::Levels::Easy);
     }));
     assert!(should_panic.is_err());
+}
+
+#[test]
+fn test_mint_uninitialized_is_structured_and_leaves_no_partial_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let game_id = env.register_contract(None, FakeGameContract);
+    let nft_id = env.register_contract(None, StellarHuntsNft);
+
+    // NOTE: `init` is intentionally NOT called — the NFT contract is
+    // uninitialized. The game contract calls `mint_level_badge` directly.
+    let game = FakeGameContractClient::new(&env, &game_id);
+    let r = recipient(&env);
+
+    // The call must fail with a *structured* error rather than an opaque
+    // `expect("admin not set")` panic.
+    let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        game.mint(&nft_id, &r, &crate::Levels::Easy);
+    }));
+    assert!(should_panic.is_err());
+
+    // The admin read happens *before* any storage write, so the failed
+    // mint must not leave any partial badge state behind.
+    let nft = StellarHuntsNftClient::new(&env, &nft_id);
+    assert!(!nft.has_level_badge(&r, &crate::Levels::Easy));
+    assert!(nft.get_badge_data(&r, &crate::Levels::Easy).is_none());
 }
 
 #[test]

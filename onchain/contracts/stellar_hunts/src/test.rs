@@ -689,5 +689,122 @@ fn test_schema_version() {
     let admin = new_admin(&e);
     client.init(&admin);
 
-    assert_eq!(client.get_schema_version(), 1);
+    assert_eq!(client.get_schema_version(), crate::CURRENT_SCHEMA_VERSION);
+}
+
+/// A legacy deployment that never wrote the SchemaVersion key must report
+/// version 0 so tooling can detect pre-versioning state.
+#[test]
+fn test_schema_version_zero_before_init() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+
+    assert_eq!(client.get_schema_version(), 0);
+}
+
+// ---------------------------------------------------------------------
+// Storage compatibility (see onchain/docs/storage-versioning.md)
+// ---------------------------------------------------------------------
+
+/// State written by a pre-versioning deployment (Question.version == 0)
+/// must still be readable by the current contract.
+#[test]
+fn test_legacy_question_readable() {
+    let env = Env::default();
+    let admin = new_admin(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    client.init(&admin);
+
+    // Write a Question exactly as an old (unversioned) contract would have:
+    // version field = 0, question stored under DataKey::Question(7).
+    env.as_contract(&contract_id, || {
+        let legacy = crate::Question {
+            question_id: 7,
+            question: b(&env, "Legacy question?"),
+            hashed_answer: env.crypto().sha256(&b(&env, "legacy-answer")).into(),
+            level: crate::Levels::Easy,
+            hint: b(&env, "legacy hint"),
+            version: 0,
+        };
+        env.storage()
+            .persistent()
+            .set(&crate::DataKey::Question(7), &legacy);
+    });
+
+    let got = client.get_question(&7u64);
+    assert_eq!(got.question_id, 7);
+    assert_eq!(got.version, 0);
+    assert_eq!(got.question, b(&env, "Legacy question?"));
+    assert_eq!(got.level, crate::Levels::Easy);
+}
+
+/// `LevelProgress` values written to storage must round-trip field-for-field
+/// through the public view. Appending a field in a future schema version
+/// must preserve every existing field (documented in
+/// onchain/docs/storage-versioning.md).
+#[test]
+fn test_level_progress_roundtrip_compat() {
+    let env = Env::default();
+    let admin = new_admin(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    client.init(&admin);
+
+    let player = user(&env);
+    let level = crate::Levels::Medium;
+
+    let lp = crate::LevelProgress {
+        player: player.clone(),
+        level: level.clone(),
+        last_question_index: 3,
+        is_completed: true,
+        attempts: 5,
+        nft_minted: true,
+        last_attempt_ledger: 12345,
+    };
+
+    env.as_contract(&contract_id, || {
+        env.storage().persistent().set(
+            &crate::DataKey::PlayerLevelProgress(player.clone(), level.clone()),
+            &lp,
+        );
+    });
+
+    let got = client.get_player_level_progress(&player, &level);
+    assert_eq!(got.player, player);
+    assert_eq!(got.level, level);
+    assert_eq!(got.last_question_index, 3);
+    assert!(got.is_completed);
+    assert_eq!(got.attempts, 5);
+    assert!(got.nft_minted);
+    assert_eq!(got.last_attempt_ledger, 12345);
+}
+
+/// The numeric discriminants of `Levels` are persisted in storage and in
+/// event payloads, so they must never be reordered or renumbered.
+#[test]
+fn test_levels_discriminants_stable() {
+    assert_eq!(crate::Levels::Easy as u32, 1);
+    assert_eq!(crate::Levels::Medium as u32, 2);
+    assert_eq!(crate::Levels::Hard as u32, 3);
+    assert_eq!(crate::Levels::Master as u32, 4);
+}
+
+#[test]
+fn test_unauthorized_add_question_fails() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    client.init(&admin);
+
+    env.mock_all_auths();
+    // Call as normal user
+    let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.add_question(&Levels::Easy, &Bytes::from_slice(&env, b"q"), &Bytes::from_slice(&env, b"a"), &Bytes::from_slice(&env, b"h"));
+    }));
+    assert!(should_panic.is_err());
 }

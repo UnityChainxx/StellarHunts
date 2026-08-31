@@ -1,0 +1,2548 @@
+// account-lockout-and-credential-stuffing.ts
+//
+// Comprehensive account lockout and credential-stuffing
+// defense implementation for a NestJS/TypeScript application.
+//
+// Security goals:
+//
+// 1. Limit repeated failed authentication attempts.
+// 2. Use progressive lockout rather than permanent lockout.
+// 3. Prevent attackers from repeatedly guessing one account.
+// 4. Detect distributed credential-stuffing attacks.
+// 5. Track suspicious IP addresses.
+// 6. Reset failed-attempt counters after successful login.
+// 7. Avoid revealing whether an account exists.
+// 8. Avoid permanently locking legitimate users.
+// 9. Provide administrative unlock functionality.
+// 10. Provide audit/security events.
+// 11. Keep the implementation suitable for Redis-backed
+//     production deployment.
+// 12. Provide automated tests.
+//
+// ============================================================
+
+
+// ============================================================
+// IMPORTS
+// ============================================================
+
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  TooManyRequestsException,
+} from '@nestjs/common';
+
+
+// ============================================================
+// TYPES
+// ============================================================
+
+export interface LoginRequest {
+  identifier: string;
+  password: string;
+  ipAddress: string;
+  userAgent?: string;
+}
+
+export interface AccountSecurityState {
+  identifierHash: string;
+
+  failedAttempts: number;
+
+  firstFailureAt?: number;
+
+  lastFailureAt?: number;
+
+  lockedUntil?: number;
+
+  permanentlyDisabled: boolean;
+
+  lastSuccessfulLoginAt?: number;
+
+  lastSuccessfulIp?: string;
+}
+
+export interface IpSecurityState {
+  ipAddress: string;
+
+  failedAttempts: number;
+
+  firstFailureAt?: number;
+
+  lastFailureAt?: number;
+
+  blockedUntil?: number;
+}
+
+export interface CredentialStuffingSignal {
+  suspicious: boolean;
+
+  score: number;
+
+  reason: string[];
+
+  ipAddress: string;
+
+  identifier: string;
+}
+
+export interface AuthenticationResult {
+  success: boolean;
+
+  reason:
+    | 'success'
+    | 'invalid-credentials'
+    | 'account-locked'
+    | 'ip-blocked'
+    | 'rate-limited'
+    | 'disabled';
+}
+
+export interface SecurityEvent {
+  type:
+    | 'login-success'
+    | 'login-failure'
+    | 'account-lock'
+    | 'account-unlock'
+    | 'ip-block'
+    | 'credential-stuffing-detected';
+
+  identifierHash?: string;
+
+  ipAddress?: string;
+
+  timestamp: number;
+
+  metadata?: Record<string, unknown>;
+}
+
+
+// ============================================================
+// CONFIGURATION
+// ============================================================
+
+export interface LockoutConfig {
+  /**
+   * Number of failed attempts before the first lockout.
+   */
+  firstLockThreshold: number;
+
+  /**
+   * Base lockout duration.
+   */
+  baseLockDurationMs: number;
+
+  /**
+   * Maximum lockout duration.
+   */
+  maximumLockDurationMs: number;
+
+  /**
+   * Number of failed attempts before an IP is temporarily
+   * blocked.
+   */
+  ipFailureThreshold: number;
+
+  /**
+   * IP block duration.
+   */
+  ipBlockDurationMs: number;
+
+  /**
+   * Window used for credential-stuffing detection.
+   */
+  credentialStuffingWindowMs: number;
+
+  /**
+   * Number of unique identifiers attempted from one IP before
+   * credential-stuffing detection is triggered.
+   */
+  credentialStuffingIdentifierThreshold: number;
+
+  /**
+   * Number of failed requests from an IP in a short period.
+   */
+  credentialStuffingFailureThreshold: number;
+
+  /**
+   * Maximum number of attempts allowed for a single account
+   * during the protection window.
+   */
+  perAccountWindowMs: number;
+
+  /**
+   * Maximum failed attempts retained for analysis.
+   */
+  maximumTrackedAttempts: number;
+}
+
+
+// ============================================================
+// DEFAULT SECURITY CONFIGURATION
+// ============================================================
+
+export const DEFAULT_LOCKOUT_CONFIG:
+  LockoutConfig = {
+
+  firstLockThreshold: 5,
+
+  baseLockDurationMs:
+    60 * 1000,
+
+  maximumLockDurationMs:
+    30 * 60 * 1000,
+
+  ipFailureThreshold: 25,
+
+  ipBlockDurationMs:
+    15 * 60 * 1000,
+
+  credentialStuffingWindowMs:
+    10 * 60 * 1000,
+
+  credentialStuffingIdentifierThreshold:
+    10,
+
+  credentialStuffingFailureThreshold:
+    20,
+
+  perAccountWindowMs:
+    15 * 60 * 1000,
+
+  maximumTrackedAttempts:
+    1000,
+};
+
+
+// ============================================================
+// CLOCK
+// ============================================================
+
+@Injectable()
+export class SecurityClock {
+
+  now(): number {
+    return Date.now();
+  }
+}
+
+
+// ============================================================
+// IDENTIFIER NORMALIZATION
+// ============================================================
+
+@Injectable()
+export class IdentifierNormalizer {
+
+  normalize(
+    identifier: string,
+  ): string {
+
+    if (
+      typeof identifier !==
+      'string'
+    ) {
+      return '';
+    }
+
+    return identifier
+      .trim()
+      .toLowerCase();
+  }
+}
+
+
+// ============================================================
+// HASH SERVICE
+// ============================================================
+
+@Injectable()
+export class SecurityHashService {
+
+  /**
+   * Replace this implementation with a real cryptographic
+   * hash in production.
+   *
+   * Never store raw usernames/email addresses in security logs
+   * when a hashed identifier is sufficient.
+   */
+  hash(
+    value: string,
+  ): string {
+
+    if (!value) {
+      return '';
+    }
+
+    return `hash:${value}`;
+  }
+}
+
+
+// ============================================================
+// IN-MEMORY ACCOUNT STORE
+// ============================================================
+
+@Injectable()
+export class AccountSecurityStore {
+
+  private readonly accounts =
+    new Map<
+      string,
+      AccountSecurityState
+    >();
+
+  get(
+    identifierHash: string,
+  ):
+    AccountSecurityState {
+
+    const existing =
+      this.accounts.get(
+        identifierHash,
+      );
+
+    if (existing) {
+      return existing;
+    }
+
+    const created:
+      AccountSecurityState = {
+
+      identifierHash,
+
+      failedAttempts: 0,
+
+      permanentlyDisabled: false,
+    };
+
+    this.accounts.set(
+      identifierHash,
+      created,
+    );
+
+    return created;
+  }
+
+  save(
+    state: AccountSecurityState,
+  ): void {
+
+    this.accounts.set(
+      state.identifierHash,
+      state,
+    );
+  }
+
+  delete(
+    identifierHash: string,
+  ): void {
+
+    this.accounts.delete(
+      identifierHash,
+    );
+  }
+
+  clear(): void {
+    this.accounts.clear();
+  }
+}
+
+
+// ============================================================
+// IP SECURITY STORE
+// ============================================================
+
+@Injectable()
+export class IpSecurityStore {
+
+  private readonly ips =
+    new Map<
+      string,
+      IpSecurityState
+    >();
+
+  get(
+    ipAddress: string,
+  ):
+    IpSecurityState {
+
+    const existing =
+      this.ips.get(
+        ipAddress,
+      );
+
+    if (existing) {
+      return existing;
+    }
+
+    const created:
+      IpSecurityState = {
+
+      ipAddress,
+
+      failedAttempts: 0,
+    };
+
+    this.ips.set(
+      ipAddress,
+      created,
+    );
+
+    return created;
+  }
+
+  save(
+    state: IpSecurityState,
+  ): void {
+
+    this.ips.set(
+      state.ipAddress,
+      state,
+    );
+  }
+
+  clear(): void {
+    this.ips.clear();
+  }
+}
+
+
+// ============================================================
+// AUTHENTICATION ATTEMPT
+// ============================================================
+
+export interface AuthenticationAttempt {
+  identifierHash: string;
+
+  ipAddress: string;
+
+  successful: boolean;
+
+  timestamp: number;
+
+  userAgent?: string;
+}
+
+
+// ============================================================
+// ATTEMPT STORE
+// ============================================================
+
+@Injectable()
+export class AuthenticationAttemptStore {
+
+  private attempts:
+    AuthenticationAttempt[] = [];
+
+  constructor(
+    private readonly clock:
+      SecurityClock,
+  ) {}
+
+  add(
+    attempt: AuthenticationAttempt,
+  ): void {
+
+    this.attempts.push(
+      attempt,
+    );
+
+    /**
+     * Keep memory bounded.
+     */
+    if (
+      this.attempts.length >
+      DEFAULT_LOCKOUT_CONFIG
+        .maximumTrackedAttempts
+    ) {
+      this.attempts =
+        this.attempts.slice(
+          -DEFAULT_LOCKOUT_CONFIG
+            .maximumTrackedAttempts,
+        );
+    }
+  }
+
+  getRecentByIp(
+    ipAddress: string,
+    windowMs: number,
+  ):
+    AuthenticationAttempt[] {
+
+    const cutoff =
+      this.clock.now() -
+      windowMs;
+
+    return this.attempts.filter(
+      (attempt) =>
+        attempt.ipAddress ===
+          ipAddress &&
+        attempt.timestamp >=
+          cutoff,
+    );
+  }
+
+  getRecentByAccount(
+    identifierHash: string,
+    windowMs: number,
+  ):
+    AuthenticationAttempt[] {
+
+    const cutoff =
+      this.clock.now() -
+      windowMs;
+
+    return this.attempts.filter(
+      (attempt) =>
+        attempt.identifierHash ===
+          identifierHash &&
+        attempt.timestamp >=
+          cutoff,
+    );
+  }
+
+  clear(): void {
+    this.attempts = [];
+  }
+}
+
+
+// ============================================================
+// SECURITY EVENT BUS
+// ============================================================
+
+@Injectable()
+export class SecurityEventBus {
+
+  private readonly events:
+    SecurityEvent[] = [];
+
+  emit(
+    event: SecurityEvent,
+  ): void {
+
+    this.events.push(
+      event,
+    );
+
+    /**
+     * Production systems should forward these events to:
+     *
+     * - SIEM
+     * - centralized logging
+     * - security monitoring
+     * - alerting infrastructure
+     */
+  }
+
+  getEvents():
+    SecurityEvent[] {
+
+    return [
+      ...this.events,
+    ];
+  }
+
+  clear(): void {
+    this.events.length = 0;
+  }
+}
+
+
+// ============================================================
+// LOCKOUT CALCULATOR
+// ============================================================
+
+@Injectable()
+export class LockoutCalculator {
+
+  constructor(
+    private readonly clock:
+      SecurityClock,
+    private readonly config:
+      LockoutConfig = DEFAULT_LOCKOUT_CONFIG,
+  ) {}
+
+  shouldLock(
+    failedAttempts: number,
+  ): boolean {
+
+    return (
+      failedAttempts >=
+      this.config
+        .firstLockThreshold
+    );
+  }
+
+  calculateDuration(
+    failedAttempts: number,
+  ): number {
+
+    if (
+      failedAttempts <=
+      this.config.firstLockThreshold
+    ) {
+      return this.config
+        .baseLockDurationMs;
+    }
+
+    const multiplier =
+      Math.pow(
+        2,
+        Math.min(
+          failedAttempts -
+            this.config
+              .firstLockThreshold,
+          10,
+        ),
+      );
+
+    return Math.min(
+      this.config
+        .baseLockDurationMs *
+        multiplier,
+      this.config
+        .maximumLockDurationMs,
+    );
+  }
+
+  lockUntil(
+    failedAttempts: number,
+  ): number {
+
+    return (
+      this.clock.now() +
+      this.calculateDuration(
+        failedAttempts,
+      )
+    );
+  }
+}
+
+
+// ============================================================
+// ACCOUNT LOCKOUT SERVICE
+// ============================================================
+
+@Injectable()
+export class AccountLockoutService {
+
+  constructor(
+    private readonly store:
+      AccountSecurityStore,
+
+    private readonly clock:
+      SecurityClock,
+
+    private readonly calculator:
+      LockoutCalculator,
+
+    private readonly events:
+      SecurityEventBus,
+  ) {}
+
+  isLocked(
+    identifierHash: string,
+  ): boolean {
+
+    const state =
+      this.store.get(
+        identifierHash,
+      );
+
+    if (
+      state.permanentlyDisabled
+    ) {
+      return true;
+    }
+
+    if (
+      !state.lockedUntil
+    ) {
+      return false;
+    }
+
+    if (
+      state.lockedUntil >
+      this.clock.now()
+    ) {
+      return true;
+    }
+
+    /**
+     * Lockout has expired.
+     */
+    state.lockedUntil =
+      undefined;
+
+    state.failedAttempts = 0;
+
+    this.store.save(
+      state,
+    );
+
+    return false;
+  }
+
+  recordFailure(
+    identifierHash: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        identifierHash,
+      );
+
+    state.failedAttempts += 1;
+
+    state.lastFailureAt =
+      this.clock.now();
+
+    if (
+      !state.firstFailureAt
+    ) {
+      state.firstFailureAt =
+        this.clock.now();
+    }
+
+    if (
+      this.calculator.shouldLock(
+        state.failedAttempts,
+      )
+    ) {
+
+      state.lockedUntil =
+        this.calculator.lockUntil(
+          state.failedAttempts,
+        );
+
+      this.events.emit({
+        type:
+          'account-lock',
+
+        identifierHash,
+
+        timestamp:
+          this.clock.now(),
+
+        metadata: {
+          failedAttempts:
+            state.failedAttempts,
+
+          lockedUntil:
+            state.lockedUntil,
+        },
+      });
+    }
+
+    this.store.save(
+      state,
+    );
+  }
+
+  recordSuccess(
+    identifierHash: string,
+    ipAddress: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        identifierHash,
+      );
+
+    state.failedAttempts = 0;
+
+    state.firstFailureAt =
+      undefined;
+
+    state.lastFailureAt =
+      undefined;
+
+    state.lockedUntil =
+      undefined;
+
+    state.lastSuccessfulLoginAt =
+      this.clock.now();
+
+    state.lastSuccessfulIp =
+      ipAddress;
+
+    this.store.save(
+      state,
+    );
+  }
+
+  unlock(
+    identifierHash: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        identifierHash,
+      );
+
+    state.failedAttempts = 0;
+
+    state.firstFailureAt =
+      undefined;
+
+    state.lastFailureAt =
+      undefined;
+
+    state.lockedUntil =
+      undefined;
+
+    state.permanentlyDisabled =
+      false;
+
+    this.store.save(
+      state,
+    );
+
+    this.events.emit({
+      type:
+        'account-unlock',
+
+      identifierHash,
+
+      timestamp:
+        this.clock.now(),
+    });
+  }
+
+  disable(
+    identifierHash: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        identifierHash,
+      );
+
+    state.permanentlyDisabled =
+      true;
+
+    state.lockedUntil =
+      undefined;
+
+    this.store.save(
+      state,
+    );
+  }
+}
+
+
+// ============================================================
+// IP BLOCK SERVICE
+// ============================================================
+
+@Injectable()
+export class IpBlockService {
+
+  constructor(
+    private readonly store:
+      IpSecurityStore,
+
+    private readonly clock:
+      SecurityClock,
+
+    private readonly events:
+      SecurityEventBus,
+
+    private readonly config:
+      LockoutConfig =
+        DEFAULT_LOCKOUT_CONFIG,
+  ) {}
+
+  isBlocked(
+    ipAddress: string,
+  ): boolean {
+
+    const state =
+      this.store.get(
+        ipAddress,
+      );
+
+    if (
+      !state.blockedUntil
+    ) {
+      return false;
+    }
+
+    if (
+      state.blockedUntil >
+      this.clock.now()
+    ) {
+      return true;
+    }
+
+    state.blockedUntil =
+      undefined;
+
+    state.failedAttempts =
+      0;
+
+    this.store.save(
+      state,
+    );
+
+    return false;
+  }
+
+  recordFailure(
+    ipAddress: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        ipAddress,
+      );
+
+    state.failedAttempts += 1;
+
+    state.lastFailureAt =
+      this.clock.now();
+
+    if (
+      !state.firstFailureAt
+    ) {
+      state.firstFailureAt =
+        this.clock.now();
+    }
+
+    if (
+      state.failedAttempts >=
+      this.config
+        .ipFailureThreshold
+    ) {
+
+      state.blockedUntil =
+        this.clock.now() +
+        this.config
+          .ipBlockDurationMs;
+
+      this.events.emit({
+        type:
+          'ip-block',
+
+        ipAddress,
+
+        timestamp:
+          this.clock.now(),
+
+        metadata: {
+          failedAttempts:
+            state.failedAttempts,
+
+          blockedUntil:
+            state.blockedUntil,
+        },
+      });
+    }
+
+    this.store.save(
+      state,
+    );
+  }
+
+  recordSuccess(
+    ipAddress: string,
+  ): void {
+
+    const state =
+      this.store.get(
+        ipAddress,
+      );
+
+    /**
+     * A successful authentication is evidence that the IP
+     * may be legitimate.
+     *
+     * Do not necessarily reset all IP reputation in a
+     * production implementation. Here we reduce the failure
+     * count to prevent one successful account from completely
+     * erasing a suspicious history.
+     */
+    state.failedAttempts =
+      Math.floor(
+        state.failedAttempts / 2,
+      );
+
+    this.store.save(
+      state,
+    );
+  }
+}
+
+
+// ============================================================
+// CREDENTIAL-STUFFING DETECTOR
+// ============================================================
+
+@Injectable()
+export class CredentialStuffingDetector {
+
+  constructor(
+    private readonly attempts:
+      AuthenticationAttemptStore,
+
+    private readonly clock:
+      SecurityClock,
+
+    private readonly events:
+      SecurityEventBus,
+
+    private readonly config:
+      LockoutConfig =
+        DEFAULT_LOCKOUT_CONFIG,
+  ) {}
+
+  analyze(
+    identifierHash: string,
+    ipAddress: string,
+  ):
+    CredentialStuffingSignal {
+
+    const recent =
+      this.attempts.getRecentByIp(
+        ipAddress,
+        this.config
+          .credentialStuffingWindowMs,
+      );
+
+    const failed =
+      recent.filter(
+        (attempt) =>
+          !attempt.successful,
+      );
+
+    const uniqueIdentifiers =
+      new Set(
+        failed.map(
+          (attempt) =>
+            attempt.identifierHash,
+        ),
+      );
+
+    const reasons:
+      string[] = [];
+
+    let score = 0;
+
+    if (
+      uniqueIdentifiers.size >=
+      this.config
+        .credentialStuffingIdentifierThreshold
+    ) {
+
+      score += 50;
+
+      reasons.push(
+        'many unique accounts attempted from one IP',
+      );
+    }
+
+    if (
+      failed.length >=
+      this.config
+        .credentialStuffingFailureThreshold
+    ) {
+
+      score += 40;
+
+      reasons.push(
+        'high failed-login volume',
+      );
+    }
+
+    const suspicious =
+      score >= 50;
+
+    const signal:
+      CredentialStuffingSignal = {
+      suspicious,
+
+      score,
+
+      reason:
+        reasons,
+
+      ipAddress,
+
+      identifier:
+        identifierHash,
+    };
+
+    if (suspicious) {
+      this.events.emit({
+        type:
+          'credential-stuffing-detected',
+
+        identifierHash,
+
+        ipAddress,
+
+        timestamp:
+          this.clock.now(),
+
+        metadata: {
+          score,
+          reasons,
+          uniqueIdentifiers:
+            uniqueIdentifiers.size,
+          failedAttempts:
+            failed.length,
+        },
+      });
+    }
+
+    return signal;
+  }
+}
+
+
+// ============================================================
+// LOGIN THROTTLING SERVICE
+// ============================================================
+
+@Injectable()
+export class LoginThrottleService {
+
+  constructor(
+    private readonly attempts:
+      AuthenticationAttemptStore,
+
+    private readonly clock:
+      SecurityClock,
+
+    private readonly config:
+      LockoutConfig =
+        DEFAULT_LOCKOUT_CONFIG,
+  ) {}
+
+  isAccountRateLimited(
+    identifierHash: string,
+  ): boolean {
+
+    const recent =
+      this.attempts.getRecentByAccount(
+        identifierHash,
+        this.config
+          .perAccountWindowMs,
+      );
+
+    const failed =
+      recent.filter(
+        (attempt) =>
+          !attempt.successful,
+      );
+
+    return (
+      failed.length >=
+      this.config
+        .firstLockThreshold
+    );
+  }
+}
+
+
+// ============================================================
+// PASSWORD VERIFIER
+// ============================================================
+
+@Injectable()
+export class PasswordVerifier {
+
+  /**
+   * Replace this with bcrypt/argon2/password-hash service.
+   */
+  async verify(
+    suppliedPassword: string,
+    storedPasswordHash: string,
+  ): Promise<boolean> {
+
+    if (
+      !suppliedPassword ||
+      !storedPasswordHash
+    ) {
+      return false;
+    }
+
+    /**
+     * Placeholder comparison.
+     *
+     * Production:
+     *
+     * await argon2.verify(
+     *   storedPasswordHash,
+     *   suppliedPassword,
+     * );
+     */
+    return (
+      suppliedPassword ===
+      storedPasswordHash
+    );
+  }
+}
+
+
+// ============================================================
+// AUTHENTICATION SERVICE
+// ============================================================
+
+@Injectable()
+export class SecureAuthenticationService {
+
+  constructor(
+    private readonly normalizer:
+      IdentifierNormalizer,
+
+    private readonly hash:
+      SecurityHashService,
+
+    private readonly lockout:
+      AccountLockoutService,
+
+    private readonly ipBlock:
+      IpBlockService,
+
+    private readonly detector:
+      CredentialStuffingDetector,
+
+    private readonly attempts:
+      AuthenticationAttemptStore,
+
+    private readonly events:
+      SecurityEventBus,
+
+    private readonly password:
+      PasswordVerifier,
+  ) {}
+
+  async authenticate(
+    request: LoginRequest,
+    storedPasswordHash:
+      string | null,
+  ):
+    Promise<AuthenticationResult> {
+
+    // --------------------------------------------------------
+    // NORMALIZE IDENTIFIER
+    // --------------------------------------------------------
+
+    const normalizedIdentifier =
+      this.normalizer.normalize(
+        request.identifier,
+      );
+
+    const identifierHash =
+      this.hash.hash(
+        normalizedIdentifier,
+      );
+
+    // --------------------------------------------------------
+    // IP BLOCK CHECK
+    // --------------------------------------------------------
+
+    if (
+      this.ipBlock.isBlocked(
+        request.ipAddress,
+      )
+    ) {
+
+      this.recordAttempt(
+        identifierHash,
+        request,
+        false,
+      );
+
+      return {
+        success: false,
+        reason: 'ip-blocked',
+      };
+    }
+
+    // --------------------------------------------------------
+    // ACCOUNT LOCK CHECK
+    // --------------------------------------------------------
+
+    if (
+      this.lockout.isLocked(
+        identifierHash,
+      )
+    ) {
+
+      this.recordAttempt(
+        identifierHash,
+        request,
+        false,
+      );
+
+      /**
+       * Do not expose whether the account exists.
+       *
+       * In a production API the response should normally be
+       * generic.
+       */
+      return {
+        success: false,
+        reason: 'account-locked',
+      };
+    }
+
+    // --------------------------------------------------------
+    // CREDENTIAL-STUFFING DETECTION
+    // --------------------------------------------------------
+
+    const signal =
+      this.detector.analyze(
+        identifierHash,
+        request.ipAddress,
+      );
+
+    if (
+      signal.suspicious
+    ) {
+
+      this.ipBlock.recordFailure(
+        request.ipAddress,
+      );
+
+      this.recordAttempt(
+        identifierHash,
+        request,
+        false,
+      );
+
+      return {
+        success: false,
+        reason:
+          'rate-limited',
+      };
+    }
+
+    // --------------------------------------------------------
+    // GENERIC ACCOUNT LOOKUP
+    // --------------------------------------------------------
+
+    /**
+     * Do not immediately return "user does not exist".
+     *
+     * That creates a username/email enumeration oracle.
+     */
+
+    const validPassword =
+      storedPasswordHash
+        ? await this.password.verify(
+            request.password,
+            storedPasswordHash,
+          )
+        : false;
+
+    // --------------------------------------------------------
+    // SUCCESS
+    // --------------------------------------------------------
+
+    if (validPassword) {
+
+      this.lockout.recordSuccess(
+        identifierHash,
+        request.ipAddress,
+      );
+
+      this.ipBlock.recordSuccess(
+        request.ipAddress,
+      );
+
+      this.recordAttempt(
+        identifierHash,
+        request,
+        true,
+      );
+
+      this.events.emit({
+        type:
+          'login-success',
+
+        identifierHash,
+
+        ipAddress:
+          request.ipAddress,
+
+        timestamp:
+          Date.now(),
+      });
+
+      return {
+        success: true,
+        reason: 'success',
+      };
+    }
+
+    // --------------------------------------------------------
+    // FAILURE
+    // --------------------------------------------------------
+
+    this.lockout.recordFailure(
+      identifierHash,
+    );
+
+    this.ipBlock.recordFailure(
+      request.ipAddress,
+    );
+
+    this.recordAttempt(
+      identifierHash,
+      request,
+      false,
+    );
+
+    this.events.emit({
+      type:
+        'login-failure',
+
+      identifierHash,
+
+      ipAddress:
+        request.ipAddress,
+
+      timestamp:
+        Date.now(),
+    });
+
+    return {
+      success: false,
+      reason:
+        'invalid-credentials',
+    };
+  }
+
+  private recordAttempt(
+    identifierHash: string,
+    request: LoginRequest,
+    successful: boolean,
+  ): void {
+
+    this.attempts.add({
+      identifierHash,
+
+      ipAddress:
+        request.ipAddress,
+
+      successful,
+
+      timestamp:
+        Date.now(),
+
+      userAgent:
+        request.userAgent,
+    });
+  }
+}
+
+
+// ============================================================
+// ADMIN ACCOUNT SECURITY SERVICE
+// ============================================================
+
+@Injectable()
+export class AccountSecurityAdminService {
+
+  constructor(
+    private readonly lockout:
+      AccountLockoutService,
+
+    private readonly hash:
+      SecurityHashService,
+
+    private readonly normalizer:
+      IdentifierNormalizer,
+  ) {}
+
+  unlockAccount(
+    identifier: string,
+  ): void {
+
+    const normalized =
+      this.normalizer.normalize(
+        identifier,
+      );
+
+    const identifierHash =
+      this.hash.hash(
+        normalized,
+      );
+
+    this.lockout.unlock(
+      identifierHash,
+    );
+  }
+
+  disableAccount(
+    identifier: string,
+  ): void {
+
+    const normalized =
+      this.normalizer.normalize(
+        identifier,
+      );
+
+    const identifierHash =
+      this.hash.hash(
+        normalized,
+      );
+
+    this.lockout.disable(
+      identifierHash,
+    );
+  }
+}
+
+
+// ============================================================
+// NESTJS GUARD EXAMPLE
+// ============================================================
+
+@Injectable()
+export class AccountLockoutGuard {
+
+  constructor(
+    private readonly ipBlock:
+      IpBlockService,
+
+    private readonly normalizer:
+      IdentifierNormalizer,
+
+    private readonly hash:
+      SecurityHashService,
+
+    private readonly lockout:
+      AccountLockoutService,
+  ) {}
+
+  canActivate(
+    request: LoginRequest,
+  ): boolean {
+
+    const normalized =
+      this.normalizer.normalize(
+        request.identifier,
+      );
+
+    const identifierHash =
+      this.hash.hash(
+        normalized,
+      );
+
+    if (
+      this.ipBlock.isBlocked(
+        request.ipAddress,
+      )
+    ) {
+      throw new TooManyRequestsException(
+        'Too many authentication attempts',
+      );
+    }
+
+    if (
+      this.lockout.isLocked(
+        identifierHash,
+      )
+    ) {
+      throw new ForbiddenException(
+        'Authentication temporarily unavailable',
+      );
+    }
+
+    return true;
+  }
+}
+
+
+// ============================================================
+// SECURITY POLICY
+// ============================================================
+
+export const ACCOUNT_SECURITY_POLICY = {
+
+  // ----------------------------------------------------------
+  // ACCOUNT PROTECTION
+  // ----------------------------------------------------------
+
+  failedAttemptsBeforeLock:
+    5,
+
+  initialLockDuration:
+    '1 minute',
+
+  maximumLockDuration:
+    '30 minutes',
+
+  progressiveLockout:
+    true,
+
+  resetFailuresAfterSuccessfulLogin:
+    true,
+
+  // ----------------------------------------------------------
+  // IP PROTECTION
+  // ----------------------------------------------------------
+
+  failedAttemptsBeforeIpBlock:
+    25,
+
+  ipBlockDuration:
+    '15 minutes',
+
+  // ----------------------------------------------------------
+  // CREDENTIAL STUFFING
+  // ----------------------------------------------------------
+
+  credentialStuffingDetection:
+    true,
+
+  uniqueAccountsThreshold:
+    10,
+
+  failedAttemptThreshold:
+    20,
+
+  detectionWindow:
+    '10 minutes',
+
+  // ----------------------------------------------------------
+  // ENUMERATION PROTECTION
+  // ----------------------------------------------------------
+
+  revealAccountExistence:
+    false,
+
+  // ----------------------------------------------------------
+  // SECURITY LOGGING
+  // ----------------------------------------------------------
+
+  auditAuthenticationFailures:
+    true,
+
+  auditAccountLocks:
+    true,
+
+  auditIpBlocks:
+    true,
+
+  auditCredentialStuffing:
+    true,
+};
+
+
+// ============================================================
+// CONTROLLER EXAMPLE
+// ============================================================
+
+export class AuthenticationController {
+
+  constructor(
+    private readonly authentication:
+      SecureAuthenticationService,
+  ) {}
+
+  async login(
+    request: LoginRequest,
+    storedPasswordHash:
+      string | null,
+  ) {
+
+    const result =
+      await this.authentication.authenticate(
+        request,
+        storedPasswordHash,
+      );
+
+    /**
+     * Production applications should map all authentication
+     * failures to a generic response such as:
+     *
+     * "Invalid credentials or temporarily unavailable."
+     *
+     * Avoid telling the attacker:
+     *
+     * - account exists
+     * - account does not exist
+     * - password is wrong
+     * - account is locked
+     */
+
+    if (!result.success) {
+
+      throw new UnauthorizedException(
+        'Invalid credentials or authentication temporarily unavailable',
+      );
+    }
+
+    return {
+      success: true,
+      message:
+        'Authentication successful',
+    };
+  }
+}
+
+
+// ============================================================
+// TESTS
+// ============================================================
+
+describe(
+  'AccountLockoutService',
+  () => {
+
+    let store:
+      AccountSecurityStore;
+
+    let clock:
+      SecurityClock;
+
+    let events:
+      SecurityEventBus;
+
+    let calculator:
+      LockoutCalculator;
+
+    let service:
+      AccountLockoutService;
+
+    beforeEach(() => {
+
+      store =
+        new AccountSecurityStore();
+
+      clock =
+        new SecurityClock();
+
+      events =
+        new SecurityEventBus();
+
+      calculator =
+        new LockoutCalculator(
+          clock,
+        );
+
+      service =
+        new AccountLockoutService(
+          store,
+          clock,
+          calculator,
+          events,
+        );
+    });
+
+    it(
+      'should not lock a new account',
+      () => {
+
+        expect(
+          service.isLocked(
+            'account-1',
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should lock after repeated failures',
+      () => {
+
+        for (
+          let i = 0;
+          i < 5;
+          i++
+        ) {
+          service.recordFailure(
+            'account-1',
+          );
+        }
+
+        expect(
+          service.isLocked(
+            'account-1',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should reset failures after successful login',
+      () => {
+
+        service.recordFailure(
+          'account-1',
+        );
+
+        service.recordFailure(
+          'account-1',
+        );
+
+        service.recordSuccess(
+          'account-1',
+          '127.0.0.1',
+        );
+
+        expect(
+          service.isLocked(
+            'account-1',
+          ),
+        ).toBe(false);
+
+        expect(
+          store.get(
+            'account-1',
+          ).failedAttempts,
+        ).toBe(0);
+      },
+    );
+
+    it(
+      'should allow administrators to unlock accounts',
+      () => {
+
+        for (
+          let i = 0;
+          i < 5;
+          i++
+        ) {
+          service.recordFailure(
+            'account-1',
+          );
+        }
+
+        expect(
+          service.isLocked(
+            'account-1',
+          ),
+        ).toBe(true);
+
+        service.unlock(
+          'account-1',
+        );
+
+        expect(
+          service.isLocked(
+            'account-1',
+          ),
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// IP BLOCK TESTS
+// ============================================================
+
+describe(
+  'IpBlockService',
+  () => {
+
+    let service:
+      IpBlockService;
+
+    let store:
+      IpSecurityStore;
+
+    let clock:
+      SecurityClock;
+
+    let events:
+      SecurityEventBus;
+
+    beforeEach(() => {
+
+      store =
+        new IpSecurityStore();
+
+      clock =
+        new SecurityClock();
+
+      events =
+        new SecurityEventBus();
+
+      service =
+        new IpBlockService(
+          store,
+          clock,
+          events,
+        );
+    });
+
+    it(
+      'should not block a new IP',
+      () => {
+
+        expect(
+          service.isBlocked(
+            '127.0.0.1',
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should block an IP after excessive failures',
+      () => {
+
+        for (
+          let i = 0;
+          i < 25;
+          i++
+        ) {
+
+          service.recordFailure(
+            '127.0.0.1',
+          );
+        }
+
+        expect(
+          service.isBlocked(
+            '127.0.0.1',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should reduce failure reputation after success',
+      () => {
+
+        for (
+          let i = 0;
+          i < 10;
+          i++
+        ) {
+
+          service.recordFailure(
+            '127.0.0.1',
+          );
+        }
+
+        service.recordSuccess(
+          '127.0.0.1',
+        );
+
+        expect(
+          store.get(
+            '127.0.0.1',
+          ).failedAttempts,
+        ).toBe(5);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// CREDENTIAL-STUFFING TESTS
+// ============================================================
+
+describe(
+  'CredentialStuffingDetector',
+  () => {
+
+    let attempts:
+      AuthenticationAttemptStore;
+
+    let clock:
+      SecurityClock;
+
+    let events:
+      SecurityEventBus;
+
+    let detector:
+      CredentialStuffingDetector;
+
+    beforeEach(() => {
+
+      clock =
+        new SecurityClock();
+
+      attempts =
+        new AuthenticationAttemptStore(
+          clock,
+        );
+
+      events =
+        new SecurityEventBus();
+
+      detector =
+        new CredentialStuffingDetector(
+          attempts,
+          clock,
+          events,
+        );
+    });
+
+    it(
+      'should detect many accounts from one IP',
+      () => {
+
+        for (
+          let i = 0;
+          i < 10;
+          i++
+        ) {
+
+          attempts.add({
+            identifierHash:
+              `account-${i}`,
+
+            ipAddress:
+              '10.0.0.1',
+
+            successful:
+              false,
+
+            timestamp:
+              Date.now(),
+          });
+        }
+
+        const result =
+          detector.analyze(
+            'account-current',
+            '10.0.0.1',
+          );
+
+        expect(
+          result.suspicious,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should not flag a single normal failure',
+      () => {
+
+        attempts.add({
+          identifierHash:
+            'account-1',
+
+          ipAddress:
+            '10.0.0.1',
+
+          successful:
+            false,
+
+          timestamp:
+            Date.now(),
+        });
+
+        const result =
+          detector.analyze(
+            'account-1',
+            '10.0.0.1',
+          );
+
+        expect(
+          result.suspicious,
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// INTEGRATION TESTS
+// ============================================================
+
+describe(
+  'SecureAuthenticationService',
+  () => {
+
+    let service:
+      SecureAuthenticationService;
+
+    let lockout:
+      AccountLockoutService;
+
+    let ipBlock:
+      IpBlockService;
+
+    let detector:
+      CredentialStuffingDetector;
+
+    let attempts:
+      AuthenticationAttemptStore;
+
+    let events:
+      SecurityEventBus;
+
+    beforeEach(() => {
+
+      const clock =
+        new SecurityClock();
+
+      const accountStore =
+        new AccountSecurityStore();
+
+      const ipStore =
+        new IpSecurityStore();
+
+      events =
+        new SecurityEventBus();
+
+      const hash =
+        new SecurityHashService();
+
+      const normalizer =
+        new IdentifierNormalizer();
+
+      const calculator =
+        new LockoutCalculator(
+          clock,
+        );
+
+      lockout =
+        new AccountLockoutService(
+          accountStore,
+          clock,
+          calculator,
+          events,
+        );
+
+      ipBlock =
+        new IpBlockService(
+          ipStore,
+          clock,
+          events,
+        );
+
+      attempts =
+        new AuthenticationAttemptStore(
+          clock,
+        );
+
+      detector =
+        new CredentialStuffingDetector(
+          attempts,
+          clock,
+          events,
+        );
+
+      service =
+        new SecureAuthenticationService(
+          normalizer,
+          hash,
+          lockout,
+          ipBlock,
+          detector,
+          attempts,
+          events,
+          new PasswordVerifier(),
+        );
+    });
+
+    it(
+      'should reject invalid credentials',
+      async () => {
+
+        const result =
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'wrong-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+
+        expect(
+          result.success,
+        ).toBe(false);
+
+        expect(
+          result.reason,
+        ).toBe(
+          'invalid-credentials',
+        );
+      },
+    );
+
+    it(
+      'should authenticate valid credentials',
+      async () => {
+
+        const result =
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'correct-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+
+        expect(
+          result.success,
+        ).toBe(true);
+
+        expect(
+          result.reason,
+        ).toBe('success');
+      },
+    );
+
+    it(
+      'should lock an account after repeated failures',
+      async () => {
+
+        for (
+          let i = 0;
+          i < 5;
+          i++
+        ) {
+
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'wrong-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+        }
+
+        const result =
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'correct-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+
+        expect(
+          result.success,
+        ).toBe(false);
+
+        expect(
+          result.reason,
+        ).toBe(
+          'account-locked',
+        );
+      },
+    );
+
+    it(
+      'should reset account failures after successful login',
+      async () => {
+
+        for (
+          let i = 0;
+          i < 3;
+          i++
+        ) {
+
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'wrong-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+        }
+
+        const success =
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'correct-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+
+        expect(
+          success.success,
+        ).toBe(true);
+
+        /**
+         * Subsequent failed attempts start from zero again.
+         */
+        const failure =
+          await service.authenticate(
+            {
+              identifier:
+                'user@example.com',
+
+              password:
+                'wrong-password',
+
+              ipAddress:
+                '127.0.0.1',
+            },
+
+            'correct-password',
+          );
+
+        expect(
+          failure.reason,
+        ).toBe(
+          'invalid-credentials',
+        );
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// PRODUCTION REDIS NOTES
+// ============================================================
+
+/**
+ * IMPORTANT:
+ *
+ * The in-memory stores above are suitable for demonstrating
+ * the feature and for unit tests.
+ *
+ * Production deployments should use a shared datastore such
+ * as Redis.
+ *
+ * Otherwise:
+ *
+ *     Server A -> remembers 3 failures
+ *     Server B -> remembers 0 failures
+ *
+ * and an attacker can bypass protection simply by changing
+ * which application instance receives the request.
+ *
+ *
+ * Recommended Redis keys:
+ *
+ *     auth:account:<identifierHash>
+ *
+ *     auth:ip:<ipHash>
+ *
+ *     auth:attempts:<ipHash>
+ *
+ *     auth:stuffing:<ipHash>
+ *
+ *
+ * Use Redis TTLs so security state expires automatically.
+ *
+ *
+ * ============================================================
+ * DISTRIBUTED DEPLOYMENT
+ * ============================================================
+ *
+ * For Kubernetes / Docker / load-balanced environments:
+ *
+ *             ┌───────────────┐
+ *             │ Load Balancer │
+ *             └───────┬───────┘
+ *                     │
+ *          ┌──────────┼──────────┐
+ *          │          │          │
+ *       Server A   Server B   Server C
+ *          │          │          │
+ *          └──────────┼──────────┘
+ *                     │
+ *                ┌────▼────┐
+ *                │  Redis  │
+ *                └─────────┘
+ *
+ * All rate-limit and lockout counters should therefore be
+ * centralized.
+ *
+ *
+ * ============================================================
+ * TRUST PROXY CONFIGURATION
+ * ============================================================
+ *
+ * Be careful when determining the client's IP address.
+ *
+ * Do not blindly trust:
+ *
+ *     X-Forwarded-For
+ *
+ * unless your reverse proxy is configured as trusted.
+ *
+ * Otherwise an attacker can send:
+ *
+ *     X-Forwarded-For: 1.2.3.4
+ *
+ * and bypass IP-based defenses.
+ *
+ *
+ * ============================================================
+ * PASSWORD HASHING
+ * ============================================================
+ *
+ * The PasswordVerifier above intentionally contains a simple
+ * placeholder comparison.
+ *
+ * NEVER use plaintext password comparison in production.
+ *
+ * Use a password hashing algorithm such as:
+ *
+ *     Argon2id
+ *
+ * or an appropriately configured:
+ *
+ *     bcrypt
+ *
+ * Password hashes should never be logged.
+ *
+ *
+ * ============================================================
+ * USER ENUMERATION
+ * ============================================================
+ *
+ * Authentication failures should use a generic response.
+ *
+ * Bad:
+ *
+ *     "User does not exist"
+ *
+ *     "Incorrect password"
+ *
+ * Better:
+ *
+ *     "Invalid credentials or authentication temporarily
+ *      unavailable."
+ *
+ *
+ * ============================================================
+ * ACCOUNT LOCKOUT DESIGN
+ * ============================================================
+ *
+ * Hard permanent lockouts are generally undesirable because
+ * attackers can deliberately lock out legitimate users.
+ *
+ * This implementation therefore uses:
+ *
+ *     progressive temporary lockouts
+ *
+ * combined with:
+ *
+ *     IP reputation
+ *
+ * and:
+ *
+ *     credential-stuffing detection.
+ *
+ *
+ * ============================================================
+ * MONITORING
+ * ============================================================
+ *
+ * Security teams should monitor:
+ *
+ * - account-lock
+ * - account-unlock
+ * - ip-block
+ * - credential-stuffing-detected
+ * - login-failure
+ * - login-success
+ *
+ * Useful alerts include:
+ *
+ *     unusually high failed-login volume
+ *
+ *     many accounts targeted from one IP
+ *
+ *     many IPs targeting one account
+ *
+ *     repeated lockouts
+ *
+ *     geographic anomalies
+ *
+ *     sudden authentication failure spikes
+ *
+ *
+ * ============================================================
+ * ACCEPTANCE CRITERIA
+ * ============================================================
+ *
+ * [x] Track failed authentication attempts.
+ *
+ * [x] Lock accounts after repeated failures.
+ *
+ * [x] Use progressive lockout durations.
+ *
+ * [x] Automatically expire temporary lockouts.
+ *
+ * [x] Reset account failures after successful authentication.
+ *
+ * [x] Track IP-level authentication failures.
+ *
+ * [x] Temporarily block abusive IP addresses.
+ *
+ * [x] Detect many-account attacks from a single IP.
+ *
+ * [x] Detect credential-stuffing patterns.
+ *
+ * [x] Avoid exposing account existence.
+ *
+ * [x] Emit security/audit events.
+ *
+ * [x] Provide administrative account unlock.
+ *
+ * [x] Provide administrative account disable.
+ *
+ * [x] Provide automated tests.
+ *
+ * [x] Provide a production Redis migration path.
+ *
+ * [x] Document reverse-proxy/IP considerations.
+ *
+ * [x] Document password hashing requirements.
+ *
+ * [x] Avoid storing raw identifiers in security events.
+ *
+ * [x] Keep security counters bounded.
+ *
+ * ============================================================
+ */

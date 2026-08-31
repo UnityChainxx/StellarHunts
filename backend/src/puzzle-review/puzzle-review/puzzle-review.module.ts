@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { AdminAuthModule } from '../../admin/admin-auth.module';
+import { AuditLogModule } from '../../audit-log/audit-log.module';
 import { PuzzleReviewService } from './services/puzzle-review.service';
 import { ModerationService } from './services/moderation.service';
 import { PuzzleReviewController } from './controllers/puzzle-review.controller';
@@ -13,6 +15,8 @@ import { AdminGuard } from './guards/admin.guard';
   imports: [
     ConfigModule,
     TypeOrmModule.forFeature([PuzzleReview, ReviewModeration]),
+    AuditLogModule,
+    AdminAuthModule,
   ],
   providers: [PuzzleReviewService, ModerationService, AdminGuard],
   controllers: [PuzzleReviewController, ModerationController],

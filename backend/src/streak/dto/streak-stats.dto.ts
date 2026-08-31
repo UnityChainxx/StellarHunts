@@ -1,4 +1,4 @@
-import type { ActivityType } from './activity-type.enum'; // Assuming ActivityType is an enum or type defined elsewhere
+import type { ActivityType } from '../entities/streak-activity.entity';
 
 export class StreakStatsDto {
   userId: string;
