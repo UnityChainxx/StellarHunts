@@ -114,11 +114,27 @@ describe('AuthService', () => {
         email: 'john@example.com',
       } as User);
 
-      await expect(service.register(registerDto)).rejects.toThrow(
-        ConflictException,
-      );
-    });
-  });
+      const result = await service.register(registerDto)
+
+      // Must NOT reveal that the account exists or issue a token.
+      expect(result).toHaveProperty("message")
+      expect(result).not.toHaveProperty("accessToken")
+      expect(userRepository.create).not.toHaveBeenCalled()
+      expect(userRepository.save).not.toHaveBeenCalled()
+    })
+
+    it("should return a generic neutral message on unique violation (anti-enumeration)", async () => {
+      userRepository.findOne.mockResolvedValue(null)
+      const error: any = new Error("duplicate")
+      error.code = "23505"
+      userRepository.save.mockRejectedValue(error)
+
+      const result = await service.register(registerDto)
+
+      expect(result).toHaveProperty("message")
+      expect(result).not.toHaveProperty("accessToken")
+    })
+  })
 
   describe('login', () => {
     it('returns a fresh token pair on valid credentials', async () => {
@@ -144,9 +160,9 @@ describe('AuthService', () => {
       userRepository.findOne.mockResolvedValue(null);
 
       await expect(service.login(loginDto)).rejects.toThrow(
-        UnauthorizedException,
-      );
-    });
+        new UnauthorizedException("Invalid email or password"),
+      )
+    })
 
     it('throws UnauthorizedException for inactive user', async () => {
       userRepository.findOne.mockResolvedValue({
@@ -154,6 +170,7 @@ describe('AuthService', () => {
         isActive: false,
       } as User);
 
+      // Message identical across all failure modes.
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
       );

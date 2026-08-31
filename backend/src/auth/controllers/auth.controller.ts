@@ -40,18 +40,15 @@ export class AuthController {
   })
   @ApiResponse({
     status: 201,
-    description: 'User successfully registered',
+    description:
+      "User successfully registered (or, for anti-enumeration, a generic neutral response when the email is already taken)",
     type: AuthResponseDto,
   })
   @ApiResponse({
     status: 400,
     description: 'Bad request - validation failed',
   })
-  @ApiResponse({
-    status: 409,
-    description: 'Conflict - user already exists',
-  })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto | GenericAuthMessageDto> {
     try {
       return await this.authService.register(registerDto);
     } catch (error) {
