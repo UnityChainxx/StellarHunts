@@ -3,11 +3,12 @@ import {
   Post,
   Patch,
   Get,
+  Delete,
   Body,
   Param,
+  Request,
   UseGuards,
 } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -28,7 +29,8 @@ export class UserController {
   @Post()
   @ApiOperation({ summary: 'Register new user' })
   @ApiResponse({ status: 201, description: 'User created' })
-  create(@Body(new ValidationPipe({ whitelist: true })) dto: CreateUserDto) {
+  // Relies on the global validation pipe (issue #340).
+  create(@Body() dto: CreateUserDto) {
     return this.userService.createUser(dto);
   }
 
@@ -36,8 +38,9 @@ export class UserController {
   @Patch('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user profile' })
+  // Relies on the global validation pipe (issue #340).
   updateProfile(
-    @Body(new ValidationPipe({ whitelist: true })) dto: UpdateUserProfileDto,
+    @Body() dto: UpdateUserProfileDto,
     @Param('id') /* or use custom decorator to get id */ id: string,
   ) {
     return this.userService.updateProfile(id, dto);
@@ -49,9 +52,17 @@ export class UserController {
   @ApiOperation({ summary: 'Link or update wallet address' })
   linkWallet(
     @Body(new ValidationPipe({ whitelist: true })) dto: LinkWalletDto,
-    @Param('id') id: string,
+    @Request() req,
   ) {
-    return this.userService.linkWallet(id, dto);
+    return this.userService.linkWallet(req.user.id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('link-wallet')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unlink wallet address' })
+  unlinkWallet(@Request() req) {
+    return this.userService.unlinkWallet(req.user.id);
   }
 
   @Get(':id')

@@ -8,7 +8,11 @@ import {
   HttpStatus,
   HttpException,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -25,6 +29,8 @@ export class UserReportCardController {
   constructor(private readonly reportCardService: UserReportCardService) {}
 
   @Get(':id/report-card')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'id' })
   @ApiOperation({
     summary: 'Get user report card',
     description:
@@ -58,6 +64,8 @@ export class UserReportCardController {
   }
 
   @Post(':id/report-card')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'id' })
   @ApiOperation({
     summary: 'Create user report card',
     description: 'Creates a new report card for a user or returns existing one',
@@ -81,6 +89,8 @@ export class UserReportCardController {
   }
 
   @Put(':id/report-card/progress')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'id' })
   @ApiOperation({
     summary: 'Update user progress',
     description: "Updates the progress statistics for a user's report card",
