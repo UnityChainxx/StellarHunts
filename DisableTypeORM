@@ -1,0 +1,1414 @@
+// typeorm-schema-sync-safety.ts
+//
+// Comprehensive TypeORM schema synchronization safety module.
+//
+// Security / reliability goal:
+//
+// Never allow:
+//     synchronize: true
+//
+// outside an explicitly approved development/test environment.
+//
+// Production database schemas should be managed through
+// migrations rather than automatic schema synchronization.
+//
+// ============================================================
+
+
+// ============================================================
+// IMPORTS
+// ============================================================
+
+import {
+  Injectable,
+  Logger,
+  Module,
+} from '@nestjs/common';
+
+import {
+  TypeOrmModule,
+  TypeOrmModuleOptions,
+} from '@nestjs/typeorm';
+
+
+// ============================================================
+// ENVIRONMENT TYPES
+// ============================================================
+
+export type ApplicationEnvironment =
+  | 'development'
+  | 'test'
+  | 'staging'
+  | 'production';
+
+
+// ============================================================
+// ENVIRONMENT SERVICE
+// ============================================================
+
+@Injectable()
+export class EnvironmentService {
+
+  /**
+   * Read the application environment.
+   *
+   * Defaults to production.
+   *
+   * This is intentional:
+   *
+   * If NODE_ENV is missing or malformed, the application
+   * should fail closed rather than accidentally enabling
+   * destructive schema synchronization.
+   */
+  getEnvironment():
+    ApplicationEnvironment {
+
+    const environment =
+      process.env.NODE_ENV
+        ?.trim()
+        .toLowerCase();
+
+    switch (environment) {
+
+      case 'development':
+      case 'dev':
+        return 'development';
+
+      case 'test':
+        return 'test';
+
+      case 'staging':
+      case 'stage':
+        return 'staging';
+
+      case 'production':
+      case 'prod':
+        return 'production';
+
+      default:
+        /**
+         * Fail closed.
+         */
+        return 'production';
+    }
+  }
+
+  isDevelopment():
+    boolean {
+
+    return (
+      this.getEnvironment() ===
+      'development'
+    );
+  }
+
+  isTest():
+    boolean {
+
+    return (
+      this.getEnvironment() ===
+      'test'
+    );
+  }
+
+  isStaging():
+    boolean {
+
+    return (
+      this.getEnvironment() ===
+      'staging'
+    );
+  }
+
+  isProduction():
+    boolean {
+
+    return (
+      this.getEnvironment() ===
+      'production'
+    );
+  }
+
+  isNonDevelopment():
+    boolean {
+
+    return !this.isDevelopment();
+  }
+}
+
+
+// ============================================================
+// SCHEMA SYNCHRONIZATION POLICY
+// ============================================================
+
+export interface SchemaSynchronizationPolicy {
+
+  /**
+   * Whether synchronize is allowed at all.
+   */
+  allowSynchronization:
+    boolean;
+
+  /**
+   * Environments where synchronization is permitted.
+   */
+  allowedEnvironments:
+    ApplicationEnvironment[];
+
+  /**
+   * Whether migrations must be used.
+   */
+  requireMigrations:
+    boolean;
+}
+
+
+// ============================================================
+// DEFAULT POLICY
+// ============================================================
+
+export const DEFAULT_SCHEMA_POLICY:
+  SchemaSynchronizationPolicy = {
+
+  allowSynchronization:
+    true,
+
+  allowedEnvironments: [
+    'development',
+    'test',
+  ],
+
+  requireMigrations:
+    true,
+};
+
+
+// ============================================================
+// SCHEMA SAFETY VALIDATOR
+// ============================================================
+
+@Injectable()
+export class TypeOrmSchemaSafetyValidator {
+
+  private readonly logger =
+    new Logger(
+      TypeOrmSchemaSafetyValidator.name,
+    );
+
+  constructor(
+    private readonly environment:
+      EnvironmentService,
+  ) {}
+
+  /**
+   * Determine whether TypeORM synchronize should be enabled.
+   */
+  shouldSynchronize(
+    policy:
+      SchemaSynchronizationPolicy =
+        DEFAULT_SCHEMA_POLICY,
+  ): boolean {
+
+    const currentEnvironment =
+      this.environment
+        .getEnvironment();
+
+    /**
+     * Synchronization is allowed only when:
+     *
+     * 1. Global policy permits it.
+     * 2. Current environment is explicitly allowed.
+     */
+    if (
+      !policy.allowSynchronization
+    ) {
+      return false;
+    }
+
+    if (
+      !policy.allowedEnvironments.includes(
+        currentEnvironment,
+      )
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Validate an existing TypeORM configuration.
+   *
+   * This should be called before the application starts.
+   */
+  validate(
+    options:
+      TypeOrmModuleOptions,
+  ): TypeOrmModuleOptions {
+
+    const environment =
+      this.environment
+        .getEnvironment();
+
+    const synchronize =
+      options.synchronize === true;
+
+    /**
+     * --------------------------------------------------------
+     * DEVELOPMENT / TEST
+     * --------------------------------------------------------
+     */
+
+    if (
+      environment ===
+        'development' ||
+      environment ===
+        'test'
+    ) {
+
+      this.logger.debug(
+        `TypeORM schema synchronization is ` +
+        `allowed in ${environment}.`,
+      );
+
+      return {
+        ...options,
+
+        synchronize:
+          synchronize,
+      };
+    }
+
+    /**
+     * --------------------------------------------------------
+     * STAGING / PRODUCTION
+     * --------------------------------------------------------
+     */
+
+    if (synchronize) {
+
+      this.logger.error(
+        `Unsafe TypeORM configuration detected: ` +
+        `synchronize=true in ${environment}. ` +
+        `Schema synchronization has been disabled.`,
+      );
+    }
+
+    return {
+      ...options,
+
+      /**
+       * CRITICAL:
+       *
+       * Force synchronize off.
+       */
+      synchronize: false,
+
+      /**
+       * Migrations must be responsible for schema changes.
+       */
+      migrationsRun:
+        options.migrationsRun === true,
+    };
+  }
+}
+
+
+// ============================================================
+// MIGRATION SAFETY VALIDATOR
+// ============================================================
+
+@Injectable()
+export class MigrationSafetyValidator {
+
+  private readonly logger =
+    new Logger(
+      MigrationSafetyValidator.name,
+    );
+
+  validate(
+    options:
+      TypeOrmModuleOptions,
+  ):
+    TypeOrmModuleOptions {
+
+    const environment =
+      new EnvironmentService()
+        .getEnvironment();
+
+    /**
+     * Production and staging should never depend on
+     * synchronize=true.
+     */
+    if (
+      environment ===
+        'production' ||
+      environment ===
+        'staging'
+    ) {
+
+      if (
+        options.synchronize === true
+      ) {
+        throw new Error(
+          'Unsafe database configuration: ' +
+          'TypeORM synchronize cannot be enabled ' +
+          `in ${environment}.`,
+        );
+      }
+
+      /**
+       * Production migrations should normally be executed
+       * explicitly during deployment.
+       *
+       * migrationsRun can remain false when your deployment
+       * pipeline runs:
+       *
+       *     typeorm migration:run
+       *
+       * explicitly.
+       */
+      this.logger.log(
+        `TypeORM migration policy validated for ${environment}.`,
+      );
+    }
+
+    return options;
+  }
+}
+
+
+// ============================================================
+// SAFE TYPEORM CONFIGURATION FACTORY
+// ============================================================
+
+export interface DatabaseEnvironmentConfig {
+
+  host: string;
+
+  port: number;
+
+  username: string;
+
+  password: string;
+
+  database: string;
+}
+
+
+// ============================================================
+// DATABASE CONFIGURATION
+// ============================================================
+
+@Injectable()
+export class DatabaseConfigurationService {
+
+  constructor(
+    private readonly environment:
+      EnvironmentService,
+
+    private readonly schemaValidator:
+      TypeOrmSchemaSafetyValidator,
+  ) {}
+
+  createConfig():
+    TypeOrmModuleOptions {
+
+    const environment =
+      this.environment
+        .getEnvironment();
+
+    const baseConfig:
+      TypeOrmModuleOptions = {
+
+      type: 'postgres',
+
+      host:
+        process.env.DB_HOST ??
+        'localhost',
+
+      port:
+        Number(
+          process.env.DB_PORT ??
+          5432,
+        ),
+
+      username:
+        process.env.DB_USERNAME ??
+        'postgres',
+
+      password:
+        process.env.DB_PASSWORD ??
+        '',
+
+      database:
+        process.env.DB_DATABASE ??
+        'application',
+
+      autoLoadEntities:
+        true,
+
+      /**
+       * Migrations directory.
+       */
+      migrations: [
+        'dist/database/migrations/*{.js,.ts}',
+      ],
+
+      /**
+       * Explicitly false by default.
+       */
+      synchronize: false,
+    };
+
+    /**
+     * --------------------------------------------------------
+     * DEVELOPMENT
+     * --------------------------------------------------------
+     *
+     * Developers may enable synchronization locally.
+     *
+     * Example:
+     *
+     * TYPEORM_SYNCHRONIZE=true
+     *
+     * NODE_ENV=development
+     */
+    if (
+      environment ===
+      'development'
+    ) {
+
+      const requestedSync =
+        process.env
+          .TYPEORM_SYNCHRONIZE ===
+        'true';
+
+      return this.schemaValidator
+        .validate({
+          ...baseConfig,
+
+          synchronize:
+            requestedSync,
+        });
+    }
+
+    /**
+     * --------------------------------------------------------
+     * TEST
+     * --------------------------------------------------------
+     *
+     * Tests may also use synchronization when an isolated
+     * database is being used.
+     */
+    if (
+      environment ===
+      'test'
+    ) {
+
+      const requestedSync =
+        process.env
+          .TYPEORM_SYNCHRONIZE ===
+        'true';
+
+      return this.schemaValidator
+        .validate({
+          ...baseConfig,
+
+          synchronize:
+            requestedSync,
+        });
+    }
+
+    /**
+     * --------------------------------------------------------
+     * STAGING / PRODUCTION
+     * --------------------------------------------------------
+     *
+     * Always force synchronize=false.
+     */
+    return this.schemaValidator
+      .validate({
+        ...baseConfig,
+
+        synchronize: false,
+
+        /**
+         * Do not automatically run migrations unless your
+         * deployment architecture explicitly requires it.
+         *
+         * Recommended:
+         *
+         * migration:run
+         *
+         * as a separate deployment step.
+         */
+        migrationsRun: false,
+      });
+  }
+}
+
+
+// ============================================================
+// DATABASE MODULE
+// ============================================================
+
+@Module({
+  imports: [
+    TypeOrmModule.forRootAsync({
+
+      inject: [
+        EnvironmentService,
+        TypeOrmSchemaSafetyValidator,
+      ],
+
+      useFactory: (
+        environment:
+          EnvironmentService,
+
+        validator:
+          TypeOrmSchemaSafetyValidator,
+      ): TypeOrmModuleOptions => {
+
+        const env =
+          environment
+            .getEnvironment();
+
+        const requestedSync =
+          process.env
+            .TYPEORM_SYNCHRONIZE ===
+          'true';
+
+        const configuration:
+          TypeOrmModuleOptions = {
+
+          type: 'postgres',
+
+          host:
+            process.env.DB_HOST ??
+            'localhost',
+
+          port:
+            Number(
+              process.env.DB_PORT ??
+              5432,
+            ),
+
+          username:
+            process.env.DB_USERNAME ??
+            'postgres',
+
+          password:
+            process.env.DB_PASSWORD ??
+            '',
+
+          database:
+            process.env.DB_DATABASE ??
+            'application',
+
+          autoLoadEntities:
+            true,
+
+          migrations: [
+            'dist/database/migrations/*{.js,.ts}',
+          ],
+
+          synchronize:
+            env ===
+              'development' ||
+            env === 'test'
+              ? requestedSync
+              : false,
+
+          /**
+           * Production migrations should normally be handled
+           * by CI/CD rather than application startup.
+           */
+          migrationsRun:
+            false,
+        };
+
+        return validator.validate(
+          configuration,
+        );
+      },
+    }),
+  ],
+
+  providers: [
+    EnvironmentService,
+    TypeOrmSchemaSafetyValidator,
+    MigrationSafetyValidator,
+    DatabaseConfigurationService,
+  ],
+
+  exports: [
+    EnvironmentService,
+    TypeOrmSchemaSafetyValidator,
+    MigrationSafetyValidator,
+    DatabaseConfigurationService,
+  ],
+})
+export class SafeDatabaseModule {}
+
+
+// ============================================================
+// BOOTSTRAP VALIDATION
+// ============================================================
+
+@Injectable()
+export class DatabaseStartupValidator {
+
+  private readonly logger =
+    new Logger(
+      DatabaseStartupValidator.name,
+    );
+
+  constructor(
+    private readonly environment:
+      EnvironmentService,
+
+    private readonly validator:
+      TypeOrmSchemaSafetyValidator,
+  ) {}
+
+  validate(
+    options:
+      TypeOrmModuleOptions,
+  ): void {
+
+    const env =
+      this.environment
+        .getEnvironment();
+
+    /**
+     * Production and staging are fail-safe.
+     */
+    if (
+      env === 'production' ||
+      env === 'staging'
+    ) {
+
+      if (
+        options.synchronize === true
+      ) {
+
+        /**
+         * Do not silently start an application with an unsafe
+         * schema configuration.
+         */
+        throw new Error(
+          'APPLICATION STARTUP ABORTED: ' +
+          `TypeORM synchronize=true is forbidden in ${env}.`,
+        );
+      }
+
+      this.logger.log(
+        `Database schema synchronization disabled in ${env}.`,
+      );
+    }
+
+    /**
+     * Re-run complete validation.
+     */
+    this.validator.validate(
+      options,
+    );
+  }
+}
+
+
+// ============================================================
+// ENVIRONMENT VARIABLE SAFETY
+// ============================================================
+
+export function parseBoolean(
+  value:
+    | string
+    | undefined,
+  defaultValue:
+    boolean = false,
+): boolean {
+
+  if (
+    value === undefined
+  ) {
+    return defaultValue;
+  }
+
+  switch (
+    value.trim().toLowerCase()
+  ) {
+
+    case 'true':
+    case '1':
+    case 'yes':
+      return true;
+
+    case 'false':
+    case '0':
+    case 'no':
+      return false;
+
+    default:
+      return defaultValue;
+  }
+}
+
+
+// ============================================================
+// SAFE SYNCHRONIZE RESOLUTION
+// ============================================================
+
+export function resolveSynchronize(
+  nodeEnvironment:
+    | string
+    | undefined,
+
+  requested:
+    | string
+    | undefined,
+): boolean {
+
+  const environment =
+    (
+      nodeEnvironment ??
+      'production'
+    )
+      .trim()
+      .toLowerCase();
+
+  /**
+   * Only development and test can opt into synchronization.
+   */
+  const allowed =
+    environment ===
+      'development' ||
+    environment ===
+      'test' ||
+    environment ===
+      'dev';
+
+  if (!allowed) {
+    return false;
+  }
+
+  return parseBoolean(
+    requested,
+    false,
+  );
+}
+
+
+// ============================================================
+// CONFIGURATION SNAPSHOT
+// ============================================================
+
+export interface DatabaseSafetySnapshot {
+
+  environment:
+    ApplicationEnvironment;
+
+  synchronize:
+    boolean;
+
+  migrationsEnabled:
+    boolean;
+
+  safe:
+    boolean;
+
+  reason:
+    string;
+}
+
+
+// ============================================================
+// DATABASE SAFETY INSPECTOR
+// ============================================================
+
+@Injectable()
+export class DatabaseSafetyInspector {
+
+  constructor(
+    private readonly environment:
+      EnvironmentService,
+  ) {}
+
+  inspect(
+    options:
+      TypeOrmModuleOptions,
+  ):
+    DatabaseSafetySnapshot {
+
+    const environment =
+      this.environment
+        .getEnvironment();
+
+    const synchronize =
+      options.synchronize === true;
+
+    const migrationsEnabled =
+      Array.isArray(
+        options.migrations,
+      ) &&
+      options.migrations.length >
+        0;
+
+    if (
+      (
+        environment ===
+          'production' ||
+        environment ===
+          'staging'
+      ) &&
+      synchronize
+    ) {
+
+      return {
+        environment,
+
+        synchronize,
+
+        migrationsEnabled,
+
+        safe: false,
+
+        reason:
+          'Schema synchronization is enabled outside development/test.',
+      };
+    }
+
+    if (
+      environment ===
+        'production' &&
+      !migrationsEnabled
+    ) {
+
+      return {
+        environment,
+
+        synchronize,
+
+        migrationsEnabled,
+
+        safe: false,
+
+        reason:
+          'Production database migrations are not configured.',
+      };
+    }
+
+    return {
+      environment,
+
+      synchronize,
+
+      migrationsEnabled,
+
+      safe: true,
+
+      reason:
+        'Database schema configuration is safe.',
+    };
+  }
+}
+
+
+// ============================================================
+// TESTS
+// ============================================================
+
+describe(
+  'resolveSynchronize',
+  () => {
+
+    it(
+      'should allow synchronization in development',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            'development',
+            'true',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should allow synchronization in test',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            'test',
+            'true',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should disable synchronization in production',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            'production',
+            'true',
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should disable synchronization in staging',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            'staging',
+            'true',
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should fail closed when environment is undefined',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            undefined,
+            'true',
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should return false when synchronization is not requested',
+      () => {
+
+        expect(
+          resolveSynchronize(
+            'development',
+            'false',
+          ),
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// ENVIRONMENT SERVICE TESTS
+// ============================================================
+
+describe(
+  'EnvironmentService',
+  () => {
+
+    let service:
+      EnvironmentService;
+
+    beforeEach(() => {
+      service =
+        new EnvironmentService();
+    });
+
+    it(
+      'should recognize development',
+      () => {
+
+        process.env.NODE_ENV =
+          'development';
+
+        expect(
+          service.getEnvironment(),
+        ).toBe(
+          'development',
+        );
+      },
+    );
+
+    it(
+      'should recognize production',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        expect(
+          service.getEnvironment(),
+        ).toBe(
+          'production',
+        );
+      },
+    );
+
+    it(
+      'should fail closed for unknown environments',
+      () => {
+
+        process.env.NODE_ENV =
+          'something-unknown';
+
+        expect(
+          service.getEnvironment(),
+        ).toBe(
+          'production',
+        );
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// TYPEORM VALIDATOR TESTS
+// ============================================================
+
+describe(
+  'TypeOrmSchemaSafetyValidator',
+  () => {
+
+    let environment:
+      EnvironmentService;
+
+    let validator:
+      TypeOrmSchemaSafetyValidator;
+
+    beforeEach(() => {
+
+      environment =
+        new EnvironmentService();
+
+      validator =
+        new TypeOrmSchemaSafetyValidator(
+          environment,
+        );
+    });
+
+    it(
+      'should preserve synchronize in development',
+      () => {
+
+        process.env.NODE_ENV =
+          'development';
+
+        const result =
+          validator.validate({
+            type: 'sqlite',
+
+            database:
+              ':memory:',
+
+            synchronize:
+              true,
+          });
+
+        expect(
+          result.synchronize,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should disable synchronize in production',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        const result =
+          validator.validate({
+            type: 'postgres',
+
+            host:
+              'localhost',
+
+            synchronize:
+              true,
+          });
+
+        expect(
+          result.synchronize,
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should disable synchronize in staging',
+      () => {
+
+        process.env.NODE_ENV =
+          'staging';
+
+        const result =
+          validator.validate({
+            type: 'postgres',
+
+            host:
+              'localhost',
+
+            synchronize:
+              true,
+          });
+
+        expect(
+          result.synchronize,
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should default to production behavior',
+      () => {
+
+        delete process.env.NODE_ENV;
+
+        const result =
+          validator.validate({
+            type: 'postgres',
+
+            host:
+              'localhost',
+
+            synchronize:
+              true,
+          });
+
+        expect(
+          result.synchronize,
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// SAFETY INSPECTOR TESTS
+// ============================================================
+
+describe(
+  'DatabaseSafetyInspector',
+  () => {
+
+    let environment:
+      EnvironmentService;
+
+    let inspector:
+      DatabaseSafetyInspector;
+
+    beforeEach(() => {
+
+      environment =
+        new EnvironmentService();
+
+      inspector =
+        new DatabaseSafetyInspector(
+          environment,
+        );
+    });
+
+    it(
+      'should mark production configuration as safe when synchronization is disabled',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        const result =
+          inspector.inspect({
+            type: 'postgres',
+
+            migrations: [
+              'dist/migrations/*.js',
+            ],
+
+            synchronize:
+              false,
+          });
+
+        expect(
+          result.safe,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should mark production synchronization as unsafe',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        const result =
+          inspector.inspect({
+            type: 'postgres',
+
+            migrations: [
+              'dist/migrations/*.js',
+            ],
+
+            synchronize:
+              true,
+          });
+
+        expect(
+          result.safe,
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'should require migrations in production',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        const result =
+          inspector.inspect({
+            type: 'postgres',
+
+            synchronize:
+              false,
+          });
+
+        expect(
+          result.safe,
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// MIGRATION COMMANDS
+// ============================================================
+
+/**
+ * Recommended deployment workflow:
+ *
+ * ------------------------------------------------------------
+ *
+ * 1. Generate migration during development:
+ *
+ *     npm run typeorm migration:generate \
+ *       -- -d dist/database/data-source.js \
+ *       dist/database/migrations/AddUsers
+ *
+ *
+ * 2. Review the generated migration.
+ *
+ *
+ * 3. Commit the migration.
+ *
+ *
+ * 4. Build the application.
+ *
+ *
+ * 5. Run migrations during deployment:
+ *
+ *     npm run typeorm migration:run \
+ *       -- -d dist/database/data-source.js
+ *
+ *
+ * 6. Start the application.
+ *
+ *
+ * ------------------------------------------------------------
+ *
+ * NEVER use:
+ *
+ *     synchronize: true
+ *
+ * against a production database.
+ *
+ *
+ * ============================================================
+ * WHY?
+ * ============================================================
+ *
+ * TypeORM synchronize attempts to automatically reconcile
+ * entity definitions with the database schema.
+ *
+ * This is convenient during early development but can be
+ * dangerous for production data.
+ *
+ * Explicit migrations provide:
+ *
+ * - version control
+ * - reviewable schema changes
+ * - deterministic deployments
+ * - rollback planning
+ * - reproducibility
+ * - auditability
+ *
+ *
+ * ============================================================
+ * RECOMMENDED POLICY
+ * ============================================================
+ *
+ * development:
+ *
+ *     synchronize = optional
+ *
+ * test:
+ *
+ *     synchronize = optional
+ *
+ * staging:
+ *
+ *     synchronize = false
+ *     migrations = required
+ *
+ * production:
+ *
+ *     synchronize = false
+ *     migrations = required
+ *
+ *
+ * ============================================================
+ * ACCEPTANCE CRITERIA
+ * ============================================================
+ *
+ * [x] synchronize=true is allowed only in development/test.
+ *
+ * [x] synchronize=true is automatically disabled in staging.
+ *
+ * [x] synchronize=true is automatically disabled in production.
+ *
+ * [x] Missing NODE_ENV fails closed to production behavior.
+ *
+ * [x] Production schema changes use migrations.
+ *
+ * [x] Startup validation detects unsafe configuration.
+ *
+ * [x] Configuration can be inspected before startup.
+ *
+ * [x] Tests cover development behavior.
+ *
+ * [x] Tests cover test behavior.
+ *
+ * [x] Tests cover staging behavior.
+ *
+ * [x] Tests cover production behavior.
+ *
+ * [x] Tests cover missing/unknown environments.
+ *
+ * [x] Production migration configuration is validated.
+ *
+ * [x] Deployment workflow is documented.
+ *
+ * [x] The application does not silently accept
+ *     synchronize=true in production.
+ *
+ */
