@@ -19,7 +19,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
   }
 
   async validate(payload: any) {
-    const admin = await this.adminService.findByEmail(payload.email);
+    // Admin login tokens carry { sub, role }. Look the admin up by id first
+    // (email is a fallback for tokens minted by older login flows).
+    const admin = payload.sub
+      ? await this.adminService.findById(payload.sub)
+      : await this.adminService.findByEmail(payload.email);
     if (!admin) {
       return null;
     }
