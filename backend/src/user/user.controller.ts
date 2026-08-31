@@ -3,8 +3,10 @@ import {
   Post,
   Patch,
   Get,
+  Delete,
   Body,
   Param,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -48,9 +50,19 @@ export class UserController {
   @Post('link-wallet')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Link or update wallet address' })
-  // Relies on the global validation pipe (issue #340).
-  linkWallet(@Body() dto: LinkWalletDto, @Param('id') id: string) {
-    return this.userService.linkWallet(id, dto);
+  linkWallet(
+    @Body(new ValidationPipe({ whitelist: true })) dto: LinkWalletDto,
+    @Request() req,
+  ) {
+    return this.userService.linkWallet(req.user.id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('link-wallet')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unlink wallet address' })
+  unlinkWallet(@Request() req) {
+    return this.userService.unlinkWallet(req.user.id);
   }
 
   @Get(':id')

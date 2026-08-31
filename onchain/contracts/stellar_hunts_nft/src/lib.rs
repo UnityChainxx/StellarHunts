@@ -53,6 +53,7 @@ pub enum Error {
     AlreadyInitialized = 3,
     InvalidBaseUri = 4,
     MetadataTooLarge = 5,
+    NotInitialized = 6,
     ContractPaused = 6,
 }
 
@@ -148,6 +149,18 @@ impl StellarHuntsNft {
             panic_with_error!(&env, Error::NotAuthorized);
         }
 
+        // Resolve the admin up front so a misconfigured (uninitialized)
+        // NFT contract surfaces a structured `NotInitialized` error before
+        // any badge state is written. Reading it here also ensures the
+        // badge/badge_data writes below can never be left as a partial
+        // state change if the contract was never configured.
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Admin)
+            .ok_or(Error::NotInitialized)
+            .unwrap();
+
         let badge_key = NftDataKey::Badge(recipient.clone(), level.clone());
         if env.storage().persistent().has(&badge_key) {
             panic_with_error!(&env, Error::AlreadyHasBadge);
@@ -160,11 +173,6 @@ impl StellarHuntsNft {
         };
         let badge_data_key = NftDataKey::BadgeData(recipient.clone(), level.clone());
         env.storage().persistent().set(&badge_data_key, &badge_data);
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&NftDataKey::Admin)
-            .expect("admin not set");
 
         env.events().publish(
             (Symbol::new(&env, "level_badge_minted"),),
