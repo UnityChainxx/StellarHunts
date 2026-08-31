@@ -10,7 +10,11 @@ import {
   HttpCode,
   ParseIntPipe,
   DefaultValuePipe,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../../common/guards/ownership.guard';
+import { Ownership } from '../../common/decorators/ownership.decorator';
 import type { StreakService } from '../services/streak.service';
 import type { RecordActivityDto } from '../dto/record-activity.dto';
 import type { StreakCalculationConfig } from '../services/streak-calculation.service';
@@ -36,6 +40,8 @@ export class StreakController {
   }
 
   @Get('user/:userId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserStreak(
     @Param('userId') userId: string,
     @Query('timezoneOffset', new DefaultValuePipe(0), ParseIntPipe)
@@ -88,6 +94,8 @@ export class StreakController {
   }
 
   @Get('user/:userId/history')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserStreakHistory(
     @Param('userId') userId: string,
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,

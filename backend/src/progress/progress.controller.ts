@@ -1,7 +1,10 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ProgressService } from './progress.service';
 import { ProgressResponseDto } from './dto/progress-response.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 
 @ApiTags('Progress')
 @Controller('users')
@@ -9,6 +12,8 @@ export class ProgressController {
   constructor(private readonly progressService: ProgressService) {}
 
   @Get(':id/progress')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'id' })
   @ApiOperation({ summary: 'Get user progress' })
   @ApiResponse({
     status: 200,
