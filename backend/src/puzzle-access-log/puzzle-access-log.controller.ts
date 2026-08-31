@@ -1,4 +1,14 @@
-import { Controller, Post, Body, Get, Param, Query, ParseIntPipe, DefaultValuePipe, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+  ValidationPipe,
+} from '@nestjs/common';
 import { PuzzleAccessLogService } from './puzzle-access-log.service';
 import { LogAccessDto } from './dto/log-access.dto';
 

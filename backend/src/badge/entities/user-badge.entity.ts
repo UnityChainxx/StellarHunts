@@ -12,7 +12,7 @@ export class UserBadge {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ length: 128 })
   userId: number;
 
   @ManyToOne(() => Badge, (badge) => badge.userBadges, { eager: true })

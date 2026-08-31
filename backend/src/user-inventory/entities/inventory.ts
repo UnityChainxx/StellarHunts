@@ -39,7 +39,7 @@ export class Inventory {
   @Column('jsonb', { nullable: true })
   acquisitionContext: Record<string, any>; // How they got it (puzzle solved, etc.)
 
-  @ManyToOne(() => User, user => user.inventory, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.inventory, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

@@ -91,7 +91,7 @@ const TestimonialsSection = () => {
       handle: "cryptoalex",
       avatar: "/nftTestimonial.jpg",
       content:
-        "Absolutely loving StellarHunt! The puzzles are challenging but rewarding, and the NFT rewards are genuinely unique. Best web3 gaming experience I've had! 🎮✨",
+        "Absolutely loving StellarHunts! The puzzles are challenging but rewarding, and the NFT rewards are genuinely unique. Best web3 gaming experience I've had! 🎮✨",
       platform: "Twitter",
       date: "2 days ago",
     },
@@ -106,7 +106,7 @@ const TestimonialsSection = () => {
     },
     {
       name: "Mike Rivers",
-      handle: "stark_hunter",
+      handle: "stellar_hunter",
       avatar: "/nftTestimonial.jpg",
       content:
         "The attention to detail in each puzzle is amazing. Love how it combines education with gameplay. The leaderboard competition is intense! Can't wait for the next update. 🚀",
@@ -118,7 +118,7 @@ const TestimonialsSection = () => {
       handle: "nft_emma",
       avatar: "/nftTestimonial.jpg",
       content:
-        "Been here since beta and the growth is incredible. The new StarkNet challenges are mind-bending in the best way possible. To be honest gys, this is how web3 gaming should be! 💫",
+        "Been here since beta and the growth is incredible. The new Stellar / Soroban challenges are mind-bending in the best way possible. Honestly, this is how web3 gaming should be! 💫",
       platform: "Facebook",
       date: "5 days ago",
     },
@@ -165,7 +165,7 @@ const TestimonialsSection = () => {
           Community Buzz
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Join thousands of players already exploring the StarkNet universe
+          Join thousands of players already exploring the Stellar universe
         </p>
       </div>
 

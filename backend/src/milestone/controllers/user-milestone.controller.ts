@@ -1,17 +1,17 @@
-import { Controller, Get } from "@nestjs/common"
-import type { MilestoneService } from "../services/milestone.service"
+import { Controller, Get } from '@nestjs/common';
+import type { MilestoneService } from '../services/milestone.service';
 
-@Controller("users")
+@Controller('users')
 export class UserMilestoneController {
   constructor(private readonly milestoneService: MilestoneService) {}
 
-  @Get(":id/milestones")
+  @Get(':id/milestones')
   async getUserMilestones(userId: string) {
-    return this.milestoneService.getUserMilestones(userId)
+    return this.milestoneService.getUserMilestones(userId);
   }
 
-  @Get(":id/milestones/stats")
+  @Get(':id/milestones/stats')
   async getUserMilestoneStats(userId: string) {
-    return this.milestoneService.getUserMilestoneStats(userId)
+    return this.milestoneService.getUserMilestoneStats(userId);
   }
 }

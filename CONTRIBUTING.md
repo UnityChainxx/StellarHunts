@@ -1,6 +1,6 @@
-# Contributing to StellarHunt
+# Contributing to StellarHunts
 
-Thank you for your interest in contributing to StellarHunt. This document outlines the development workflow, coding standards, and pull request process for this monorepo.
+Thank you for your interest in contributing to StellarHunts. This document outlines the development workflow, coding standards, and pull request process for this monorepo.
 
 ## Code of Conduct
 
@@ -13,15 +13,14 @@ By participating in this project, you agree to maintain a respectful and inclusi
 - Node.js 18+
 - npm or yarn
 - PostgreSQL 13+
-- Scarb 2.8.4 (for onchain contracts)
-- StarkNet Foundry 0.30.0 (for contract tests)
+- Rust toolchain (stable) + Soroban / Stellar CLI 22.x
 
 ### Local Development Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/UnityChainx/StellarHunt.git
-cd StellarHunt
+git clone https://github.com/UnityChainx/StellarHunts.git
+cd StellarHunts
 
 # Install frontend dependencies
 cd frontend && npm install
@@ -65,16 +64,16 @@ Use clear, descriptive commit messages following the [Conventional Commits](http
 
 ### Types
 
-| Type     | Usage                                     |
-|----------|-------------------------------------------|
-| `feat`   | A new feature                             |
-| `fix`    | A bug fix                                 |
+| Type | Usage |
+|------|-------|
+| `feat` | A new feature |
+| `fix` | A bug fix |
 | `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `style`  | Formatting, missing semicolons, etc.      |
-| `docs`   | Documentation only changes                |
-| `test`   | Adding or updating tests                  |
-| `chore`  | Build process, tooling, or dependency changes |
-| `ci`     | CI configuration and scripts              |
+| `style` | Formatting, missing semicolons, etc. |
+| `docs` | Documentation only changes |
+| `test` | Adding or updating tests |
+| `chore` | Build process, tooling, or dependency changes |
+| `ci` | CI configuration and scripts |
 
 ### Examples
 
@@ -104,47 +103,50 @@ docs(api): document rewards claim endpoint
 - **DTOs**: Validate all inputs using `class-validator` decorators
 - **API docs**: Use Swagger decorators (`@ApiTags`, `@ApiOperation`, `@ApiResponse`) for all endpoints
 
-### Onchain (Cairo)
+### Onchain (Soroban / Rust)
 
-- **Formatting**: Run `scarb fmt --check` in the `onchain/` directory
-- **Contracts**: Follow the established patterns in `src/contracts/`
-- **Testing**: Write tests using `snforge` for all contract methods
+- **Formatting**: Run `cargo fmt --all -- --check` in the `onchain/` directory
+- **Contracts**: Follow the established patterns in `contracts/`
+- **Storage**: Use the `#[contracttype]` enum pattern for storage keys
+- **Errors**: Use a `#[contracterror]` enum with stable error codes (do not use `panic!("string")`)
+- **Authorization**: Use `require_auth()` on top-level callers; rely on `env.invoker()` to gate cross-contract calls
+- **Testing**: Write `#[test]` cases for all contract methods using `Env::default()` and `env.mock_all_auths()`
 
-## Testing
+### Testing Strategies & Watch Mode Guide
 
 All changes should include appropriate tests. Run the relevant test suite before submitting a PR.
 
-### Backend Tests
+#### Watch Mode & Path Filtering
+When working on specific modules, run Jest in watch mode or filter by file path to speed up iteration:
 
 ```bash
-# Unit tests
-cd backend && npm test
+# Filter backend tests by path pattern
+cd backend && npm test -- --testPathPattern=auth
 
-# Watch mode
-npm run test:watch
+# Watch mode for a specific test file
+cd backend && npm run test:watch -- src/auth/auth.service.spec.ts
 
-# With coverage
-npm run test:cov
-
-# E2E tests
-npm run test:e2e
+# Filter frontend Vitest tests by filename
+cd frontend && npm test -- puzzleReviewService
 ```
 
-### Frontend Tests
-
-Currently, the frontend does not have a dedicated test suite configured. Ensure any UI changes are manually verified in the browser before submitting a pull request.
+Tests live in `frontend/tests/` and use `.test.js` (or `.test.jsx`) extensions.
 
 ### Onchain Tests
 
 ```bash
-cd onchain && snforge test
+cd onchain && cargo test --workspace
+
+# Format check
+cargo fmt --all -- --check
 ```
 
 ### CI Pipeline
 
 The CI workflow (`.github/workflows/build.yml`) runs automatically on push to `main` and on pull requests:
-- **Build**: `scarb fmt --check` followed by `scarb build`
-- **Test**: `snforge test` for Cairo contracts
+- **Format**: `cargo fmt --all -- --check`
+- **Build**: `cargo build --workspace --release`
+- **Test**: `cargo test --workspace`
 
 All checks must pass before a pull request can be merged.
 
@@ -172,16 +174,15 @@ Before submitting, confirm:
 
 A PR template is available at `.github/PULL_REQUEST_TEMPLATE.md` and will auto-populate when you open a new pull request.
 
-
 ## Smart Contract Contributions
 
 For contributions to the `onchain/` directory:
 
-- Contract changes must include corresponding tests in `onchain/tests/`
-- Run `scarb build` before committing to ensure compilation succeeds
-- Be mindful of contract size and gas costs
+- Contract changes must include corresponding tests
+- Run `cargo build --workspace --release` before committing to ensure compilation succeeds
+- Be mindful of contract size and gas (resource) costs
 - Document any state changes or new storage variables
-- Follow the existing access control patterns (roles, ownership)
+- Follow the existing access-control patterns (`require_auth`, env-level admin, `env.invoker()` checks for cross-contract calls)
 
 ## Questions?
 

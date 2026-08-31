@@ -1,3 +1,5 @@
+ "use client";
+
 import React, { useState } from "react";
 
 const difficulties = ["Easy", "Medium", "Hard", "Expert"];
@@ -10,16 +12,50 @@ export default function AdminPuzzleSubmission() {
     difficulty: difficulties[0],
     nftMetadata: "",
   });
+  const [status, setStatus] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Submit form to backend
-    alert("Puzzle submitted!");
+    setSubmitting(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/admin/puzzles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          difficulty: form.difficulty.toLowerCase(),
+          hint: form.nftMetadata.trim() || undefined,
+          solution: form.answer.trim(),
+          isActive: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit puzzle");
+      }
+
+      setForm({
+        title: "",
+        description: "",
+        answer: "",
+        difficulty: difficulties[0],
+        nftMetadata: "",
+      });
+      setStatus("Puzzle submitted successfully.");
+    } catch (error) {
+      setStatus(error.message || "Failed to submit puzzle.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -101,10 +137,12 @@ export default function AdminPuzzleSubmission() {
           </div>
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg hover:shadow-purple-500/50"
+            disabled={submitting}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:cursor-not-allowed disabled:opacity-70 text-white font-bold py-3 px-6 rounded-lg transform transition-all hover:scale-105 shadow-lg hover:shadow-purple-500/50"
           >
-            Submit Puzzle
+            {submitting ? "Submitting..." : "Submit Puzzle"}
           </button>
+          {status && <p className="text-sm text-white/80">{status}</p>}
         </form>
       </div>
     </main>

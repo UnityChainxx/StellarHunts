@@ -33,7 +33,12 @@ describe('DailyRewardController', () => {
   describe('dailyCheckIn', () => {
     it('should call the dailyCheckIn service with the correct userId', async () => {
       const dto: DailyCheckinDto = { userId: 'user-123' };
-      const expectedResult = { id: 'uuid', userId: dto.userId, streak: 1, timestamp: new Date() };
+      const expectedResult = {
+        id: 'uuid',
+        userId: dto.userId,
+        streak: 1,
+        timestamp: new Date(),
+      };
       mockDailyRewardService.dailyCheckIn.mockResolvedValue(expectedResult);
 
       const result = await controller.dailyCheckIn(dto);

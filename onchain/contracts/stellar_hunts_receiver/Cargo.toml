@@ -1,0 +1,18 @@
+[package]
+name = "stellar-hunts-receiver"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+stellar-hunts-nft = { path = "../stellar_hunts_nft" }
+stellar-hunts-types = { path = "../stellar_hunts_types" }

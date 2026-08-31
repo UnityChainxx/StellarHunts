@@ -12,7 +12,6 @@ export class PuzzleVersion {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  
   @Column()
   puzzleId: string;
 
@@ -22,7 +21,6 @@ export class PuzzleVersion {
   @Column()
   title: string;
 
-  
   @Column({ type: 'jsonb' })
   content: Record<string, any>;
 

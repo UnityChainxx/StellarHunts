@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 @Entity('puzzle_completions')
 @Index(['userId', 'puzzleId'], { unique: true })
@@ -6,7 +12,7 @@ export class PuzzleCompletion {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', length: 128 })
   @Index()
   userId: string;
 
@@ -14,7 +20,11 @@ export class PuzzleCompletion {
   @Index()
   puzzleId: string;
 
-  @Column({ name: 'completed_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    name: 'completed_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   completedAt: Date;
 
   @CreateDateColumn({ name: 'created_at' })

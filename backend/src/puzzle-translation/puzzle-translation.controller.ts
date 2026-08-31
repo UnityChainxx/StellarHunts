@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { PuzzleTranslationService } from './puzzle-translation.service';
 import { CreateTranslationDto } from './dto/create-translation.dto';
 import { UpdateTranslationDto } from './dto/update-translation.dto';
@@ -28,7 +37,8 @@ export class PuzzleTranslationController {
     @Query('lang') lang: string,
     @Req() req,
   ) {
-    const language = lang || req.headers['accept-language']?.split(',')[0] || 'en';
+    const language =
+      lang || req.headers['accept-language']?.split(',')[0] || 'en';
     return this.service.findByPuzzleAndLanguage(puzzleId, language);
   }
-} 
+}

@@ -11,7 +11,9 @@ describe('PuzzleDependencyController', () => {
       providers: [PuzzleDependencyService],
     }).compile();
 
-    controller = module.get<PuzzleDependencyController>(PuzzleDependencyController);
+    controller = module.get<PuzzleDependencyController>(
+      PuzzleDependencyController,
+    );
   });
 
   it('should be defined', () => {

@@ -1,7 +1,22 @@
 import {
-  Controller, Post, Get, Patch, Delete, Param, Body, Query, HttpCode, HttpStatus
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -15,7 +30,12 @@ export class ContentController {
   // Public endpoints
   @Get('content')
   @ApiOperation({ summary: 'Get all active content (public)' })
-  @ApiQuery({ name: 'topic', required: false, type: String, description: 'Filter content by topic' })
+  @ApiQuery({
+    name: 'topic',
+    required: false,
+    type: String,
+    description: 'Filter content by topic',
+  })
   @ApiResponse({ status: 200, description: 'List of active content.' })
   async findAll(@Query('topic') topic?: string) {
     if (topic) {
@@ -68,7 +88,10 @@ export class ContentController {
   @ApiResponse({ status: 200, description: 'Content updated successfully.' })
   @ApiResponse({ status: 404, description: 'Content not found.' })
   // @UseGuards(AdminAuthGuard)
-  async updateAdmin(@Param('id') id: string, @Body() updateContentDto: UpdateContentDto) {
+  async updateAdmin(
+    @Param('id') id: string,
+    @Body() updateContentDto: UpdateContentDto,
+  ) {
     return this.contentService.updateAdmin(id, updateContentDto);
   }
 
@@ -82,4 +105,4 @@ export class ContentController {
   async removeAdmin(@Param('id') id: string) {
     return this.contentService.removeAdmin(id);
   }
-} 
+}

@@ -1,7 +1,7 @@
-import create from 'zustand';
-import { persist } from 'zustand/middleware';
+import create from "zustand";
+import { persist } from "zustand/middleware";
 
-const useGameStore = create(
+const useGameProgressStore = create(
   persist(
     (set) => ({
       completedPuzzles: [],
@@ -27,10 +27,10 @@ const useGameStore = create(
         }),
     }),
     {
-      name: 'game-storage', // unique name for storage
+      name: "game-progress-store:v1", // unique name for storage — do not reuse 'game-storage'
       getStorage: () => localStorage, // (optional) by default, 'localStorage' is used
-    }
-  )
+    },
+  ),
 );
 
-export default useGameStore;
+export default useGameProgressStore;

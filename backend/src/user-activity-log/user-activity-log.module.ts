@@ -8,6 +8,6 @@ import { UserActivityLogController } from './user-activity-log.controller';
   imports: [TypeOrmModule.forFeature([ActivityLog])],
   controllers: [UserActivityLogController],
   providers: [UserActivityLogService],
-  exports: [UserActivityLogService]
+  exports: [UserActivityLogService],
 })
 export class UserActivityLogModule {}

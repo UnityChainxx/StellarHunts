@@ -34,7 +34,11 @@ describe('WalletController', () => {
   });
 
   it('should verify signature (POST)', async () => {
-    const result = await controller.verifySignature({ address: '0x123', signature: 'sig', message: 'msg' });
+    const result = await controller.verifySignature({
+      address: '0x123',
+      signature: 'sig',
+      message: 'msg',
+    });
     expect(result.valid).toBe(true);
   });
 

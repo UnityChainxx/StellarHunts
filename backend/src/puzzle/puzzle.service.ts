@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Puzzle } from './puzzle.entity';
 import { CreatePuzzleDto } from './dto/create-puzzle.dto';
 import { UpdatePuzzleDto } from './dto/update-puzzle.dto';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 export class PuzzleService {
@@ -14,6 +15,10 @@ export class PuzzleService {
 
   async create(createPuzzleDto: CreatePuzzleDto): Promise<Puzzle> {
     const puzzle = this.puzzleRepository.create(createPuzzleDto);
+    puzzle.title = sanitizeText(puzzle.title);
+    puzzle.description = sanitizeText(puzzle.description);
+    puzzle.hint = puzzle.hint ? sanitizeText(puzzle.hint) : puzzle.hint;
+    puzzle.solution = sanitizeText(puzzle.solution);
     return this.puzzleRepository.save(puzzle);
   }
 
@@ -30,6 +35,10 @@ export class PuzzleService {
   async update(id: string, updatePuzzleDto: UpdatePuzzleDto): Promise<Puzzle> {
     const puzzle = await this.findOneAdmin(id);
     Object.assign(puzzle, updatePuzzleDto);
+    puzzle.title = sanitizeText(puzzle.title);
+    puzzle.description = sanitizeText(puzzle.description);
+    puzzle.hint = puzzle.hint ? sanitizeText(puzzle.hint) : puzzle.hint;
+    puzzle.solution = sanitizeText(puzzle.solution);
     return this.puzzleRepository.save(puzzle);
   }
 
@@ -43,8 +52,24 @@ export class PuzzleService {
     if (difficulty) where.difficulty = difficulty;
     const puzzles = await this.puzzleRepository.find({ where });
     // Exclude solution and hint
-    return puzzles.map(({ id, title, description, difficulty, rewardId, createdAt, updatedAt }) => ({
-      id, title, description, difficulty, rewardId, createdAt, updatedAt
-    }));
+    return puzzles.map(
+      ({
+        id,
+        title,
+        description,
+        difficulty,
+        rewardId,
+        createdAt,
+        updatedAt,
+      }) => ({
+        id,
+        title,
+        description,
+        difficulty,
+        rewardId,
+        createdAt,
+        updatedAt,
+      }),
+    );
   }
 }

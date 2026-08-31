@@ -12,11 +12,70 @@ body {
   }
 }
 
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  .animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+  }
+}
+
 @layer base {
   :root {
     --radius: 0.5rem;
     --brand-purple: 139 92 246;
     --brand-pink: 236 72 153;
     --brand-dark: 9 9 11;
+  }
+}
+
+/* ── Reduced-motion support ─────────────────────────────────
+   Respect the user's prefers-reduced-motion media query.
+   Disables non-essential motion for users who have indicated
+   they prefer reduced movement.
+   ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Disable specific utility animations */
+  .animate-shimmer {
+    animation: none !important;
+  }
+
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  .animate-spin {
+    animation: none !important;
+  }
+
+  .animate-bounce {
+    animation: none !important;
+  }
+
+  .animate-gradient {
+    animation: none !important;
+  }
+
+  /* Keep essential transitions for interactivity (hover/focus) */
+  .hover\\:scale-105,
+  .hover\\:scale-110,
+  .group-hover\\:translate-x-0.5,
+  .group-hover\\:scale-110 {
+    transition-duration: 0.01ms !important;
   }
 }

@@ -5,9 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TimeTrial } from './time-trial.entity';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([TimeTrial])],
+  imports: [TypeOrmModule.forFeature([TimeTrial])],
   providers: [TimetrialService],
   controllers: [TimeTrialController],
-  exports: [TimetrialService]
+  exports: [TimetrialService],
 })
 export class TimeTrialModule {}

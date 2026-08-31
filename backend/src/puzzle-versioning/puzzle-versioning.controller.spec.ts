@@ -24,7 +24,9 @@ describe('PuzzleVersioningController', () => {
       ],
     }).compile();
 
-    controller = module.get<PuzzleVersioningController>(PuzzleVersioningController);
+    controller = module.get<PuzzleVersioningController>(
+      PuzzleVersioningController,
+    );
     service = module.get<PuzzleVersioningService>(PuzzleVersioningService);
   });
 

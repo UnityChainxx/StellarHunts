@@ -17,4 +17,4 @@ export class NFTClaimController {
   async claimNFT(@Body() claimNFTDto: ClaimNFTDto) {
     return this.nftClaimService.claimNFT(claimNFTDto);
   }
-} 
+}

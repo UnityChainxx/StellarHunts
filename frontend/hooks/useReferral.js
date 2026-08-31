@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-export const useReferral = () => {
+export const useReferral = (userId = null) => {
   const [referralStats, setReferralStats] = useState({
     totalInvites: 0,
     activeUsers: 0,
@@ -13,6 +13,12 @@ export const useReferral = () => {
   const [invitedUsers, setInvitedUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (userId) {
+      fetchReferralData(userId);
+    }
+  }, [userId]);
 
   // Generate referral link for current user
   const generateReferralLink = (userId) => {
@@ -87,8 +93,8 @@ export const useReferral = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join StellarHunt!",
-          text: "I'm playing this amazing StellarHunt game. Join me and earn exclusive rewards!",
+          title: "Join StellarHunts!",
+          text: "I'm playing this amazing StellarHunts game. Join me and earn exclusive rewards!",
           url: referralLink
         });
         return true;

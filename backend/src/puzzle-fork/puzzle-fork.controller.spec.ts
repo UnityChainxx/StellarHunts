@@ -14,7 +14,9 @@ describe('PuzzleForkController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PuzzleForkController],
-      providers: [{ provide: PuzzleForkService, useValue: mockPuzzleForkService }],
+      providers: [
+        { provide: PuzzleForkService, useValue: mockPuzzleForkService },
+      ],
     }).compile();
 
     controller = module.get<PuzzleForkController>(PuzzleForkController);

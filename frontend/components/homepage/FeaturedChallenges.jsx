@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   Brain,
   Timer,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 const ChallengeCard = ({ challenge, isActive }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
   return (
     <div
       className={`relative group overflow-hidden rounded-xl backdrop-blur-sm border transition-all duration-300 ${
@@ -26,7 +28,7 @@ const ChallengeCard = ({ challenge, isActive }) => {
       {/* Animated gradient background */}{" "}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
         {" "}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 animate-gradient" />{" "}
+        <div className={`absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 ${prefersReducedMotion ? "" : "animate-gradient"}`} />{" "}
       </div>{" "}
       {/* Challenge content */}{" "}
       <div className="relative p-6">
@@ -51,7 +53,7 @@ const ChallengeCard = ({ challenge, isActive }) => {
         {isActive && (
           <div className="flex items-center space-x-2 mb-4">
             {" "}
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />{" "}
+            <div className={`w-2 h-2 rounded-full bg-green-500 ${prefersReducedMotion ? "" : "animate-pulse"}`} />{" "}
             <span className="text-green-400 text-sm">Active Challenge</span>{" "}
           </div>
         )}{" "}
@@ -100,13 +102,13 @@ const ChallengeCard = ({ challenge, isActive }) => {
       </div>{" "}
     </div>
   );
-};
+}
 const FeaturedChallenges = () => {
   const challenges = [
     {
       title: "The Cryptic Key",
       description:
-        "Decode the ancient StarkNet runes to unlock the hidden vault.",
+        "Decode the ancient Stellar / Soroban runes to unlock the hidden vault.",
       type: "riddle",
       difficulty: "Easy",
       timeLeft: "2 days left",

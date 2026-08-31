@@ -8,7 +8,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ValidationPipe } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
@@ -33,8 +38,7 @@ export class UserController {
   @ApiOperation({ summary: 'Update user profile' })
   updateProfile(
     @Body(new ValidationPipe({ whitelist: true })) dto: UpdateUserProfileDto,
-    @Param('id') /* or use custom decorator to get id */ 
-    id: string,
+    @Param('id') /* or use custom decorator to get id */ id: string,
   ) {
     return this.userService.updateProfile(id, dto);
   }

@@ -1,18 +1,23 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { Language, Theme, NotificationFrequency, SoundVolume } from "../entities/user-settings.entity"
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  Language,
+  Theme,
+  NotificationFrequency,
+  SoundVolume,
+} from '../entities/user-settings.entity';
 
 export class UserSettingsResponseDto {
   @ApiProperty({
-    description: "Settings ID",
-    example: "123e4567-e89b-12d3-a456-426614174000",
+    description: 'Settings ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  id: string
+  id: string;
 
   @ApiProperty({
-    description: "User ID",
-    example: "456e7890-e89b-12d3-a456-426614174001",
+    description: 'User ID',
+    example: '456e7890-e89b-12d3-a456-426614174001',
   })
-  userId: string
+  userId: string;
 
   // Display & Theme Settings
   @ApiProperty({
@@ -20,73 +25,73 @@ export class UserSettingsResponseDto {
     enum: Language,
     example: Language.ENGLISH,
   })
-  language: Language
+  language: Language;
 
   @ApiProperty({
-    description: "Theme preference",
+    description: 'Theme preference',
     enum: Theme,
     example: Theme.AUTO,
   })
-  theme: Theme
+  theme: Theme;
 
   @ApiProperty({
-    description: "Dark mode enabled",
+    description: 'Dark mode enabled',
     example: false,
   })
-  darkMode: boolean
+  darkMode: boolean;
 
   @ApiProperty({
     description: "User's timezone",
-    example: "America/New_York",
+    example: 'America/New_York',
   })
-  timezone: string
+  timezone: string;
 
   @ApiProperty({
-    description: "Time format preference",
-    example: "12h",
+    description: 'Time format preference',
+    example: '12h',
   })
-  timeFormat: string
+  timeFormat: string;
 
   @ApiProperty({
-    description: "Date format preference",
-    example: "MM/DD/YYYY",
+    description: 'Date format preference',
+    example: 'MM/DD/YYYY',
   })
-  dateFormat: string
+  dateFormat: string;
 
   // Notification Settings
   @ApiProperty({
-    description: "Enable all notifications",
+    description: 'Enable all notifications',
     example: true,
   })
-  notificationsEnabled: boolean
+  notificationsEnabled: boolean;
 
   @ApiProperty({
-    description: "Enable email notifications",
+    description: 'Enable email notifications',
     example: true,
   })
-  emailNotifications: boolean
+  emailNotifications: boolean;
 
   @ApiProperty({
-    description: "Enable push notifications",
+    description: 'Enable push notifications',
     example: true,
   })
-  pushNotifications: boolean
+  pushNotifications: boolean;
 
   @ApiProperty({
-    description: "Enable SMS notifications",
+    description: 'Enable SMS notifications',
     example: false,
   })
-  smsNotifications: boolean
+  smsNotifications: boolean;
 
   @ApiProperty({
-    description: "Notification frequency",
+    description: 'Notification frequency',
     enum: NotificationFrequency,
     example: NotificationFrequency.IMMEDIATE,
   })
-  notificationFrequency: NotificationFrequency
+  notificationFrequency: NotificationFrequency;
 
   @ApiProperty({
-    description: "Specific notification type preferences",
+    description: 'Specific notification type preferences',
     example: {
       gameUpdates: true,
       friendRequests: true,
@@ -98,164 +103,164 @@ export class UserSettingsResponseDto {
     nullable: true,
   })
   notificationTypes: {
-    gameUpdates?: boolean
-    friendRequests?: boolean
-    achievements?: boolean
-    puzzleCompletions?: boolean
-    leaderboardChanges?: boolean
-    maintenanceAlerts?: boolean
-  } | null
+    gameUpdates?: boolean;
+    friendRequests?: boolean;
+    achievements?: boolean;
+    puzzleCompletions?: boolean;
+    leaderboardChanges?: boolean;
+    maintenanceAlerts?: boolean;
+  } | null;
 
   // Audio Settings
   @ApiProperty({
-    description: "Master volume level",
+    description: 'Master volume level',
     enum: SoundVolume,
     example: SoundVolume.MEDIUM,
   })
-  masterVolume: SoundVolume
+  masterVolume: SoundVolume;
 
   @ApiProperty({
-    description: "Sound effects volume level",
+    description: 'Sound effects volume level',
     enum: SoundVolume,
     example: SoundVolume.MEDIUM,
   })
-  effectsVolume: SoundVolume
+  effectsVolume: SoundVolume;
 
   @ApiProperty({
-    description: "Music volume level",
+    description: 'Music volume level',
     enum: SoundVolume,
     example: SoundVolume.LOW,
   })
-  musicVolume: SoundVolume
+  musicVolume: SoundVolume;
 
   @ApiProperty({
-    description: "Enable sound",
+    description: 'Enable sound',
     example: true,
   })
-  soundEnabled: boolean
+  soundEnabled: boolean;
 
   // Game Settings
   @ApiProperty({
-    description: "Enable auto-save",
+    description: 'Enable auto-save',
     example: false,
   })
-  autoSave: boolean
+  autoSave: boolean;
 
   @ApiProperty({
-    description: "Auto-save interval in seconds",
+    description: 'Auto-save interval in seconds',
     example: 30,
   })
-  autoSaveInterval: number
+  autoSaveInterval: number;
 
   @ApiProperty({
-    description: "Show hints during gameplay",
+    description: 'Show hints during gameplay',
     example: true,
   })
-  showHints: boolean
+  showHints: boolean;
 
   @ApiProperty({
-    description: "Skip animations for faster gameplay",
+    description: 'Skip animations for faster gameplay',
     example: false,
   })
-  skipAnimations: boolean
+  skipAnimations: boolean;
 
   @ApiProperty({
-    description: "Game difficulty level",
-    example: "normal",
+    description: 'Game difficulty level',
+    example: 'normal',
   })
-  difficulty: string
+  difficulty: string;
 
   @ApiProperty({
-    description: "Show timer during gameplay",
+    description: 'Show timer during gameplay',
     example: true,
   })
-  showTimer: boolean
+  showTimer: boolean;
 
   @ApiProperty({
-    description: "Enable competitive mode",
+    description: 'Enable competitive mode',
     example: false,
   })
-  competitiveMode: boolean
+  competitiveMode: boolean;
 
   // Privacy Settings
   @ApiProperty({
-    description: "Make profile visible to other users",
+    description: 'Make profile visible to other users',
     example: true,
   })
-  profileVisible: boolean
+  profileVisible: boolean;
 
   @ApiProperty({
-    description: "Show online status to other users",
+    description: 'Show online status to other users',
     example: true,
   })
-  showOnlineStatus: boolean
+  showOnlineStatus: boolean;
 
   @ApiProperty({
-    description: "Allow friend requests from other users",
+    description: 'Allow friend requests from other users',
     example: false,
   })
-  allowFriendRequests: boolean
+  allowFriendRequests: boolean;
 
   @ApiProperty({
-    description: "Show achievements on profile",
+    description: 'Show achievements on profile',
     example: true,
   })
-  showAchievements: boolean
+  showAchievements: boolean;
 
   @ApiProperty({
-    description: "Share game statistics publicly",
+    description: 'Share game statistics publicly',
     example: false,
   })
-  shareGameStats: boolean
+  shareGameStats: boolean;
 
   // Accessibility Settings
   @ApiProperty({
-    description: "Enable high contrast mode",
+    description: 'Enable high contrast mode',
     example: false,
   })
-  highContrast: boolean
+  highContrast: boolean;
 
   @ApiProperty({
-    description: "Enable large text mode",
+    description: 'Enable large text mode',
     example: false,
   })
-  largeText: boolean
+  largeText: boolean;
 
   @ApiProperty({
-    description: "Reduce motion and animations",
+    description: 'Reduce motion and animations',
     example: false,
   })
-  reducedMotion: boolean
+  reducedMotion: boolean;
 
   @ApiProperty({
-    description: "Enable screen reader compatibility",
+    description: 'Enable screen reader compatibility',
     example: false,
   })
-  screenReader: boolean
+  screenReader: boolean;
 
   @ApiProperty({
-    description: "Text size percentage",
+    description: 'Text size percentage',
     example: 100,
   })
-  textSize: number
+  textSize: number;
 
   // Custom Settings
   @ApiProperty({
-    description: "Custom user-defined settings",
-    example: { customTheme: "neon", favoriteColor: "blue" },
+    description: 'Custom user-defined settings',
+    example: { customTheme: 'neon', favoriteColor: 'blue' },
     nullable: true,
   })
-  customSettings: Record<string, any> | null
+  customSettings: Record<string, any> | null;
 
   @ApiProperty({
-    description: "Settings creation timestamp",
-    example: "2024-01-15T10:30:00Z",
+    description: 'Settings creation timestamp',
+    example: '2024-01-15T10:30:00Z',
   })
-  createdAt: Date
+  createdAt: Date;
 
   @ApiProperty({
-    description: "Settings last update timestamp",
-    example: "2024-01-15T14:45:00Z",
+    description: 'Settings last update timestamp',
+    example: '2024-01-15T14:45:00Z',
   })
-  updatedAt: Date
+  updatedAt: Date;
 }

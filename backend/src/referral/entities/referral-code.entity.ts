@@ -21,7 +21,7 @@ export class ReferralCode {
   @Column({ type: "varchar", length: 20, unique: true })
   code: string
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", length: 128 })
   userId: string
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })

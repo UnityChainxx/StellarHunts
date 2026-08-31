@@ -8,7 +8,11 @@ export class ContentRatingController {
 
   @Post()
   async rateContent(@Body() dto: CreateRatingDto) {
-    return this.ratingService.rateContent(dto.userId, dto.contentId, dto.rating);
+    return this.ratingService.rateContent(
+      dto.userId,
+      dto.contentId,
+      dto.rating,
+    );
   }
 
   @Get('/stats')

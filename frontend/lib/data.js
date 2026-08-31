@@ -3,7 +3,7 @@ const terms = [
     value: "item-1",
     title: "1. Acceptance of Terms",
     content: [
-      "By accessing or using StellarHunt, the website, and services (collectively, the 'Services'), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our Services.",
+      "By accessing or using StellarHunts, the website, and services (collectively, the 'Services'), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, please do not use our Services.",
       "We reserve the right to update or modify these Terms and Conditions at any time without prior notice. Your continued use of the Services following any changes constitutes your acceptance of such changes.",
     ],
   },
@@ -19,7 +19,7 @@ const terms = [
     value: "item-3",
     title: "3. NFTs and Digital Assets",
     content: [
-      "Non-Fungible Tokens ('NFTs') earned through our Services are digital assets stored on the StarkNet blockchain that represent ownership or proof of achievement related to our game.",
+      "Non-Fungible Tokens ('NFTs') earned through our Services are digital assets minted by Soroban smart contracts deployed on the Stellar blockchain. They represent ownership or proof of achievement related to our game.",
       "You understand and acknowledge that:",
       [
         "We do not guarantee the value, transferability, or marketability of any NFTs earned through our Services.",
@@ -34,21 +34,21 @@ const terms = [
     value: "item-4",
     title: "4. User Accounts and Wallet Security",
     content: [
-      "To participate in StellarHunt, you must connect a compatible StarkNet wallet to our platform. You are solely responsible for:",
+      "To participate in StellarHunts, you must connect a compatible Stellar wallet (for example, the Freighter browser extension) to our platform. You are solely responsible for:",
       [
-        "Maintaining the confidentiality of your wallet's private keys and seed phrases.",
+        "Maintaining the confidentiality of your wallet's secret keys and seed phrases.",
         "All activities that occur in connection with your wallet.",
         "Implementing appropriate security measures to protect your digital assets.",
         "Any losses resulting from unauthorized access to your wallet or account.",
       ],
-      "We will never ask for your private keys or seed phrases. Be vigilant about phishing attempts and unauthorized third-party websites claiming to be affiliated with our Services.",
+      "We will never ask for your secret keys or seed phrases. Be vigilant about phishing attempts and unauthorized third-party websites claiming to be affiliated with our Services.",
     ],
   },
   {
     value: "item-5",
     title: "5. Gameplay and Fair Play",
     content: [
-      "By participating in StellarHunt, you agree to abide by fair play rules and refrain from engaging in any fraudulent, exploitative, or abusive behavior.",
+      "By participating in StellarHunts, you agree to abide by fair play rules and refrain from engaging in any fraudulent, exploitative, or abusive behavior.",
       "Prohibited activities include but are not limited to:",
       [
         "Using bots, scripts, or automated methods to gain an unfair advantage.",
@@ -63,7 +63,7 @@ const terms = [
     value: "item-6",
     title: "6. Rewards and Distribution",
     content: [
-      "Rewards earned through StellarHunt, including NFTs and other digital assets, will be distributed as per the game's official rules and mechanics.",
+      "Rewards earned through StellarHunts, including NFTs and other digital assets, will be distributed as per the game's official rules and mechanics.",
       "You acknowledge that:",
       [
         "Rewards are subject to availability and may be modified, delayed, or revoked at any time.",
@@ -76,7 +76,7 @@ const terms = [
     value: "item-7",
     title: "7. Intellectual Property",
     content: [
-      "All content, branding, trademarks, and intellectual property related to StellarHunt, including game mechanics, artwork, and designs, are owned by us or licensed to us.",
+      "All content, branding, trademarks, and intellectual property related to StellarHunts, including game mechanics, artwork, and designs, are owned by us or licensed to us.",
       "You may not copy, modify, distribute, or create derivative works from our intellectual property without prior written permission.",
       "Unauthorized use of our intellectual property may result in legal action.",
     ],

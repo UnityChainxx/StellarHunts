@@ -5,7 +5,7 @@ export class TimeTrial {
   @PrimaryGeneratedColumn("uuid")
   id: string
 
-  @Column("uuid")
+  @Column({ type: "uuid", length: 128 })
   @Index()
   userId: string
 

@@ -12,7 +12,9 @@ import { RateLimit } from "../common/decorators/rate-limit.decorator"
 @Controller("multiplayer-queue")
 @UseGuards(RateLimitGuard)
 export class MultiplayerQueueController {
-  constructor(private readonly multiplayerQueueService: MultiplayerQueueService) {}
+  constructor(
+    private readonly multiplayerQueueService: MultiplayerQueueService,
+  ) {}
 
   @Post("join")
   @RateLimit({ limit: 5, windowMs: 60_000 })
@@ -21,10 +23,10 @@ export class MultiplayerQueueController {
   @ApiResponse({ status: 400, description: "User already in queue or invalid data" })
   @ApiResponse({ status: 429, description: "Rate limit exceeded" })
   async joinQueue(joinQueueDto: JoinQueueDto): Promise<QueueStatusDto> {
-    return await this.multiplayerQueueService.joinQueue(joinQueueDto)
+    return await this.multiplayerQueueService.joinQueue(joinQueueDto);
   }
 
-  @Delete("leave/:userId")
+  @Delete('leave/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RateLimit({ limit: 10, windowMs: 60_000 })
   @ApiOperation({ summary: "Leave the multiplayer queue" })
@@ -53,7 +55,7 @@ export class MultiplayerQueueController {
   @ApiResponse({ status: 200, description: "Queue list retrieved", type: [QueueStatusDto] })
   @ApiResponse({ status: 429, description: "Rate limit exceeded" })
   async getQueueList(): Promise<QueueStatusDto[]> {
-    return await this.multiplayerQueueService.getQueueList()
+    return await this.multiplayerQueueService.getQueueList();
   }
 
   @Get("stats")
@@ -62,7 +64,7 @@ export class MultiplayerQueueController {
   @ApiResponse({ status: 200, description: "Queue statistics retrieved", type: QueueStatsDto })
   @ApiResponse({ status: 429, description: "Rate limit exceeded" })
   async getQueueStats(): Promise<QueueStatsDto> {
-    return await this.multiplayerQueueService.getQueueStats()
+    return await this.multiplayerQueueService.getQueueStats();
   }
 
   @Get("match/:matchId")
@@ -76,14 +78,14 @@ export class MultiplayerQueueController {
     return await this.multiplayerQueueService.getMatch(matchId)
   }
 
-  @Post("process-matchmaking")
+  @Post('process-matchmaking')
   @HttpCode(HttpStatus.OK)
   @RateLimit({ limit: 2, windowMs: 60_000 })
   @ApiOperation({ summary: "Manually trigger matchmaking process" })
   @ApiResponse({ status: 200, description: "Matchmaking process triggered" })
   @ApiResponse({ status: 429, description: "Rate limit exceeded" })
   async processMatchmaking(): Promise<{ message: string }> {
-    await this.multiplayerQueueService.processMatchmaking()
-    return { message: "Matchmaking process completed" }
+    await this.multiplayerQueueService.processMatchmaking();
+    return { message: 'Matchmaking process completed' };
   }
 }

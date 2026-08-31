@@ -1,6 +1,23 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, HttpCode } from "@nestjs/common"
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from "@nestjs/swagger"
-import { PuzzleCategoryService } from "./puzzle-category.service"
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { PuzzleCategoryService } from './puzzle-category.service';
 import {
   CreateCategoryDto,
   UpdateCategoryDto,
@@ -9,10 +26,10 @@ import {
   PuzzlesByCategoryResponseDto,
   CategoryResponseDto,
   PuzzleResponseDto,
-} from "./dto/puzzle-category.dto"
+} from './dto/puzzle-category.dto';
 
-@ApiTags("Puzzle Categories")
-@Controller("puzzle-categories")
+@ApiTags('Puzzle Categories')
+@Controller('puzzle-categories')
 export class PuzzleCategoryController {
   constructor(private readonly puzzleCategoryService: PuzzleCategoryService) {}
 
@@ -20,85 +37,90 @@ export class PuzzleCategoryController {
    * GET /puzzles-by-category - Main endpoint requested in the task
    * Returns puzzles grouped under each category
    */
-  @Get("puzzles-by-category")
+  @Get('puzzles-by-category')
   @ApiOperation({
-    summary: "Get puzzles grouped by categories",
+    summary: 'Get puzzles grouped by categories',
     description:
-      "Fetch all puzzles organized by their categories. This helps users discover puzzles based on their interests or skill levels.",
+      'Fetch all puzzles organized by their categories. This helps users discover puzzles based on their interests or skill levels.',
   })
   @ApiResponse({
     status: 200,
-    description: "Puzzles successfully grouped by categories",
+    description: 'Puzzles successfully grouped by categories',
     type: [PuzzlesByCategoryResponseDto],
   })
   async getPuzzlesByCategory(): Promise<PuzzlesByCategoryResponseDto[]> {
-    return this.puzzleCategoryService.getPuzzlesByCategory()
+    return this.puzzleCategoryService.getPuzzlesByCategory();
   }
 
   // Category endpoints
-  @Get("categories")
-  @ApiOperation({ summary: "Get all categories" })
+  @Get('categories')
+  @ApiOperation({ summary: 'Get all categories' })
   @ApiResponse({
     status: 200,
-    description: "All categories retrieved successfully",
+    description: 'All categories retrieved successfully',
     type: [CategoryResponseDto],
   })
   async getAllCategories(): Promise<CategoryResponseDto[]> {
-    return this.puzzleCategoryService.getAllCategories()
+    return this.puzzleCategoryService.getAllCategories();
   }
 
   @Get('categories/:id')
   @ApiOperation({ summary: 'Get category by ID' })
   @ApiParam({ name: 'id', description: 'Category ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Category retrieved successfully',
-    type: CategoryResponseDto
+    type: CategoryResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  async getCategoryById(@Param('id') id: string): Promise<CategoryResponseDto> { // Changed to ParseUUIDPipe and string
+  async getCategoryById(@Param('id') id: string): Promise<CategoryResponseDto> {
+    // Changed to ParseUUIDPipe and string
     return this.puzzleCategoryService.getCategoryById(id);
   }
 
   @Get('categories/slug/:slug')
   @ApiOperation({ summary: 'Get category by slug' })
   @ApiParam({ name: 'slug', description: 'Category slug' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Category retrieved successfully',
-    type: CategoryResponseDto
+    type: CategoryResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  async getCategoryBySlug(@Param('slug') slug: string): Promise<CategoryResponseDto> {
+  async getCategoryBySlug(
+    @Param('slug') slug: string,
+  ): Promise<CategoryResponseDto> {
     return this.puzzleCategoryService.getCategoryBySlug(slug);
   }
 
   @Post('categories')
   @ApiOperation({ summary: 'Create a new category' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Category created successfully',
-    type: CategoryResponseDto
+    type: CategoryResponseDto,
   })
   @HttpCode(HttpStatus.CREATED)
-  async createCategory(@Body() createCategoryDto: CreateCategoryDto): Promise<CategoryResponseDto> {
+  async createCategory(
+    @Body() createCategoryDto: CreateCategoryDto,
+  ): Promise<CategoryResponseDto> {
     return this.puzzleCategoryService.createCategory(createCategoryDto);
   }
 
-  @Put("categories/:id")
-  @ApiOperation({ summary: "Update a category" })
-  @ApiParam({ name: "id", description: "Category ID" })
+  @Put('categories/:id')
+  @ApiOperation({ summary: 'Update a category' })
+  @ApiParam({ name: 'id', description: 'Category ID' })
   @ApiResponse({
     status: 200,
-    description: "Category updated successfully",
+    description: 'Category updated successfully',
     type: CategoryResponseDto,
   })
-  @ApiResponse({ status: 404, description: "Category not found" })
+  @ApiResponse({ status: 404, description: 'Category not found' })
   async updateCategory(
     @Param('id') id: string, // Changed to ParseUUIDPipe and string
     @Body() updateCategoryDto: UpdateCategoryDto,
   ): Promise<CategoryResponseDto> {
-    return this.puzzleCategoryService.updateCategory(id, updateCategoryDto)
+    return this.puzzleCategoryService.updateCategory(id, updateCategoryDto);
   }
 
   @Delete('categories/:id')
@@ -106,61 +128,65 @@ export class PuzzleCategoryController {
   @ApiParam({ name: 'id', description: 'Category ID' })
   @ApiResponse({ status: 200, description: 'Category deleted successfully' })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  async deleteCategory(@Param('id') id: string): Promise<void> { // Changed to ParseUUIDPipe and string
+  async deleteCategory(@Param('id') id: string): Promise<void> {
+    // Changed to ParseUUIDPipe and string
     return this.puzzleCategoryService.deleteCategory(id);
   }
 
   // Puzzle endpoints
-  @Get("puzzles")
-  @ApiOperation({ summary: "Get all puzzles" })
+  @Get('puzzles')
+  @ApiOperation({ summary: 'Get all puzzles' })
   @ApiResponse({
     status: 200,
-    description: "All puzzles retrieved successfully",
+    description: 'All puzzles retrieved successfully',
     type: [PuzzleResponseDto],
   })
   async getAllPuzzles(): Promise<PuzzleResponseDto[]> {
-    return this.puzzleCategoryService.getAllPuzzles()
+    return this.puzzleCategoryService.getAllPuzzles();
   }
 
   @Get('puzzles/:id')
   @ApiOperation({ summary: 'Get puzzle by ID' })
   @ApiParam({ name: 'id', description: 'Puzzle ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Puzzle retrieved successfully',
-    type: PuzzleResponseDto
+    type: PuzzleResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Puzzle not found' })
-  async getPuzzleById(@Param('id') id: string): Promise<PuzzleResponseDto> { // Changed to ParseUUIDPipe and string
+  async getPuzzleById(@Param('id') id: string): Promise<PuzzleResponseDto> {
+    // Changed to ParseUUIDPipe and string
     return this.puzzleCategoryService.getPuzzleById(id);
   }
 
   @Post('puzzles')
   @ApiOperation({ summary: 'Create a new puzzle' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Puzzle created successfully',
-    type: PuzzleResponseDto
+    type: PuzzleResponseDto,
   })
   @HttpCode(HttpStatus.CREATED)
-  async createPuzzle(@Body() createPuzzleDto: CreatePuzzleDto): Promise<PuzzleResponseDto> {
+  async createPuzzle(
+    @Body() createPuzzleDto: CreatePuzzleDto,
+  ): Promise<PuzzleResponseDto> {
     return this.puzzleCategoryService.createPuzzle(createPuzzleDto);
   }
 
-  @Put("puzzles/:id")
-  @ApiOperation({ summary: "Update a puzzle" })
-  @ApiParam({ name: "id", description: "Puzzle ID" })
+  @Put('puzzles/:id')
+  @ApiOperation({ summary: 'Update a puzzle' })
+  @ApiParam({ name: 'id', description: 'Puzzle ID' })
   @ApiResponse({
     status: 200,
-    description: "Puzzle updated successfully",
+    description: 'Puzzle updated successfully',
     type: PuzzleResponseDto,
   })
-  @ApiResponse({ status: 404, description: "Puzzle not found" })
+  @ApiResponse({ status: 404, description: 'Puzzle not found' })
   async updatePuzzle(
     @Param('id') id: string, // Changed to ParseUUIDPipe and string
     @Body() updatePuzzleDto: UpdatePuzzleDto,
   ): Promise<PuzzleResponseDto> {
-    return this.puzzleCategoryService.updatePuzzle(id, updatePuzzleDto)
+    return this.puzzleCategoryService.updatePuzzle(id, updatePuzzleDto);
   }
 
   @Delete('puzzles/:id')
@@ -168,7 +194,8 @@ export class PuzzleCategoryController {
   @ApiParam({ name: 'id', description: 'Puzzle ID' })
   @ApiResponse({ status: 200, description: 'Puzzle deleted successfully' })
   @ApiResponse({ status: 404, description: 'Puzzle not found' })
-  async deletePuzzle(@Param('id') id: string): Promise<void> { // Changed to ParseUUIDPipe and string
+  async deletePuzzle(@Param('id') id: string): Promise<void> {
+    // Changed to ParseUUIDPipe and string
     return this.puzzleCategoryService.deletePuzzle(id);
   }
 
@@ -176,55 +203,65 @@ export class PuzzleCategoryController {
   @Get('categories/:id/puzzles')
   @ApiOperation({ summary: 'Get puzzles by category ID' })
   @ApiParam({ name: 'id', description: 'Category ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Puzzles for category retrieved successfully',
-    type: [PuzzleResponseDto]
+    type: [PuzzleResponseDto],
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  async getPuzzlesByCategoryId(@Param('id') categoryId: string): Promise<PuzzleResponseDto[]> { // Changed to ParseUUIDPipe and string
+  async getPuzzlesByCategoryId(
+    @Param('id') categoryId: string,
+  ): Promise<PuzzleResponseDto[]> {
+    // Changed to ParseUUIDPipe and string
     return this.puzzleCategoryService.getPuzzlesByCategoryId(categoryId);
   }
 
   @Get('puzzles/difficulty/:difficulty')
   @ApiOperation({ summary: 'Get puzzles by difficulty level' })
-  @ApiParam({ 
-    name: 'difficulty', 
+  @ApiParam({
+    name: 'difficulty',
     description: 'Difficulty level',
-    enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']
+    enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'],
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Puzzles by difficulty retrieved successfully',
-    type: [PuzzleResponseDto]
+    type: [PuzzleResponseDto],
   })
-  async getPuzzlesByDifficulty(@Param('difficulty') difficulty: string): Promise<PuzzleResponseDto[]> {
+  async getPuzzlesByDifficulty(
+    @Param('difficulty') difficulty: string,
+  ): Promise<PuzzleResponseDto[]> {
     return this.puzzleCategoryService.getPuzzlesByDifficulty(difficulty);
   }
 
   @Get('puzzles/search')
   @ApiOperation({ summary: 'Search puzzles by title or description' })
   @ApiQuery({ name: 'q', description: 'Search term' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Search results retrieved successfully',
-    type: [PuzzleResponseDto]
+    type: [PuzzleResponseDto],
   })
-  async searchPuzzles(@Query('q') searchTerm: string): Promise<PuzzleResponseDto[]> {
+  async searchPuzzles(
+    @Query('q') searchTerm: string,
+  ): Promise<PuzzleResponseDto[]> {
     return this.puzzleCategoryService.searchPuzzles(searchTerm);
   }
 
   // Admin endpoint for seeding initial data
-  @Post("seed-categories")
+  @Post('seed-categories')
   @ApiOperation({
-    summary: "Seed initial categories",
+    summary: 'Seed initial categories',
     description:
-      "Create initial categories for StellarHunt. This endpoint should only be called once during setup.",
+      'Create initial categories for StellarHunts. This endpoint should only be called once during setup.',
   })
-  @ApiResponse({ status: 201, description: "Initial categories seeded successfully" })
+  @ApiResponse({
+    status: 201,
+    description: 'Initial categories seeded successfully',
+  })
   @HttpCode(HttpStatus.CREATED)
   async seedInitialCategories(): Promise<{ message: string }> {
-    await this.puzzleCategoryService.seedInitialCategories()
-    return { message: "Initial categories seeded successfully" }
+    await this.puzzleCategoryService.seedInitialCategories();
+    return { message: 'Initial categories seeded successfully' };
   }
 }

@@ -1,11 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('progress')
 export class Progress {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', unique: true })
+  @Column({ type: 'uuid', unique: true, length: 128 })
   userId: string;
 
   @Column({ default: 0 })
@@ -23,4 +29,3 @@ export class Progress {
   @CreateDateColumn()
   createdAt: Date;
 }
-

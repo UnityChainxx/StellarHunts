@@ -17,10 +17,14 @@ describe('PuzzleAccessLogController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PuzzleAccessLogController],
-      providers: [{ provide: PuzzleAccessLogService, useValue: mockAccessLogService }],
+      providers: [
+        { provide: PuzzleAccessLogService, useValue: mockAccessLogService },
+      ],
     }).compile();
 
-    controller = module.get<PuzzleAccessLogController>(PuzzleAccessLogController);
+    controller = module.get<PuzzleAccessLogController>(
+      PuzzleAccessLogController,
+    );
     service = module.get<PuzzleAccessLogService>(PuzzleAccessLogService);
   });
 

@@ -12,7 +12,7 @@ export class PuzzleAccessLog {
   id: string;
 
   @Index() // Index for faster user-specific queries
-  @Column()
+  @Column({ length: 128 })
   userId: string;
 
   @Index() // Index for faster puzzle-specific queries

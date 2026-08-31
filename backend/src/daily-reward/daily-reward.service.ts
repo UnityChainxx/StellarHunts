@@ -12,35 +12,32 @@ export class DailyRewardService {
 
   async dailyCheckIn(userId: string): Promise<DailyRewardLog> {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
 
     const lastCheckIn = await this.rewardLogRepository.findOne({
       where: { userId },
       order: { timestamp: 'DESC' },
     });
 
-    
     if (lastCheckIn) {
       const lastCheckInDate = new Date(lastCheckIn.timestamp);
-      lastCheckInDate.setHours(0, 0, 0, 0); 
+      lastCheckInDate.setHours(0, 0, 0, 0);
 
       if (lastCheckInDate.getTime() === today.getTime()) {
         throw new ConflictException('Reward already claimed for today.');
       }
     }
 
-    
-    let currentStreak = 1; 
+    let currentStreak = 1;
     if (lastCheckIn) {
       const lastCheckInDate = new Date(lastCheckIn.timestamp);
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
-      yesterday.setHours(0, 0, 0, 0); 
-      
+      yesterday.setHours(0, 0, 0, 0);
+
       if (lastCheckInDate.getTime() === yesterday.getTime()) {
         currentStreak = lastCheckIn.streak + 1;
       }
-      
     }
 
     const newLog = this.rewardLogRepository.create({
