@@ -1,28 +1,13 @@
-import {
-  Injectable,
-  ConflictException,
-  UnauthorizedException,
-  BadRequestException,
-} from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { User } from '../entities/user.entity';
-import { RegisterDto } from '../dto/register.dto';
-import { AuthResponseDto } from '../dto/auth-response.dto';
-import { LoginDto } from '../dto/login.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-
-const BREACHED_PASSWORDS = new Set([
-  'password',
-  'password123!',
-  '12345678',
-  'qwerty123!',
-  'letmein123!',
-  'welcome123!',
-  'iloveyou123!',
-  'admin123!',
-]);
+import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common"
+import { Repository } from "typeorm"
+import { JwtService } from "@nestjs/jwt"
+import { ConfigService } from "@nestjs/config"
+import { User } from "../entities/user.entity"
+import { RegisterDto } from "../dto/register.dto"
+import { AuthResponseDto } from "../dto/auth-response.dto"
+import { GenericAuthMessageDto } from "../dto/generic-auth-message.dto"
+import { LoginDto } from "../dto/login.dto"
+import { InjectRepository } from "@nestjs/typeorm"
 
 export interface JwtPayload {
   sub: string; // user id
@@ -42,8 +27,20 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { name, username, email, password } = registerDto;
+  /**
+   * Registers a new user.
+   *
+   * Anti-enumeration: whether or not the account already exists we return a
+   * generic, account-existence-neutral success response instead of a
+   * distinctive "already exists" error, so attackers cannot probe whether a
+   * given email is registered (OWASP A01 — account enumeration).
+   *
+   * A real (fresh) registration still returns the authenticated session
+   * (AuthResponseDto); a duplicate email returns the same neutral HTTP
+   * success status without issuing a token.
+   */
+  async register(registerDto: RegisterDto): Promise<AuthResponseDto | GenericAuthMessageDto> {
+    const { name, username, email, password } = registerDto
 
     try {
       this.assertPasswordPolicy(password, email, username);
@@ -54,7 +51,7 @@ export class AuthService {
       });
 
       if (existingUser) {
-        throw new ConflictException('User with this email already exists');
+        return this.genericRegistrationMessage()
       }
 
       // Create new user
@@ -91,25 +88,25 @@ export class AuthService {
     } catch (error) {
       console.error('Registration error:', error); // Add logging
 
-      if (error instanceof ConflictException) {
-        throw error;
+      if (error.code === "23505") {
+        // PostgreSQL unique violation (email/username collision). Same
+        // neutral response so attackers cannot infer which identifier is
+        // already taken.
+        return this.genericRegistrationMessage()
       }
 
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      if (error.code === '23505') {
-        // PostgreSQL unique violation
-        throw new ConflictException('User with this email already exists');
-      }
-
-      throw new BadRequestException(
-        `Failed to create user account: ${error.message}`,
-      );
+      throw new BadRequestException("Registration could not be completed")
     }
   }
 
+  /**
+   * Authenticates a user.
+   *
+   * Anti-enumeration: every failure path (unknown email, deactivated account,
+   * wrong password) returns the same generic `UnauthorizedException`, so an
+   * attacker cannot infer whether an account exists or its status from the
+   * login response.
+   */
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { email, password } = loginDto;
 
@@ -119,19 +116,11 @@ export class AuthService {
         where: { email: email.toLowerCase() },
       });
 
-      if (!user) {
-        throw new UnauthorizedException('Invalid email or password');
-      }
-
-      // Check if user is active
-      if (!user.isActive) {
-        throw new UnauthorizedException('Account has been deactivated');
-      }
-
-      // Validate password
-      const isPasswordValid = await user.validatePassword(password);
-      if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid email or password');
+      // Check password. Nobody exists OR account deactivated OR wrong
+      // password all surface the exact same generic message & status.
+      const isPasswordValid = user ? await user.validatePassword(password) : false
+      if (!user || !user.isActive || !isPasswordValid) {
+        throw new UnauthorizedException("Invalid email or password")
       }
 
       // Update last login time
@@ -167,7 +156,7 @@ export class AuthService {
         throw error;
       }
 
-      throw new BadRequestException(`Login failed: ${error.message}`);
+      throw new BadRequestException("Login failed")
     }
   }
 
@@ -193,6 +182,16 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  /**
+   * Returns a neutral, account-existence-neutral registration response.
+   * Mirrors the JS static message constant so tests can assert against it.
+   */
+  private genericRegistrationMessage(): GenericAuthMessageDto {
+    return {
+      message: "Registration successful. If an account already exists, please log in.",
+    }
   }
 
   private getTokenExpirationTime(): number {

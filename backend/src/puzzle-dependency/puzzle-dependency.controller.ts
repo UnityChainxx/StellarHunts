@@ -9,7 +9,11 @@ import {
   Query,
   HttpStatus,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -134,6 +138,8 @@ export class PuzzleDependencyController {
 
   // Eligibility and Completion Endpoints
   @Post('check-eligibility')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ body: 'userId' })
   @ApiOperation({ summary: 'Check if a user is eligible to access a puzzle' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -147,6 +153,8 @@ export class PuzzleDependencyController {
   }
 
   @Post('mark-completed')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ body: 'userId' })
   @ApiOperation({ summary: 'Mark a puzzle as completed for a user' })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -160,6 +168,8 @@ export class PuzzleDependencyController {
   }
 
   @Get('user/:userId/completed')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get all puzzles completed by a user' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({
@@ -171,6 +181,8 @@ export class PuzzleDependencyController {
   }
 
   @Get('user/:userId/unlocked')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get all puzzles unlocked for a user' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiQuery({

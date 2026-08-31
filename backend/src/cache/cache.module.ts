@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RedisModule, RedisOptions } from '@nestjs-modules/ioredis';
+import { RedisModule } from '@nestjs-modules/ioredis';
 import { CacheService } from './cache.service';
 
 /**
@@ -19,7 +19,7 @@ import { CacheService } from './cache.service';
     RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService): RedisOptions => {
+      useFactory: (configService: ConfigService) => {
         const host =
           configService.get<string>('cache.redisHost') ||
           process.env.REDIS_HOST ||

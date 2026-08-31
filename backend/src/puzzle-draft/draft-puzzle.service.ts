@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -31,6 +31,23 @@ export class DraftPuzzleService {
 
   async update(id: string, updateDto: UpdateDraftDto) {
     const draft = await this.findOne(id);
+    if (draft.status === 'published') {
+      throw new BadRequestException('Cannot edit a published draft.');
+    }
+    
+    if (updateDto.status) {
+      const allowedTransitions: Record<string, string[]> = {
+        draft: ['review'],
+        review: ['draft', 'approved'],
+        approved: ['review', 'published'],
+        published: []
+      };
+      const allowed = allowedTransitions[draft.status] || [];
+      if (!allowed.includes(updateDto.status)) {
+        throw new BadRequestException(`Invalid status transition from ${draft.status} to ${updateDto.status}`);
+      }
+    }
+
     Object.assign(draft, updateDto);
     return this.draftRepo.save(draft);
   }

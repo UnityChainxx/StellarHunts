@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { CsrfMiddleware } from './common/security/csrf.middleware';
+import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -21,36 +22,61 @@ import { DraftPuzzle } from './puzzle-draft/entities/draft-puzzle.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
+import { AchievementModule } from './achievement/achievement.module';
 import { ActivityModule } from './activity/activity.module';
 import { AnalyticsModule } from './analytic/analytic.module';
 import { ApiKeyModule } from './api-key/api-key.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuthModule } from './auth/auth.module';
+import { BadgeModule } from './badge/badge.module';
+import { CacheModule } from './cache/cache.module';
 import { ContentModule } from './content/content.module';
 import { ContentRatingModule } from './content-rating/content-rating.module';
+import { DailyRewardModule } from './daily-reward/daily-reward.module';
+import { FeedbackModule } from './feedback/feedback.module';
+import { GeoStatsModule } from './geostat/geostat.module';
 import { HintModule } from './hint/hint.module';
 import { InAppNotificationsModule } from './in-app-notifications/in-app-notifications.module';
+import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
+import { MigrationModule } from './migration/migration.module';
+import { MilestoneModule } from './milestone/milestone.module';
 import { MultiplayerQueueModule } from './multiplayer-queue/multiplayer-queue.module';
 import { NFTClaimModule } from './nft-claim/nft-claim.module';
+import { NftMarketplaceStubModule } from './nft-marketplace-stub/nft-marketplace-stub.module';
 import { ProgressModule } from './progress/progress.module';
+import { PromoCodeModule } from './promo-code/entities/promo-code.module';
+import { PuzzleAccessLogModule } from './puzzle-access-log/puzzle-access-log.module';
 import { PuzzleCategoryModule } from './puzzle-category/puzzle-category.module';
+import { PuzzleCommentModule } from './puzzle-comment/puzzle-comment.module';
 import { PuzzleDependencyModule } from './puzzle-dependency/puzzle-dependency.module';
+import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
+import { PuzzleForkModule } from './puzzle-fork/puzzle-fork.module';
 import { PuzzleModule } from './puzzle/puzzle.module';
+import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
 import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
+import { PuzzleVersioningModule } from './puzzle-versioning/puzzle-versioning.module';
+import { QuizModule } from './quiz/quiz.module';
+import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReportsModule } from './report/report.module';
 import { RewardShopModule } from './reward-shop/reward-shop.module';
 import { RewardsModule } from './reward/reward.module';
 import { StreakModule } from './streak/streak.module';
 import { TimeTrialModule } from './time-trial/time-trial.module';
+import { TokenVerificationModule } from './token-verification/token-verification.module';
 import { UserActivityLogModule } from './user-activity-log/user-activity-log.module';
 import { UserInventoryModule } from './user-inventory/user-inventory.module';
+import { UserModule } from './user/user.module';
 import { UserRankingModule } from './user-ranking/user-ranking.module';
 import { UserReactionModule } from './user-reaction/user-reaction.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
 import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
+import { UserSettingsModule } from './user-settings/user-settings.module';
+import { UserTokenHistoryModule } from './user-token-history/user-token-history.module';
+import { WalletModule } from './wallet/wallet.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
 import { GracefulShutdownService } from './graceful-shutdown.service';
 
@@ -132,18 +158,32 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         autoLoadEntities: configService.get('database.autoload'),
       }),
     }),
+    AchievementModule,
     ActivityModule,
     AnalyticsModule,
     ApiKeyModule,
+    AuditLogModule,
     AuthModule,
+    BadgeModule,
+    CacheModule,
     ContentModule,
     ContentRatingModule,
+    DailyRewardModule,
+    FeedbackModule,
+    GeoStatsModule,
     HintModule,
     InAppNotificationsModule,
+    MaintenanceModeModule,
+    MigrationModule,
+    MilestoneModule,
     MultiplayerQueueModule,
     NFTClaimModule,
+    NftMarketplaceStubModule,
     ProgressModule,
+    PromoCodeModule,
+    PuzzleAccessLogModule,
     PuzzleCategoryModule,
+    PuzzleCommentModule,
     PuzzleDependencyModule,
     PuzzleDraftModule,
     PuzzleModule,
@@ -151,20 +191,31 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     AuditLogModule,
     PuzzleSubmissionModule,
     PuzzleTranslationModule,
+    PuzzleVersioningModule,
+    QuizModule,
+    RateLimiterModule.forRoot(),
     ReferralModule,
     ReportsModule,
     RewardShopModule,
     RewardsModule,
     StreakModule,
     TimeTrialModule,
+    TokenVerificationModule,
     UserActivityLogModule,
     UserInventoryModule,
+    UserModule,
     UserRankingModule,
     UserReactionModule,
     UserReportCardModule,
-    MaintenanceModeModule,
+    UserSettingsModule,
+    UserTokenHistoryModule,
+    WalletModule,
   ],
   controllers: [AppController],
   providers: [AppService, GracefulShutdownService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}
