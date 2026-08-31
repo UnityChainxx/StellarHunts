@@ -13,6 +13,9 @@ import { TimeTrial } from './time-trial/time-trial.entity';
 import { Puzzle } from './puzzle/puzzle.entity';
 import { Category } from './puzzle-category/entities/category.entity';
 import { Report } from './report/entities/report.entity';
+import { Wallet } from './wallet/entities/wallet.entity';
+import { ConsumedWalletNonce } from './wallet/entities/consumed-nonce.entity';
+import { TokenHistory } from './user-token-history/entities/token-history.entity';
 import { AuditLog } from './audit-log/entities/audit-log.entity';
 import { Admin } from './admin/admin.entity';
 import { PuzzleReview } from './puzzle-review/puzzle-review/entities/puzzle-review.entity';
@@ -76,6 +79,7 @@ import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
 import { HealthModule } from './health/health.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
+import { WalletModule } from './wallet/wallet.module';
 import { GracefulShutdownService } from './graceful-shutdown.service';
 
 @Module({
@@ -92,6 +96,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         PORT: Joi.number().port().default(3001),
         JWT_SECRET: Joi.string().required(),
         JWT_EXPIRES_IN: Joi.string().default('15m'),
+        JWT_REFRESH_EXPIRES_IN: Joi.string().default('30d'),
         FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
         DATABASE_HOST: Joi.string().required(),
         DATABASE_PORT: Joi.number().port().default(5432),
@@ -146,14 +151,19 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
           Puzzle,
           Category,
           Report,
+          Wallet,
+          ConsumedWalletNonce,
+          TokenHistory,
           AuditLog,
           Admin,
           PuzzleReview,
           ReviewModeration,
           DraftPuzzle,
         ],
-        synchronize: configService.get('database.synchronize'),
-        autoLoadEntities: configService.get('database.autoload'),
+        migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
+        synchronize: configService.get('database.synchronize') === true,
+        autoLoadEntities: configService.get('database.autoload') === true,
+        migrationsRun: configService.get('database.migrationsRun') === true,
       }),
     }),
     AchievementModule,
@@ -205,6 +215,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     UserRankingModule,
     UserReactionModule,
     UserReportCardModule,
+    MaintenanceModeModule,
     UserSettingsModule,
     UserTokenHistoryModule,
     WalletModule,

@@ -7,7 +7,7 @@ import {
   CreateDateColumn,
   Index,
 } from 'typeorm';
-import { User } from './user';
+import { User } from '../../auth/entities/user.entity';
 
 export enum AssetType {
   NFT = 'nft',
@@ -39,7 +39,7 @@ export class Inventory {
   @Column('jsonb', { nullable: true })
   acquisitionContext: Record<string, any>; // How they got it (puzzle solved, etc.)
 
-  @ManyToOne(() => User, (user) => user.inventory, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

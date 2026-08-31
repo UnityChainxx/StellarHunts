@@ -18,8 +18,62 @@ concurrency:
 # Onchain jobs (contracts)
 # ─────────────────────────────────────────────────────────────────────
 jobs:
+  # Changed-path matrix: only run the jobs relevant to the files touched
+  # in a PR/push, while preserving a full run whenever shared configuration
+  # (lockfile, workflows, release config, root manifests) changes. This
+  # speeds up validation without losing coverage (#321).
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      onchain: ${{ steps.filter.outputs.onchain }}
+      shared: ${{ steps.filter.outputs.shared }}
+      run-all: ${{ steps.filter.outputs.run_all }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ github.event.pull_request.base.sha || 'main' }}
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            onchain:
+              - 'onchain/**'
+            # Shared configuration affects every project: any of these alone
+            # is enough to force a full (all jobs) validation run.
+            shared:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'npm-workspaces.yaml'
+              - '**/package.json'
+              - '**/package-lock.json'
+              - '.github/workflows/**.yml'
+              - '.github/workflows/**.yaml'
+            run_all:
+              - 'package.json'
+              - 'package-lock.json'
+              - '**/package.json'
+              - '**/package-lock.json'
+              - '.github/workflows/release.yml'
+              - 'onchain/Scarb.lock'
+              - 'onchain/Scarb.toml'
+              - 'onchain/Cargo.lock'
+              - 'onchain/Cargo.toml'
+
+  # Helper: resolves the effective "should this job run?" boolean by OR-ing
+  # the project-specific filter with the shared/run-all signal.
   onchain-build:
     name: Build contracts
+    needs: changes
+    if: ${{ needs.changes.outputs.onchain == 'true' || needs.changes.outputs.run-all == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -76,6 +130,8 @@ jobs:
 
   onchain-test:
     name: Test contracts
+    needs: changes
+    if: ${{ needs.changes.outputs.onchain == 'true' || needs.changes.outputs.run-all == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -139,6 +195,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────
   backend-lint:
     name: Backend lint
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -174,6 +232,8 @@ jobs:
 
   backend-test:
     name: Backend tests
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -202,6 +262,8 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────
   frontend-lint:
     name: Frontend lint
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -219,25 +281,25 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        # Now that @types/node is in devDependencies (added in commit 2a7ce2a),
-        # `next lint` should pass. Kept non-blocking while we verify.
-        continue-on-error: true
+        # Required gate (#311): `next lint` passes cleanly, so a lint failure
+        # now blocks the PR.
         run: npm run lint
 
       - name: npm audit
         working-directory: frontend
-        # The high threshold is enforced (issue #344). All auto-fixable
-        # findings have been resolved; the remaining high-severity
-        # advisories are Next.js framework issues (next <16.3.3, plus the
-        # glob/postcss pinned by @next/eslint-plugin-next) that only a
-        # Next.js major upgrade can clear. Tracked as residual risk in
-        # SECURITY.md; advisory until that upgrade lands.
+        # Advisory (#311/#344): the remaining high-severity advisories are
+        # Next.js framework issues (next, next-auth -> nodemailer) that only
+        # a Next.js major upgrade can clear (tracked in SECURITY.md). The
+        # dependency-review gate in security.yml already fail-closes on any
+        # *new* advisory, so npm audit stays advisory here.
         continue-on-error: true
         run: npm audit --audit-level=high
 
 
   frontend-build:
     name: Frontend build
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -255,15 +317,16 @@ jobs:
 
       - name: Build
         working-directory: frontend
-        # Advisory only — pending fix-up of pre-existing frontend build errors
-        # in the codebase (separate PR).
-        continue-on-error: true
+        # Required gate (#311): the pre-existing build errors (missing
+        # `onClaim` prop, invalid tsconfig `ignoreDeprecations`) are fixed,
+        # so a build failure now blocks the PR.
         run: npm run build
 
   frontend-smoke-test:
     name: Frontend production smoke test
+    needs: [changes, frontend-build]
+    if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
-    needs: frontend-build
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
@@ -305,6 +368,8 @@ jobs:
 
   frontend-test:
     name: Frontend tests
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' || needs.changes.outputs.shared == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7

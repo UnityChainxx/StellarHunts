@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindManyOptions } from 'typeorm';
 import { Inventory, AssetType } from './entities/inventory';
-import { User } from './entities/user';
+import { User } from '../auth/entities/user.entity';
 import { NFT } from './entities/nft';
 import { Badge } from './entities/badge';
 import {
