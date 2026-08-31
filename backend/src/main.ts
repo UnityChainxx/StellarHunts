@@ -73,12 +73,8 @@ async function bootstrap(): Promise<void> {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
 
-  // Global request validation (#335). `whitelist` strips properties that are
-  // not declared on the request DTO, and `forbidNonWhitelisted` turns any
-  // remaining unknown property into a 400 so public APIs reject unexpected
-  // fields instead of silently ignoring them. Exception: handlers that must
-  // accept extra fields (e.g. third-party webhooks) can opt out with a local
-  // pipe, e.g. `@UsePipes(new ValidationPipe({ forbidNonWhitelisted: false }))`.
+  // Global validation policy (issue #340): unknown properties are stripped,
+  // DTOs are transformed, and all controllers share the same defaults.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
