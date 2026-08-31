@@ -1,127 +1,136 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+"use client";
 
-export const useReferral = () => {
-  const [referralStats, setReferralStats] = useState({
-    totalInvites: 0,
-    activeUsers: 0,
-    totalRewards: 0,
-    totalXPEarned: 0,
-    nextMilestone: ""
+import { useCallback } from "react";
+import axios from "axios";
+import { useApiQuery } from "./useApiQuery";
+import { useApiMutation } from "./useApiMutation";
+
+/**
+ * Hook for managing referral data with consistent loading / error / empty states.
+ *
+ * Built on the shared useApiQuery / useApiMutation wrappers so all requests get
+ * automatic retry, cancellation, stale-data handling, and user-visible errors.
+ */
+export const useReferral = (userId) => {
+  // ── Queries ──────────────────────────────────────────────────────────────
+
+  const referralQuery = useApiQuery({
+    key: ["referral", userId],
+    fn: async ({ signal }) => {
+      if (!userId) return null;
+      const response = await axios.get(`/api/referrals/${userId}`, {
+        withCredentials: true,
+        signal,
+      });
+      return response.data;
+    },
+    enabled: !!userId,
+    staleTime: 60_000,
   });
 
-  const [invitedUsers, setInvitedUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  // ── Mutations ────────────────────────────────────────────────────────────
 
-  // Generate referral link for current user
-  const generateReferralLink = (userId) => {
+  const trackMutation = useApiMutation({
+    fn: async ({ referrerId, newUserId }) => {
+      await axios.post(
+        "/api/referrals/track",
+        { referrerId, newUserId },
+        { withCredentials: true },
+      );
+    },
+    invalidate: ["referral"],
+  });
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+
+  const fetchReferralData = useCallback(
+    (id) => {
+      if (id) referralQuery.refetch();
+    },
+    [referralQuery],
+  );
+
+  const trackReferral = useCallback(
+    (referrerId, newUserId) =>
+      trackMutation.mutateAsync({ referrerId, newUserId }),
+    [trackMutation],
+  );
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  const generateReferralLink = useCallback((id) => {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nft-hunt.com";
-    return `${baseUrl}/ref/${userId}`;
-  };
+    return `${baseUrl}/ref/${id}`;
+  }, []);
 
-  // Fetch referral data
-  const fetchReferralData = async (userId) => {
-    if (!userId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await axios.get(`/api/referrals/${userId}`, {
-        withCredentials: true
-      });
-
-      setReferralStats(response.data.stats);
-      setInvitedUsers(response.data.invitedUsers);
-    } catch (err) {
-      console.error("Failed to fetch referral data:", err);
-      setError("Failed to load referral data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Track new referral
-  const trackReferral = async (referrerId, newUserId) => {
-    try {
-      await axios.post("/api/referrals/track", {
-        referrerId,
-        newUserId
-      }, {
-        withCredentials: true
-      });
-
-      // Refresh referral data
-      await fetchReferralData(referrerId);
-    } catch (err) {
-      console.error("Failed to track referral:", err);
-    }
-  };
-
-  // Get reward tier info
-  const getRewardTier = (totalInvites) => {
+  const getRewardTier = useCallback((totalInvites) => {
     if (totalInvites >= 50) return { tier: "Mythic", reward: "Mythic NFT", color: "pink" };
     if (totalInvites >= 25) return { tier: "Legendary", reward: "Legendary NFT", color: "yellow" };
     if (totalInvites >= 10) return { tier: "Epic", reward: "Epic NFT", color: "purple" };
     if (totalInvites >= 5) return { tier: "Rare", reward: "Rare NFT", color: "green" };
     return { tier: "Common", reward: "Common NFT", color: "gray" };
-  };
+  }, []);
 
-  // Calculate progress to next milestone
-  const getProgressToNextMilestone = (currentInvites) => {
+  const getProgressToNextMilestone = useCallback((currentInvites) => {
     const milestones = [5, 10, 25, 50];
-    const nextMilestone = milestones.find(m => m > currentInvites) || 50;
+    const nextMilestone = milestones.find((m) => m > currentInvites) || 50;
     const progress = (currentInvites / nextMilestone) * 100;
-    
     return {
       current: currentInvites,
       next: nextMilestone,
       progress: Math.min(progress, 100),
-      remaining: nextMilestone - currentInvites
+      remaining: nextMilestone - currentInvites,
     };
-  };
+  }, []);
 
-  // Share referral link
-  const shareReferral = async (referralLink) => {
+  const shareReferral = useCallback(async (referralLink) => {
     if (navigator.share) {
       try {
         await navigator.share({
           title: "Join StellarHunt!",
           text: "I'm playing this amazing StellarHunt game. Join me and earn exclusive rewards!",
-          url: referralLink
+          url: referralLink,
         });
         return true;
-      } catch (err) {
-        console.error("Error sharing:", err);
+      } catch {
         return false;
       }
     }
     return false;
-  };
+  }, []);
 
-  // Copy referral link to clipboard
-  const copyReferralLink = async (referralLink) => {
+  const copyReferralLink = useCallback(async (referralLink) => {
     try {
       await navigator.clipboard.writeText(referralLink);
       return true;
-    } catch (err) {
-      console.error("Failed to copy:", err);
+    } catch {
       return false;
     }
+  }, []);
+
+  // ── Derived state ────────────────────────────────────────────────────────
+
+  const data = referralQuery.data;
+  const referralStats = data?.stats ?? {
+    totalInvites: 0,
+    activeUsers: 0,
+    totalRewards: 0,
+    totalXPEarned: 0,
+    nextMilestone: "",
   };
+  const invitedUsers = data?.invitedUsers ?? [];
 
   return {
     referralStats,
     invitedUsers,
-    loading,
-    error,
+    loading: referralQuery.isLoading,
+    error: referralQuery.error,
     generateReferralLink,
     fetchReferralData,
     trackReferral,
     getRewardTier,
     getProgressToNextMilestone,
     shareReferral,
-    copyReferralLink
+    copyReferralLink,
   };
-}; 
+};
