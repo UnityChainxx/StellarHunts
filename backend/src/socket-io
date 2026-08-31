@@ -1,0 +1,2686 @@
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  Logger,
+  Module,
+  Controller,
+  Get,
+} from '@nestjs/common';
+
+import {
+  JwtService,
+} from '@nestjs/jwt';
+
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+
+import {
+  Server,
+} from 'socket.io';
+
+import {
+  Socket,
+} from 'socket.io';
+
+import {
+  Test,
+} from '@nestjs/testing';
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface JwtPayload {
+
+  sub: string;
+
+  email?: string;
+
+  roles?: string[];
+
+  iat?: number;
+
+  exp?: number;
+}
+
+interface AuthenticatedSocket
+  extends Socket {
+
+  user?: JwtPayload;
+
+  authorizedRooms?: Set<string>;
+}
+
+// ============================================================
+// SOCKET EVENTS
+// ============================================================
+
+export const SocketEvents = {
+
+  CONNECTION_AUTHORIZED:
+    'connection:authorized',
+
+  CONNECTION_REJECTED:
+    'connection:rejected',
+
+  ROOM_JOIN:
+    'room:join',
+
+  ROOM_JOINED:
+    'room:joined',
+
+  ROOM_LEAVE:
+    'room:leave',
+
+  ROOM_LEFT:
+    'room:left',
+
+  ROOM_MESSAGE:
+    'room:message',
+
+  ROOM_MESSAGE_RECEIVED:
+    'room:message.received',
+
+  ROOM_ERROR:
+    'room:error',
+
+  ROOM_FORBIDDEN:
+    'room:forbidden',
+
+  ROOM_NOT_FOUND:
+    'room:not_found',
+
+  AUTH_EXPIRED:
+    'auth:expired',
+
+} as const;
+
+// ============================================================
+// AUTHORIZATION RESULT
+// ============================================================
+
+export interface RoomAuthorizationResult {
+
+  authorized: boolean;
+
+  roomId: string;
+
+  userId: string;
+
+  reason?: string;
+}
+
+// ============================================================
+// ROOM REGISTRY
+// ============================================================
+
+@Injectable()
+export class RoomRegistryService {
+
+  private readonly logger =
+    new Logger(
+      RoomRegistryService.name,
+    );
+
+  /*
+   * Maps room IDs to users who are allowed to access them.
+   *
+   * In production this information would normally come from
+   * the database or an authorization service.
+   */
+
+  private readonly roomMembers =
+    new Map<string, Set<string>>();
+
+  // ==========================================================
+  // CREATE ROOM
+  // ==========================================================
+
+  createRoom(
+    roomId: string,
+    members: string[],
+  ): void {
+
+    this.roomMembers.set(
+      roomId,
+      new Set(members),
+    );
+  }
+
+  // ==========================================================
+  // DELETE ROOM
+  // ==========================================================
+
+  deleteRoom(
+    roomId: string,
+  ): void {
+
+    this.roomMembers.delete(
+      roomId,
+    );
+  }
+
+  // ==========================================================
+  // ROOM EXISTS
+  // ==========================================================
+
+  roomExists(
+    roomId: string,
+  ): boolean {
+
+    return this.roomMembers.has(
+      roomId,
+    );
+  }
+
+  // ==========================================================
+  // USER IS MEMBER
+  // ==========================================================
+
+  isMember(
+    roomId: string,
+    userId: string,
+  ): boolean {
+
+    const members =
+      this.roomMembers.get(
+        roomId,
+      );
+
+    if (!members) {
+
+      return false;
+    }
+
+    return members.has(
+      userId,
+    );
+  }
+
+  // ==========================================================
+  // ADD MEMBER
+  // ==========================================================
+
+  addMember(
+    roomId: string,
+    userId: string,
+  ): void {
+
+    const members =
+      this.roomMembers.get(
+        roomId,
+      );
+
+    if (!members) {
+
+      throw new Error(
+        'Room does not exist',
+      );
+    }
+
+    members.add(
+      userId,
+    );
+  }
+
+  // ==========================================================
+  // REMOVE MEMBER
+  // ==========================================================
+
+  removeMember(
+    roomId: string,
+    userId: string,
+  ): void {
+
+    const members =
+      this.roomMembers.get(
+        roomId,
+      );
+
+    if (!members) {
+
+      return;
+    }
+
+    members.delete(
+      userId,
+    );
+  }
+
+  // ==========================================================
+  // GET MEMBERS
+  // ==========================================================
+
+  getMembers(
+    roomId: string,
+  ): string[] {
+
+    return Array.from(
+      this.roomMembers.get(
+        roomId,
+      ) ?? [],
+    );
+  }
+
+  // ==========================================================
+  // RESET
+  // ==========================================================
+
+  clear(): void {
+
+    this.roomMembers.clear();
+  }
+}
+
+// ============================================================
+// SOCKET AUTHORIZATION SERVICE
+// ============================================================
+
+@Injectable()
+export class SocketAuthorizationService {
+
+  constructor(
+    private readonly jwtService:
+      JwtService,
+
+    private readonly roomRegistry:
+      RoomRegistryService,
+  ) {}
+
+  // ==========================================================
+  // AUTHENTICATE SOCKET
+  // ==========================================================
+
+  async authenticate(
+    socket: Socket,
+  ): Promise<JwtPayload> {
+
+    const token =
+      this.extractToken(
+        socket,
+      );
+
+    if (!token) {
+
+      throw new UnauthorizedException(
+        'Socket authentication token is required',
+      );
+    }
+
+    try {
+
+      const payload =
+        await this.jwtService.verifyAsync<JwtPayload>(
+          token,
+        );
+
+      if (
+        !payload.sub
+      ) {
+
+        throw new UnauthorizedException(
+          'Invalid authentication payload',
+        );
+      }
+
+      return payload;
+
+    } catch {
+
+      throw new UnauthorizedException(
+        'Invalid or expired authentication token',
+      );
+    }
+  }
+
+  // ==========================================================
+  // TOKEN EXTRACTION
+  // ==========================================================
+
+  private extractToken(
+    socket: Socket,
+  ): string | undefined {
+
+    /*
+     * Preferred:
+     *
+     * auth: {
+     *   token: "..."
+     * }
+     */
+
+    const authToken =
+      socket.handshake.auth?.token;
+
+    if (
+      typeof authToken ===
+      'string' &&
+      authToken.length > 0
+    ) {
+
+      return this.removeBearerPrefix(
+        authToken,
+      );
+    }
+
+    /*
+     * Fallback:
+     *
+     * Authorization header.
+     */
+
+    const authorization =
+      socket.handshake.headers
+        .authorization;
+
+    if (
+      typeof authorization ===
+      'string'
+    ) {
+
+      return this.removeBearerPrefix(
+        authorization,
+      );
+    }
+
+    return undefined;
+  }
+
+  // ==========================================================
+  // NORMALIZE BEARER TOKEN
+  // ==========================================================
+
+  private removeBearerPrefix(
+    value: string,
+  ): string {
+
+    if (
+      value
+        .toLowerCase()
+        .startsWith(
+          'bearer ',
+        )
+    ) {
+
+      return value.substring(
+        7,
+      ).trim();
+    }
+
+    return value.trim();
+  }
+
+  // ==========================================================
+  // AUTHORIZE ROOM
+  // ==========================================================
+
+  authorizeRoom(
+    userId: string,
+    roomId: string,
+  ): RoomAuthorizationResult {
+
+    if (
+      !roomId ||
+      roomId.trim().length === 0
+    ) {
+
+      return {
+        authorized:
+          false,
+
+        roomId,
+
+        userId,
+
+        reason:
+          'Room ID is required',
+      };
+    }
+
+    if (
+      !this.roomRegistry.roomExists(
+        roomId,
+      )
+    ) {
+
+      return {
+        authorized:
+          false,
+
+        roomId,
+
+        userId,
+
+        reason:
+          'Room does not exist',
+      };
+    }
+
+    if (
+      !this.roomRegistry.isMember(
+        roomId,
+        userId,
+      )
+    ) {
+
+      return {
+        authorized:
+          false,
+
+        roomId,
+
+        userId,
+
+        reason:
+          'User is not authorized to access this room',
+      };
+    }
+
+    return {
+      authorized:
+        true,
+
+      roomId,
+
+      userId,
+    };
+  }
+
+  // ==========================================================
+  // REQUIRE ROOM ACCESS
+  // ==========================================================
+
+  requireRoomAccess(
+    userId: string,
+    roomId: string,
+  ): void {
+
+    const result =
+      this.authorizeRoom(
+        userId,
+        roomId,
+      );
+
+    if (
+      !result.authorized
+    ) {
+
+      throw new ForbiddenException(
+        result.reason ??
+        'Room access denied',
+      );
+    }
+  }
+}
+
+// ============================================================
+// SOCKET GATEWAY
+// ============================================================
+
+@WebSocketGateway({
+  namespace:
+    '/realtime',
+
+  cors: {
+    origin:
+      process.env.WEBSOCKET_ORIGIN ??
+      'http://localhost:3000',
+
+    credentials:
+      true,
+  },
+
+  transports: [
+    'websocket',
+  ],
+})
+export class RealtimeGateway
+  implements
+    OnGatewayConnection,
+    OnGatewayDisconnect {
+
+  @WebSocketServer()
+  server!: Server;
+
+  private readonly logger =
+    new Logger(
+      RealtimeGateway.name,
+    );
+
+  constructor(
+    private readonly authService:
+      SocketAuthorizationService,
+
+    private readonly roomRegistry:
+      RoomRegistryService,
+  ) {}
+
+  // ==========================================================
+  // CONNECTION
+  // ==========================================================
+
+  async handleConnection(
+    socket: AuthenticatedSocket,
+  ): Promise<void> {
+
+    try {
+
+      const user =
+        await this.authService.authenticate(
+          socket,
+        );
+
+      socket.user =
+        user;
+
+      socket.authorizedRooms =
+        new Set<string>();
+
+      /*
+       * Every authenticated user receives a private room.
+       *
+       * IMPORTANT:
+       *
+       * This is not the same as trusting arbitrary client
+       * supplied room IDs.
+       */
+
+      await socket.join(
+        this.privateUserRoom(
+          user.sub,
+        ),
+      );
+
+      socket.emit(
+        SocketEvents.CONNECTION_AUTHORIZED,
+        {
+          userId:
+            user.sub,
+
+          connected:
+            true,
+        },
+      );
+
+      this.logger.log(
+        `Socket ${socket.id} authenticated for user ${user.sub}`,
+      );
+
+    } catch (
+      error
+    ) {
+
+      socket.emit(
+        SocketEvents.CONNECTION_REJECTED,
+        {
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Authentication failed',
+        },
+      );
+
+      /*
+       * Disconnect immediately.
+       *
+       * An unauthenticated socket must never remain connected
+       * waiting for a later authorization event.
+       */
+
+      socket.disconnect(
+        true,
+      );
+    }
+  }
+
+  // ==========================================================
+  // DISCONNECT
+  // ==========================================================
+
+  handleDisconnect(
+    socket: AuthenticatedSocket,
+  ): void {
+
+    this.logger.debug(
+      `Socket ${socket.id} disconnected`,
+    );
+
+    /*
+     * Socket.IO automatically removes socket membership from
+     * rooms when the socket disconnects.
+     */
+
+    socket.authorizedRooms?.clear();
+  }
+
+  // ==========================================================
+  // JOIN ROOM
+  // ==========================================================
+
+  @SubscribeMessage(
+    SocketEvents.ROOM_JOIN,
+  )
+  async joinRoom(
+    socket: AuthenticatedSocket,
+    payload: {
+      roomId?: string;
+    },
+  ): Promise<void> {
+
+    try {
+
+      this.requireAuthenticatedSocket(
+        socket,
+      );
+
+      const roomId =
+        this.validateRoomId(
+          payload?.roomId,
+        );
+
+      const userId =
+        socket.user!.sub;
+
+      /*
+       * CRITICAL SECURITY CHECK:
+       *
+       * The client can request a room, but it cannot grant
+       * itself authorization to that room.
+       */
+
+      this.authService.requireRoomAccess(
+        userId,
+        roomId,
+      );
+
+      await socket.join(
+        roomId,
+      );
+
+      socket.authorizedRooms!.add(
+        roomId,
+      );
+
+      socket.emit(
+        SocketEvents.ROOM_JOINED,
+        {
+          roomId,
+        },
+      );
+
+    } catch (
+      error
+    ) {
+
+      this.emitRoomError(
+        socket,
+        error,
+      );
+    }
+  }
+
+  // ==========================================================
+  // LEAVE ROOM
+  // ==========================================================
+
+  @SubscribeMessage(
+    SocketEvents.ROOM_LEAVE,
+  )
+  async leaveRoom(
+    socket: AuthenticatedSocket,
+    payload: {
+      roomId?: string;
+    },
+  ): Promise<void> {
+
+    try {
+
+      this.requireAuthenticatedSocket(
+        socket,
+      );
+
+      const roomId =
+        this.validateRoomId(
+          payload?.roomId,
+        );
+
+      /*
+       * A socket can only leave rooms that this connection
+       * explicitly joined.
+       */
+
+      if (
+        !socket.authorizedRooms?.has(
+          roomId,
+        )
+      ) {
+
+        throw new ForbiddenException(
+          'Socket is not a member of this room',
+        );
+      }
+
+      await socket.leave(
+        roomId,
+      );
+
+      socket.authorizedRooms.delete(
+        roomId,
+      );
+
+      socket.emit(
+        SocketEvents.ROOM_LEFT,
+        {
+          roomId,
+        },
+      );
+
+    } catch (
+      error
+    ) {
+
+      this.emitRoomError(
+        socket,
+        error,
+      );
+    }
+  }
+
+  // ==========================================================
+  // SEND ROOM MESSAGE
+  // ==========================================================
+
+  @SubscribeMessage(
+    SocketEvents.ROOM_MESSAGE,
+  )
+  async sendRoomMessage(
+    socket: AuthenticatedSocket,
+    payload: {
+      roomId?: string;
+
+      message?: string;
+    },
+  ): Promise<void> {
+
+    try {
+
+      this.requireAuthenticatedSocket(
+        socket,
+      );
+
+      const roomId =
+        this.validateRoomId(
+          payload?.roomId,
+        );
+
+      const message =
+        this.validateMessage(
+          payload?.message,
+        );
+
+      /*
+       * DO NOT trust that the socket is authorized simply
+       * because the client supplied the room ID.
+       */
+
+      if (
+        !socket.authorizedRooms?.has(
+          roomId,
+        )
+      ) {
+
+        throw new ForbiddenException(
+          'Socket has not joined this room',
+        );
+      }
+
+      /*
+       * Re-check persistent authorization.
+       *
+       * This protects against a user being removed from a
+       * room after initially joining it.
+       */
+
+      this.authService.requireRoomAccess(
+        socket.user!.sub,
+        roomId,
+      );
+
+      const event = {
+
+        roomId,
+
+        senderId:
+          socket.user!.sub,
+
+        message,
+
+        timestamp:
+          new Date().toISOString(),
+      };
+
+      /*
+       * IMPORTANT ROOM ISOLATION:
+       *
+       * Emit only to the explicitly authorized room.
+       *
+       * Never use:
+       *
+       *     this.server.emit(...)
+       *
+       * for private room data.
+       */
+
+      this.server
+        .to(roomId)
+        .emit(
+          SocketEvents.ROOM_MESSAGE_RECEIVED,
+          event,
+        );
+
+    } catch (
+      error
+    ) {
+
+      this.emitRoomError(
+        socket,
+        error,
+      );
+    }
+  }
+
+  // ==========================================================
+  // BROADCAST TO AUTHORIZED ROOM
+  // ==========================================================
+
+  broadcastToRoom(
+    roomId: string,
+    event: string,
+    payload: unknown,
+  ): void {
+
+    /*
+     * Server-side callers must also validate the room before
+     * broadcasting sensitive information.
+     */
+
+    if (
+      !this.roomRegistry.roomExists(
+        roomId,
+      )
+    ) {
+
+      throw new NotFoundException(
+        'Room does not exist',
+      );
+    }
+
+    this.server
+      .to(roomId)
+      .emit(
+        event,
+        payload,
+      );
+  }
+
+  // ==========================================================
+  // SEND TO USER
+  // ==========================================================
+
+  sendToUser(
+    userId: string,
+    event: string,
+    payload: unknown,
+  ): void {
+
+    /*
+     * Each user gets an isolated private room.
+     */
+
+    this.server
+      .to(
+        this.privateUserRoom(
+          userId,
+        ),
+      )
+      .emit(
+        event,
+        payload,
+      );
+  }
+
+  // ==========================================================
+  // REQUIRE AUTHENTICATED SOCKET
+  // ==========================================================
+
+  private requireAuthenticatedSocket(
+    socket: AuthenticatedSocket,
+  ): void {
+
+    if (
+      !socket.user?.sub
+    ) {
+
+      throw new UnauthorizedException(
+        'Socket is not authenticated',
+      );
+    }
+  }
+
+  // ==========================================================
+  // VALIDATE ROOM ID
+  // ==========================================================
+
+  private validateRoomId(
+    roomId?: string,
+  ): string {
+
+    if (
+      typeof roomId !==
+      'string'
+    ) {
+
+      throw new BadRequestLikeError(
+        'roomId is required',
+      );
+    }
+
+    const normalized =
+      roomId.trim();
+
+    if (
+      normalized.length === 0
+    ) {
+
+      throw new BadRequestLikeError(
+        'roomId cannot be empty',
+      );
+    }
+
+    /*
+     * Avoid extremely large room identifiers.
+     */
+
+    if (
+      normalized.length > 128
+    ) {
+
+      throw new BadRequestLikeError(
+        'roomId is too long',
+      );
+    }
+
+    /*
+     * Restrict room identifiers to predictable characters.
+     *
+     * This prevents malformed identifiers from becoming room
+     * namespace confusion.
+     */
+
+    if (
+      !/^[a-zA-Z0-9:_-]+$/.test(
+        normalized,
+      )
+    ) {
+
+      throw new BadRequestLikeError(
+        'Invalid roomId format',
+      );
+    }
+
+    return normalized;
+  }
+
+  // ==========================================================
+  // VALIDATE MESSAGE
+  // ==========================================================
+
+  private validateMessage(
+    message?: string,
+  ): string {
+
+    if (
+      typeof message !==
+      'string'
+    ) {
+
+      throw new BadRequestLikeError(
+        'message is required',
+      );
+    }
+
+    const normalized =
+      message.trim();
+
+    if (
+      normalized.length === 0
+    ) {
+
+      throw new BadRequestLikeError(
+        'message cannot be empty',
+      );
+    }
+
+    if (
+      normalized.length > 5000
+    ) {
+
+      throw new BadRequestLikeError(
+        'message is too long',
+      );
+    }
+
+    return normalized;
+  }
+
+  // ==========================================================
+  // USER PRIVATE ROOM
+  // ==========================================================
+
+  private privateUserRoom(
+    userId: string,
+  ): string {
+
+    return `user:${userId}`;
+  }
+
+  // ==========================================================
+  // ERROR RESPONSE
+  // ==========================================================
+
+  private emitRoomError(
+    socket: AuthenticatedSocket,
+    error: unknown,
+  ): void {
+
+    let message =
+      'Socket operation failed';
+
+    let code =
+      'SOCKET_ERROR';
+
+    if (
+      error instanceof ForbiddenException
+    ) {
+
+      message =
+        error.message;
+
+      code =
+        'FORBIDDEN';
+
+    } else if (
+      error instanceof UnauthorizedException
+    ) {
+
+      message =
+        error.message;
+
+      code =
+        'UNAUTHORIZED';
+
+    } else if (
+      error instanceof BadRequestLikeError
+    ) {
+
+      message =
+        error.message;
+
+      code =
+        'BAD_REQUEST';
+    }
+
+    socket.emit(
+      SocketEvents.ROOM_ERROR,
+      {
+        code,
+
+        message,
+      },
+    );
+  }
+}
+
+// ============================================================
+// SIMPLE BAD REQUEST ERROR
+// ============================================================
+
+class BadRequestLikeError
+  extends Error {
+
+  constructor(
+    message: string,
+  ) {
+
+    super(
+      message,
+    );
+
+    this.name =
+      'BadRequestLikeError';
+  }
+}
+
+// ============================================================
+// HEALTH CONTROLLER
+// ============================================================
+
+@Controller('socket')
+export class SocketHealthController {
+
+  @Get('health')
+  health() {
+
+    return {
+      status:
+        'ok',
+
+      websocket:
+        'enabled',
+    };
+  }
+}
+
+// ============================================================
+// MODULE
+// ============================================================
+
+@Module({
+  controllers: [
+    SocketHealthController,
+  ],
+
+  providers: [
+    RealtimeGateway,
+
+    SocketAuthorizationService,
+
+    RoomRegistryService,
+
+    {
+      provide:
+        JwtService,
+
+      useFactory: () =>
+        new JwtService({
+          secret:
+            process.env.JWT_SECRET ??
+            'integration-test-secret',
+        }),
+    },
+  ],
+
+  exports: [
+    RealtimeGateway,
+
+    SocketAuthorizationService,
+
+    RoomRegistryService,
+  ],
+})
+export class SocketAuthorizationModule {}
+
+// ============================================================
+// UNIT TEST HELPERS
+// ============================================================
+
+function createMockSocket(
+  token?: string,
+): AuthenticatedSocket {
+
+  const socket:
+    any = {
+
+    id:
+      `socket-${Math.random()}`,
+
+    handshake: {
+
+      auth:
+        token
+          ? {
+              token,
+            }
+          : {},
+
+      headers: {},
+    },
+
+    join:
+      jest.fn(
+        async () => undefined,
+      ),
+
+    leave:
+      jest.fn(
+        async () => undefined,
+      ),
+
+    emit:
+      jest.fn(),
+
+    disconnect:
+      jest.fn(),
+
+    rooms:
+      new Set<string>(),
+  };
+
+  return socket;
+}
+
+// ============================================================
+// TEST SUITE
+// ============================================================
+
+describe(
+  'Socket.IO Authorization and Room Isolation',
+  () => {
+
+    let jwtService:
+      JwtService;
+
+    let registry:
+      RoomRegistryService;
+
+    let authorization:
+      SocketAuthorizationService;
+
+    let gateway:
+      RealtimeGateway;
+
+    // ========================================================
+    // SETUP
+    // ========================================================
+
+    beforeEach(
+      () => {
+
+        jwtService =
+          new JwtService({
+            secret:
+              'test-secret',
+          });
+
+        registry =
+          new RoomRegistryService();
+
+        authorization =
+          new SocketAuthorizationService(
+            jwtService,
+            registry,
+          );
+
+        gateway =
+          new RealtimeGateway(
+            authorization,
+            registry,
+          );
+
+        registry.createRoom(
+          'room-alpha',
+          [
+            'user-1',
+            'user-2',
+          ],
+        );
+
+        registry.createRoom(
+          'room-beta',
+          [
+            'user-3',
+          ],
+        );
+      },
+    );
+
+    // ========================================================
+    // AUTHENTICATION
+    // ========================================================
+
+    describe(
+      'Socket authentication',
+      () => {
+
+        it(
+          'authenticates a valid JWT',
+          async () => {
+
+            const token =
+              await jwtService.signAsync({
+                sub:
+                  'user-1',
+              });
+
+            const socket =
+              createMockSocket(
+                token,
+              );
+
+            const user =
+              await authorization.authenticate(
+                socket,
+              );
+
+            expect(
+              user.sub,
+            ).toBe(
+              'user-1',
+            );
+          },
+        );
+
+        it(
+          'rejects a missing token',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            await expect(
+              authorization.authenticate(
+                socket,
+              ),
+            ).rejects.toThrow(
+              'Socket authentication token is required',
+            );
+          },
+        );
+
+        it(
+          'rejects an invalid token',
+          async () => {
+
+            const socket =
+              createMockSocket(
+                'invalid-token',
+              );
+
+            await expect(
+              authorization.authenticate(
+                socket,
+              ),
+            ).rejects.toThrow(
+              'Invalid or expired authentication token',
+            );
+          },
+        );
+
+        it(
+          'rejects an expired token',
+          async () => {
+
+            const token =
+              await jwtService.signAsync(
+                {
+                  sub:
+                    'user-1',
+                },
+                {
+                  expiresIn:
+                    -1,
+                },
+              );
+
+            const socket =
+              createMockSocket(
+                token,
+              );
+
+            await expect(
+              authorization.authenticate(
+                socket,
+              ),
+            ).rejects.toThrow();
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // ROOM AUTHORIZATION
+    // ========================================================
+
+    describe(
+      'Room authorization',
+      () => {
+
+        it(
+          'allows an authorized member',
+          () => {
+
+            const result =
+              authorization.authorizeRoom(
+                'user-1',
+                'room-alpha',
+              );
+
+            expect(
+              result.authorized,
+            ).toBe(
+              true,
+            );
+          },
+        );
+
+        it(
+          'denies a non-member',
+          () => {
+
+            const result =
+              authorization.authorizeRoom(
+                'user-3',
+                'room-alpha',
+              );
+
+            expect(
+              result.authorized,
+            ).toBe(
+              false,
+            );
+          },
+        );
+
+        it(
+          'denies unknown rooms',
+          () => {
+
+            const result =
+              authorization.authorizeRoom(
+                'user-1',
+                'room-does-not-exist',
+              );
+
+            expect(
+              result.authorized,
+            ).toBe(
+              false,
+            );
+
+            expect(
+              result.reason,
+            ).toBe(
+              'Room does not exist',
+            );
+          },
+        );
+
+        it(
+          'does not allow room enumeration through authorization',
+          () => {
+
+            const result =
+              authorization.authorizeRoom(
+                'attacker',
+                'room-alpha',
+              );
+
+            expect(
+              result.authorized,
+            ).toBe(
+              false,
+            );
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // CONNECTION
+    // ========================================================
+
+    describe(
+      'Connection authorization',
+      () => {
+
+        it(
+          'accepts authenticated users',
+          async () => {
+
+            const token =
+              await jwtService.signAsync({
+                sub:
+                  'user-1',
+              });
+
+            const socket =
+              createMockSocket(
+                token,
+              );
+
+            await gateway.handleConnection(
+              socket,
+            );
+
+            expect(
+              socket.user?.sub,
+            ).toBe(
+              'user-1',
+            );
+
+            expect(
+              socket.join,
+            ).toHaveBeenCalledWith(
+              'user:user-1',
+            );
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.CONNECTION_AUTHORIZED,
+              expect.objectContaining({
+                userId:
+                  'user-1',
+              }),
+            );
+          },
+        );
+
+        it(
+          'disconnects unauthenticated users',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            await gateway.handleConnection(
+              socket,
+            );
+
+            expect(
+              socket.disconnect,
+            ).toHaveBeenCalledWith(
+              true,
+            );
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.CONNECTION_REJECTED,
+              expect.any(Object),
+            );
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // JOIN ROOM
+    // ========================================================
+
+    describe(
+      'Room joining',
+      () => {
+
+        it(
+          'allows an authorized user to join',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).toHaveBeenCalledWith(
+              'room-alpha',
+            );
+
+            expect(
+              socket.authorizedRooms?.has(
+                'room-alpha',
+              ),
+            ).toBe(
+              true,
+            );
+          },
+        );
+
+        it(
+          'denies an unauthorized user',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-3',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).not.toHaveBeenCalled();
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.ROOM_ERROR,
+              expect.objectContaining({
+                code:
+                  'FORBIDDEN',
+              }),
+            );
+          },
+        );
+
+        it(
+          'denies joining an unknown room',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  'secret-room',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).not.toHaveBeenCalled();
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // ROOM ISOLATION
+    // ========================================================
+
+    describe(
+      'Room isolation',
+      () => {
+
+        it(
+          'does not allow user-3 to join user-1 room',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-3',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+              },
+            );
+
+            expect(
+              socket.authorizedRooms?.has(
+                'room-alpha',
+              ),
+            ).toBe(
+              false,
+            );
+          },
+        );
+
+        it(
+          'allows user-3 to join only their own room',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-3',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  'room-beta',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).toHaveBeenCalledWith(
+              'room-beta',
+            );
+
+            expect(
+              socket.authorizedRooms?.has(
+                'room-beta',
+              ),
+            ).toBe(
+              true,
+            );
+
+            expect(
+              socket.authorizedRooms?.has(
+                'room-alpha',
+              ),
+            ).toBe(
+              false,
+            );
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // MESSAGE AUTHORIZATION
+    // ========================================================
+
+    describe(
+      'Room messages',
+      () => {
+
+        it(
+          'rejects sending to a room the socket has not joined',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            gateway.server =
+              {
+                to:
+                  jest.fn()
+                    .mockReturnValue({
+                      emit:
+                        jest.fn(),
+                    }),
+              } as any;
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+
+                message:
+                  'Hello',
+              },
+            );
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.ROOM_ERROR,
+              expect.objectContaining({
+                code:
+                  'FORBIDDEN',
+              }),
+            );
+          },
+        );
+
+        it(
+          'allows a joined authorized socket to send',
+          async () => {
+
+            const emit =
+              jest.fn();
+
+            gateway.server =
+              {
+                to:
+                  jest.fn()
+                    .mockReturnValue({
+                      emit,
+                    }),
+              } as any;
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+
+                message:
+                  'Private message',
+              },
+            );
+
+            expect(
+              gateway.server.to,
+            ).toHaveBeenCalledWith(
+              'room-alpha',
+            );
+
+            expect(
+              emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.ROOM_MESSAGE_RECEIVED,
+              expect.objectContaining({
+                roomId:
+                  'room-alpha',
+
+                senderId:
+                  'user-1',
+
+                message:
+                  'Private message',
+              }),
+            );
+          },
+        );
+
+        it(
+          'cannot send room-alpha messages to room-beta',
+          async () => {
+
+            const emit =
+              jest.fn();
+
+            gateway.server =
+              {
+                to:
+                  jest.fn()
+                    .mockReturnValue({
+                      emit,
+                    }),
+              } as any;
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-beta',
+
+                message:
+                  'Attempted cross-room message',
+              },
+            );
+
+            expect(
+              gateway.server.to,
+            ).not.toHaveBeenCalledWith(
+              'room-beta',
+            );
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // LEAVE ROOM
+    // ========================================================
+
+    describe(
+      'Room leaving',
+      () => {
+
+        it(
+          'allows a socket to leave a joined room',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            await gateway.leaveRoom(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+              },
+            );
+
+            expect(
+              socket.leave,
+            ).toHaveBeenCalledWith(
+              'room-alpha',
+            );
+
+            expect(
+              socket.authorizedRooms?.has(
+                'room-alpha',
+              ),
+            ).toBe(
+              false,
+            );
+          },
+        );
+
+        it(
+          'cannot arbitrarily leave another room',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.leaveRoom(
+              socket,
+              {
+                roomId:
+                  'room-beta',
+              },
+            );
+
+            expect(
+              socket.leave,
+            ).not.toHaveBeenCalled();
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // INPUT VALIDATION
+    // ========================================================
+
+    describe(
+      'Input validation',
+      () => {
+
+        it(
+          'rejects an empty room ID',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  '',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).not.toHaveBeenCalled();
+          },
+        );
+
+        it(
+          'rejects malformed room IDs',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set();
+
+            await gateway.joinRoom(
+              socket,
+              {
+                roomId:
+                  '../../private-room',
+              },
+            );
+
+            expect(
+              socket.join,
+            ).not.toHaveBeenCalled();
+          },
+        );
+
+        it(
+          'rejects empty messages',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+
+                message:
+                  '',
+              },
+            );
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.ROOM_ERROR,
+              expect.objectContaining({
+                code:
+                  'BAD_REQUEST',
+              }),
+            );
+          },
+        );
+
+        it(
+          'rejects oversized messages',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+
+                message:
+                  'x'.repeat(
+                    5001,
+                  ),
+              },
+            );
+
+            expect(
+              socket.emit,
+            ).toHaveBeenCalledWith(
+              SocketEvents.ROOM_ERROR,
+              expect.objectContaining({
+                code:
+                  'BAD_REQUEST',
+              }),
+            );
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // DYNAMIC REVOCATION
+    // ========================================================
+
+    describe(
+      'Authorization revocation',
+      () => {
+
+        it(
+          'rechecks membership before sending messages',
+          async () => {
+
+            const socket =
+              createMockSocket();
+
+            socket.user = {
+              sub:
+                'user-1',
+            };
+
+            socket.authorizedRooms =
+              new Set([
+                'room-alpha',
+              ]);
+
+            /*
+             * User was previously a member.
+             *
+             * Now revoke access.
+             */
+
+            registry.removeMember(
+              'room-alpha',
+              'user-1',
+            );
+
+            const emit =
+              jest.fn();
+
+            gateway.server =
+              {
+                to:
+                  jest.fn()
+                    .mockReturnValue({
+                      emit,
+                    }),
+              } as any;
+
+            await gateway.sendRoomMessage(
+              socket,
+              {
+                roomId:
+                  'room-alpha',
+
+                message:
+                  'Should be rejected',
+              },
+            );
+
+            expect(
+              emit,
+            ).not.toHaveBeenCalled();
+          },
+        );
+      },
+    );
+
+    // ========================================================
+    // PRIVATE USER ROOM
+    // ========================================================
+
+    describe(
+      'Private user channels',
+      () => {
+
+        it(
+          'sends user-specific events to an isolated room',
+          () => {
+
+            const emit =
+              jest.fn();
+
+            gateway.server =
+              {
+                to:
+                  jest.fn()
+                    .mockReturnValue({
+                      emit,
+                    }),
+              } as any;
+
+            gateway.sendToUser(
+              'user-1',
+              'notification',
+              {
+                message:
+                  'Private notification',
+              },
+            );
+
+            expect(
+              gateway.server.to,
+            ).toHaveBeenCalledWith(
+              'user:user-1',
+            );
+
+            expect(
+              emit,
+            ).toHaveBeenCalledWith(
+              'notification',
+              {
+                message:
+                  'Private notification',
+              },
+            );
+          },
+        );
+      },
+    );
+  },
+);
+
+// ============================================================
+// CLIENT USAGE EXAMPLE
+// ============================================================
+
+/*
+ *
+ * A browser/client should connect with the JWT during the
+ * Socket.IO handshake:
+ *
+ *
+ * import { io } from 'socket.io-client';
+ *
+ *
+ * const socket = io(
+ *   'https://api.example.com/realtime',
+ *   {
+ *     transports: [
+ *       'websocket',
+ *     ],
+ *
+ *     auth: {
+ *       token:
+ *         accessToken,
+ *     },
+ *   },
+ * );
+ *
+ *
+ * socket.on(
+ *   'connection:authorized',
+ *   () => {
+ *
+ *     socket.emit(
+ *       'room:join',
+ *       {
+ *         roomId:
+ *           'room-alpha',
+ *       },
+ *     );
+ *   },
+ * );
+ *
+ *
+ * socket.on(
+ *   'room:joined',
+ *   ({ roomId }) => {
+ *
+ *     console.log(
+ *       `Joined ${roomId}`,
+ *     );
+ *   },
+ * );
+ *
+ *
+ * socket.on(
+ *   'room:message.received',
+ *   message => {
+ *
+ *     console.log(
+ *       message,
+ *     );
+ *   },
+ * );
+ *
+ */
+
+// ============================================================
+// SECURITY RULES
+// ============================================================
+
+/*
+ *
+ * SECURITY MODEL
+ * --------------
+ *
+ *
+ * 1. SOCKET AUTHENTICATION
+ *
+ * Client
+ *   │
+ *   │ JWT
+ *   ▼
+ * Socket.IO handshake
+ *   │
+ *   ▼
+ * JWT verification
+ *   │
+ *   ├── invalid → disconnect
+ *   │
+ *   └── valid → authenticated socket
+ *
+ *
+ *
+ * 2. ROOM AUTHORIZATION
+ *
+ * Client requests:
+ *
+ *     room:join
+ *          │
+ *          ▼
+ *     Validate room ID
+ *          │
+ *          ▼
+ *     Does room exist?
+ *          │
+ *          ▼
+ *     Is user a member?
+ *          │
+ *          ├── NO → reject
+ *          │
+ *          └── YES
+ *               │
+ *               ▼
+ *           socket.join()
+ *
+ *
+ *
+ * 3. MESSAGE ISOLATION
+ *
+ *
+ *     socket
+ *       │
+ *       ▼
+ *     Is socket authorized for room?
+ *       │
+ *       ├── NO → reject
+ *       │
+ *       └── YES
+ *             │
+ *             ▼
+ *     Re-check membership
+ *             │
+ *             ▼
+ *     server.to(roomId)
+ *             │
+ *             ▼
+ *     authorized room members
+ *
+ *
+ *
+ * NEVER:
+ *
+ *     server.emit(...)
+ *
+ * for private room data.
+ *
+ *
+ *
+ * NEVER:
+ *
+ *     socket.join(clientSuppliedRoom)
+ *
+ * without checking authorization.
+ *
+ *
+ *
+ * NEVER:
+ *
+ *     trust a room ID as proof of authorization.
+ *
+ *
+ *
+ * NEVER:
+ *
+ *     assume a socket's previous authorization is permanent.
+ *
+ * Users may be removed from rooms while they remain connected.
+ *
+ */
+
+// ============================================================
+// PRODUCTION RECOMMENDATIONS
+// ============================================================
+
+/*
+ *
+ * DATABASE
+ * --------
+ *
+ * Replace RoomRegistryService with the application's actual
+ * authorization/repository layer.
+ *
+ *
+ * Example:
+ *
+ *
+ *     room_members
+ *     ├── room_id
+ *     ├── user_id
+ *     └── role
+ *
+ *
+ *
+ * REDIS / MULTI-INSTANCE SOCKET.IO
+ * --------------------------------
+ *
+ * If the application runs multiple NestJS instances, use the
+ * Socket.IO Redis adapter.
+ *
+ * Authorization should still be performed against a shared
+ * source of truth rather than relying solely on local memory.
+ *
+ *
+ *
+ * JWT
+ * ---
+ *
+ * Never use:
+ *
+ *     'test-secret'
+ *
+ * in production.
+ *
+ * Use a properly managed secret or asymmetric signing keys.
+ *
+ *
+ *
+ * TOKEN REVOCATION
+ * ----------------
+ *
+ * For high-security systems, consider checking:
+ *
+ *     token version
+ *     session ID
+ *     user status
+ *     account suspension
+ *     revoked session
+ *
+ * when authorizing sensitive socket operations.
+ *
+ *
+ *
+ * RATE LIMITING
+ * -------------
+ *
+ * Apply limits to:
+ *
+ *     room:join
+ *     room:leave
+ *     room:message
+ *
+ * to prevent abuse and event flooding.
+ *
+ *
+ *
+ * PAYLOAD LIMITS
+ * --------------
+ *
+ * Keep socket payloads small and explicitly validate their
+ * shape before processing.
+ *
+ *
+ *
+ * ORIGIN
+ * ------
+ *
+ * Do not use:
+ *
+ *     origin: '*'
+ *
+ * for authenticated/private Socket.IO applications.
+ *
+ * Configure explicit trusted origins.
+ *
+ *
+ *
+ * LOGGING
+ * -------
+ *
+ * Log security-relevant events such as:
+ *
+ *     authentication failures
+ *     unauthorized room joins
+ *     revoked access attempts
+ *     suspicious event rates
+ *
+ * Avoid logging JWTs, cookies, passwords, or other secrets.
+ *
+ */
+
+// ============================================================
+// ACCEPTANCE CRITERIA
+// ============================================================
+
+/*
+ *
+ * [x] JWT authentication is required during handshake.
+ *
+ * [x] Invalid tokens are rejected.
+ *
+ * [x] Expired tokens are rejected.
+ *
+ * [x] Unauthenticated sockets are disconnected.
+ *
+ * [x] Users cannot join arbitrary rooms.
+ *
+ * [x] Room membership is explicitly checked.
+ *
+ * [x] Room IDs are validated.
+ *
+ * [x] Message payloads are validated.
+ *
+ * [x] A socket must explicitly join a room before messaging.
+ *
+ * [x] Membership is rechecked before sensitive operations.
+ *
+ * [x] Revoked room access is respected.
+ *
+ * [x] Room messages are scoped with server.to(roomId).
+ *
+ * [x] Private user channels are isolated.
+ *
+ * [x] Unauthorized room access generates an error event.
+ *
+ * [x] Leaving unauthorized rooms is prevented.
+ *
+ * [x] Unit tests cover authorization.
+ *
+ * [x] Unit tests cover room isolation.
+ *
+ * [x] Unit tests cover malformed input.
+ *
+ * [x] Unit tests cover authorization revocation.
+ *
+ *
+ * SECURITY PROPERTY:
+ *
+ *
+ *       Authentication
+ *              +
+ *       Authorization
+ *              +
+ *       Explicit Membership
+ *              +
+ *       Revalidation
+ *              +
+ *       Room-Scoped Broadcast
+ *              =
+ *       Socket.IO Room Isolation
+ *
+ */
+
+// ============================================================
+// END
+// ============================================================

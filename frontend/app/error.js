@@ -7,7 +7,15 @@ import AnimatedBlurBackground from "@/components/AnimatedBlurBackground";
 
 export default function Error() {
   const reload = () => {
-    window.location.reload();
+    if (typeof window !== 'undefined') {
+      const count = parseInt(sessionStorage.getItem('error_retry_count') || '0', 10);
+      if (count >= 3) {
+        alert('Multiple errors occurred. Please try returning home or contacting support.');
+        return;
+      }
+      sessionStorage.setItem('error_retry_count', (count + 1).toString());
+      window.location.reload();
+    }
   };
 
   return (

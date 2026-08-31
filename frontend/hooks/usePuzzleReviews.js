@@ -1,110 +1,159 @@
-import { useState, useCallback } from 'react';
-import {
-  usePuzzleReviewsQuery,
-  useReviewStatsQuery,
-  useApproveReviewMutation,
-  useRejectReviewMutation,
-  useBulkApproveReviewsMutation,
-  useBulkRejectReviewsMutation,
-} from '../services/puzzleReviewHooks';
+"use client";
+
+import { useState, useCallback } from "react";
+import puzzleReviewService from "../services/puzzleReviewService";
+import { useApiQuery } from "./useApiQuery";
+import { useApiMutation } from "./useApiMutation";
 
 /**
- * Thin glue hook — wraps TanStack Query hooks for the puzzle review dashboard.
- * The page component uses this hook so it doesn't need useState/useCallback itself.
+ * Hook for managing puzzle review data with consistent loading / error / empty states.
+ *
+ * Built on the shared useApiQuery / useApiMutation wrappers so all requests get
+ * automatic retry, cancellation, stale-data handling, and user-visible errors.
  */
 export const usePuzzleReviews = () => {
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  });
   const [filters, setFilters] = useState({
-    status: 'PENDING',
-    sortBy: 'createdAt',
-    sortOrder: 'DESC',
+    status: "PENDING",
+    sortBy: "createdAt",
+    sortOrder: "DESC",
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
 
-  const queryFilters = { ...filters, page, limit };
+  // ── Queries ──────────────────────────────────────────────────────────────
 
-  const {
-    data: queryData,
-    isLoading: loading,
-    error: queryError,
-  } = usePuzzleReviewsQuery(queryFilters);
+  const reviewsQuery = useApiQuery({
+    key: ["reviews", filters, pagination.page, pagination.limit],
+    fn: async ({ signal }) => {
+      const response = await puzzleReviewService.getPuzzleReviews({
+        ...filters,
+        page: pagination.page,
+        limit: pagination.limit,
+      });
+      if (!response.success) throw new Error(response.message || "Failed to fetch reviews");
+      return response.data;
+    },
+    staleTime: 30_000,
+  });
 
-  const {
-    data: stats,
-    isLoading: statsLoading,
-  } = useReviewStatsQuery();
+  const statsQuery = useApiQuery({
+    key: ["reviewStats"],
+    fn: async () => {
+      const response = await puzzleReviewService.getReviewStats();
+      if (!response.success) throw new Error(response.message || "Failed to fetch stats");
+      return response.data;
+    },
+    staleTime: 60_000,
+  });
 
-  const approveReviewMutation = useApproveReviewMutation();
-  const rejectReviewMutation = useRejectReviewMutation();
-  const bulkApproveMutation = useBulkApproveReviewsMutation();
-  const bulkRejectMutation = useBulkRejectReviewsMutation();
+  // ── Mutations ────────────────────────────────────────────────────────────
 
-  const error = queryError?.message || null;
+  const approveMutation = useApiMutation({
+    fn: async ({ reviewId, moderationReason }) => {
+      const response = await puzzleReviewService.updateReviewStatus(
+        reviewId,
+        "APPROVED",
+        moderationReason,
+      );
+      if (!response.success) throw new Error(response.message);
+      return response.data;
+    },
+    invalidate: ["reviews", "reviewStats"],
+  });
 
-  const reviews = queryData?.reviews ?? [];
-  const pagination = {
-    page,
-    limit,
-    total: queryData?.total ?? 0,
-    totalPages: queryData?.totalPages ?? 0,
-  };
+  const rejectMutation = useApiMutation({
+    fn: async ({ reviewId, moderationReason }) => {
+      const response = await puzzleReviewService.updateReviewStatus(
+        reviewId,
+        "REJECTED",
+        moderationReason,
+      );
+      if (!response.success) throw new Error(response.message);
+      return response.data;
+    },
+    invalidate: ["reviews", "reviewStats"],
+  });
+
+  const bulkApproveMutation = useApiMutation({
+    fn: async ({ reviewIds, moderationReason }) => {
+      const response = await puzzleReviewService.bulkUpdateReviewStatuses(
+        reviewIds,
+        "APPROVED",
+        moderationReason,
+      );
+      if (!response.success) throw new Error(response.message);
+      return response.data;
+    },
+    invalidate: ["reviews", "reviewStats"],
+  });
+
+  const bulkRejectMutation = useApiMutation({
+    fn: async ({ reviewIds, moderationReason }) => {
+      const response = await puzzleReviewService.bulkUpdateReviewStatuses(
+        reviewIds,
+        "REJECTED",
+        moderationReason,
+      );
+      if (!response.success) throw new Error(response.message);
+      return response.data;
+    },
+    invalidate: ["reviews", "reviewStats"],
+  });
+
+  // ── Actions ──────────────────────────────────────────────────────────────
 
   const updateFilters = useCallback((newFilters) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
-    setPage(1);
+    setPagination((prev) => ({ ...prev, page: 1 }));
   }, []);
 
   const updatePagination = useCallback((newPagination) => {
-    if (newPagination.page) setPage(newPagination.page);
+    setPagination((prev) => ({ ...prev, ...newPagination }));
   }, []);
 
   const approveReview = useCallback(
-    async (reviewId, moderationReason = '') => {
-      try {
-        await approveReviewMutation.mutateAsync({ reviewId, moderationReason });
-        return { success: true, message: 'Review approved successfully' };
-      } catch (err) {
-        return { success: false, message: err.message };
-      }
-    },
-    [approveReviewMutation],
+    (reviewId, moderationReason = "") =>
+      approveMutation.mutateAsync({ reviewId, moderationReason }),
+    [approveMutation],
   );
 
   const rejectReview = useCallback(
-    async (reviewId, moderationReason = '') => {
-      try {
-        await rejectReviewMutation.mutateAsync({ reviewId, moderationReason });
-        return { success: true, message: 'Review rejected successfully' };
-      } catch (err) {
-        return { success: false, message: err.message };
-      }
-    },
-    [rejectReviewMutation],
+    (reviewId, moderationReason = "") =>
+      rejectMutation.mutateAsync({ reviewId, moderationReason }),
+    [rejectMutation],
   );
 
   const bulkApproveReviews = useCallback(
-    async (reviewIds, moderationReason = '') => {
-      try {
-        await bulkApproveMutation.mutateAsync({ reviewIds, moderationReason });
-        return { success: true, message: `${reviewIds.length} reviews approved successfully` };
-      } catch (err) {
-        return { success: false, message: err.message };
-      }
-    },
+    (reviewIds, moderationReason = "") =>
+      bulkApproveMutation.mutateAsync({ reviewIds, moderationReason }),
     [bulkApproveMutation],
   );
 
   const bulkRejectReviews = useCallback(
-    async (reviewIds, moderationReason = '') => {
-      try {
-        await bulkRejectMutation.mutateAsync({ reviewIds, moderationReason });
-        return { success: true, message: `${reviewIds.length} reviews rejected successfully` };
-      } catch (err) {
-        return { success: false, message: err.message };
-      }
-    },
+    (reviewIds, moderationReason = "") =>
+      bulkRejectMutation.mutateAsync({ reviewIds, moderationReason }),
     [bulkRejectMutation],
   );
+
+  // ── Derived state ────────────────────────────────────────────────────────
+
+  const reviews = reviewsQuery.data?.reviews ?? [];
+  const stats = statsQuery.data ?? null;
+  const loading = reviewsQuery.isLoading;
+  const error = reviewsQuery.error;
+  const statsLoading = statsQuery.isLoading;
+
+  // Sync pagination totals from the last successful query
+  if (reviewsQuery.data) {
+    pagination.total = reviewsQuery.data.total;
+    pagination.totalPages = reviewsQuery.data.totalPages;
+  }
 
   return {
     // State
@@ -117,11 +166,13 @@ export const usePuzzleReviews = () => {
     statsLoading,
 
     // Actions
+    fetchReviews: reviewsQuery.refetch,
     updateFilters,
     updatePagination,
     approveReview,
     rejectReview,
     bulkApproveReviews,
     bulkRejectReviews,
+    fetchStats: statsQuery.refetch,
   };
 };

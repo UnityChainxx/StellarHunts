@@ -10,7 +10,7 @@ export enum ActivityType {
 }
 
 @Entity("streak_activities")
-@Index(["userId", "activityDate"])
+@Index(["userId", "activityDate", "activityType"], { unique: true })
 @Index(["streakId"])
 @Index(["activityType"])
 export class StreakActivity {

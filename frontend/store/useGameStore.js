@@ -205,7 +205,26 @@ const useGameStore = create(
         const pointsPerCompletion = difficultyConfig?.pointsPerCompletion ?? POINTS_PER_COMPLETION;
         const newScore = score + pointsPerCompletion;
 
-        // Update the backend
+        // Optimistic update: apply the new progress immediately so the UI
+        // feels instant, then persist to the backend. If the request fails
+        // we roll back to the exact prior snapshot so a failed mutation
+        // never leaves the game state half-advanced (issue #299).
+        const previous = {
+          completedPuzzles,
+          completedDifficulties,
+          currentDifficulty,
+          currentPuzzleIndex,
+          score,
+        };
+        const next = {
+          completedPuzzles: newCompletedPuzzles,
+          completedDifficulties: newCompletedDifficulties,
+          currentDifficulty: nextDifficulty,
+          currentPuzzleIndex: nextPuzzleIndex,
+          score: newScore,
+        };
+        set(next);
+
         try {
           await axios.post(
             apiUrl("/game/update"),
@@ -219,15 +238,9 @@ const useGameStore = create(
             },
             { withCredentials: true },
           );
-
-          set({
-            completedPuzzles: newCompletedPuzzles,
-            completedDifficulties: newCompletedDifficulties,
-            currentDifficulty: nextDifficulty,
-            currentPuzzleIndex: nextPuzzleIndex,
-            score: newScore,
-          });
         } catch (error) {
+          // Restore prior state on failure.
+          set(previous);
           const entry = { action: "completePuzzle", message: error.message, time: Date.now() };
           set((state) => ({ errors: [...state.errors, entry] }));
         }
@@ -236,6 +249,13 @@ const useGameStore = create(
       addNFT: async (nft) => {
         const { user, nfts } = get();
         if (!user) return;
+
+        // Optimistic update: add the NFT locally first, then persist. On
+        // failure we roll the inventory back to its prior contents (issue
+        // #299) so a failed request never leaves a phantom NFT behind.
+        const previousNfts = nfts;
+        const nextNfts = [...nfts, nft];
+        set({ nfts: nextNfts });
 
         try {
           await axios.post(
@@ -246,9 +266,8 @@ const useGameStore = create(
             },
             { withCredentials: true },
           );
-
-          set({ nfts: [...nfts, nft] });
         } catch (error) {
+          set({ nfts: previousNfts });
           const entry = { action: "addNFT", message: error.message, time: Date.now() };
           set((state) => ({ errors: [...state.errors, entry] }));
         }

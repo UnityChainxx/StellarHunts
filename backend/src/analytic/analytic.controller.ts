@@ -9,8 +9,12 @@ import {
   Logger,
   Query,
   OnModuleInit,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AnalyticService } from './analytic.service';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import type { PaginatedUserPuzzleHistory } from './analytic.service';
 
 class RecordSolveDto {
@@ -71,6 +75,8 @@ export class AnalyticController implements OnModuleInit {
   }
 
   @Get('users/:userId/history')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserPuzzleHistory(
     @Param('userId') userId: string,
   ): Promise<Record<string, any>> {
@@ -86,6 +92,8 @@ export class AnalyticController implements OnModuleInit {
   }
 
   @Get('users/:userId/history/paginated')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserPuzzleHistoryPaginated(
     @Param('userId') userId: string,
     @Query('page') page?: string,

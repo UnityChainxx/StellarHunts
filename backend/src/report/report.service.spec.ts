@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { ReportService } from './report.service';
 import { Report, ReportStatus } from './entities/report.entity';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -27,6 +28,10 @@ describe('ReportService', () => {
         {
           provide: getRepositoryToken(Report),
           useValue: repository,
+        },
+        {
+          provide: AuditLogService,
+          useValue: { createLog: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();
