@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn, Index } from "typeorm"
-import { User } from "../../user/entities/user.entity" // Adjust path as needed
+import { User } from '../../auth/entities/user.entity';
 import { ReferralInvite } from "./referral-invite.entity"
 
 export enum BonusType {

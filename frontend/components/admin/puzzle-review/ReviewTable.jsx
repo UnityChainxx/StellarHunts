@@ -260,7 +260,11 @@ const ReviewTable = ({
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
+          <nav
+            role="navigation"
+            aria-label="Reviews pagination"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-6"
+          >
             <div className="text-sm text-gray-700">
               Page {pagination.page} of {pagination.totalPages}
             </div>
@@ -270,18 +274,26 @@ const ReviewTable = ({
                 size="sm"
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
+                aria-label="Previous page"
               >
                 Previous
               </Button>
-              <div className="flex items-center space-x-1">
+              <div
+                className="flex items-center space-x-1"
+                role="list"
+                aria-label="Page numbers"
+              >
                 {[...Array(Math.min(5, pagination.totalPages))].map((_, i) => {
                   const pageNum = i + 1;
+                  const isCurrent = pagination.page === pageNum;
                   return (
                     <Button
                       key={pageNum}
-                      variant={pagination.page === pageNum ? "default" : "outline"}
+                      variant={isCurrent ? "default" : "outline"}
                       size="sm"
                       onClick={() => handlePageChange(pageNum)}
+                      aria-current={isCurrent ? "page" : undefined}
+                      aria-label={`Page ${pageNum}`}
                     >
                       {pageNum}
                     </Button>
@@ -293,11 +305,12 @@ const ReviewTable = ({
                 size="sm"
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
+                aria-label="Next page"
               >
                 Next
               </Button>
             </div>
-          </div>
+          </nav>
         )}
       </div>
     </div>

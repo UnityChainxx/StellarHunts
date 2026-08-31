@@ -14,14 +14,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
+      passReqToCallback: true,
       secretOrKey: configService.get('JWT_SECRET') || 'your-secret-key',
     });
   }
 
-  async validate(payload: JwtPayload): Promise<User> {
+  async validate(request: Request & { headers: any }, payload: JwtPayload): Promise<User> {
     try {
-      const user = await this.authService.validateUser(payload);
-      return user;
+      const authHeader = request.headers?.authorization;
+      const rawToken =
+        typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : undefined;
+
+      return await this.authService.validateUser(payload, rawToken);
     } catch (error) {
       throw new UnauthorizedException('Invalid token');
     }

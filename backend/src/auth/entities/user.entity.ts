@@ -36,6 +36,15 @@ export class User {
   @Column({ nullable: true })
   lastLoginAt: Date;
 
+  @Column({ nullable: true })
+  walletAddress?: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

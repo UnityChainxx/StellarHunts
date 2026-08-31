@@ -43,6 +43,12 @@ export interface NftGalleryVirtualizedProps {
   tilesPerRow?: number;
   /** Bottom sentinel — fires when the user scrolls within `threshold`px of it. */
   onReachEnd?: () => void;
+  /** Optional claim handler forwarded to each NFT card. */
+  onClaim?: (nft: NFTLike) => void;
+  /** When true, announces that more NFTs are being loaded (a11y available region). */
+  loading?: boolean;
+  /** Whether more pages exist; when false and not loading, announces end of list. */
+  hasMore?: boolean;
   /** Extra rows to render above/below the visible area to avoid blank flashes. */
   overscan?: number;
   /** Tailwind/object-friendly className for the scroll container. */
@@ -67,6 +73,9 @@ const NftGalleryVirtualized = ({
   rowHeight = DEFAULT_ROW_HEIGHT,
   tilesPerRow: tilesPerRowProp = DEFAULT_TILES_PER_ROW,
   onReachEnd,
+  onClaim,
+  loading = false,
+  hasMore = false,
   overscan = DEFAULT_OVERSCAN,
   className,
 }: NftGalleryVirtualizedProps) => {
@@ -171,8 +180,9 @@ const NftGalleryVirtualized = ({
       ref={containerRef}
       onScroll={handleScroll}
       className={className}
-      role="region"
+      role="feed"
       aria-label="NFT collection"
+      aria-busy={loading}
       style={{
         position: "relative",
         height: "70vh",
@@ -211,13 +221,22 @@ const NftGalleryVirtualized = ({
                     key={(nft.id as string) ?? absoluteIndex}
                     style={tileStyle}
                   >
-                    <NFTCard nft={nft as any} />
+                    <NFTCard nft={nft as any} onClaim={onClaim} />
                   </div>
                 );
               })}
             </div>
           );
         })}
+      </div>
+
+      {/* Screen-reader status region for infinite-scroll (#309). */}
+      <div aria-live="polite" role="status" className="sr-only">
+        {loading
+          ? "Loading more NFTs…"
+          : !hasMore && items.length > 0
+          ? `End of NFT collection. ${items.length} total.`
+          : ""}
       </div>
     </div>
   );
