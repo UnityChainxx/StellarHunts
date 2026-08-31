@@ -1,8 +1,8 @@
-# StellarHunt Architecture
+# StellarHunts Architecture
 
 ## System Overview
 
-StellarHunt is a three-tier gamified blockchain application. The system consists of a Next.js frontend, a NestJS API backend, and Cairo smart contracts deployed on StarkNet. Players solve cryptographic puzzles through the web interface, with progress tracked server-side and NFT rewards minted on-chain.
+StellarHunts is a three-tier gamified blockchain application. The system consists of a Next.js frontend, a NestJS API backend, and Soroban smart contracts deployed on the Stellar network. Players solve cryptographic puzzles through the web interface, with progress tracked server-side and NFT rewards minted on-chain.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -13,6 +13,9 @@ StellarHunt is a three-tier gamified blockchain application. The system consists
 │  │  │ App     │  │ Zustand  │  │ TanStack Query     │   │   │
 │  │  │ Router  │  │ (State)  │  │ (Server State)     │   │   │
 │  │  └─────────┘  └──────────┘  └────────────────────┘   │   │
+│  │  ┌──────────────────────────────────────────────────┐ │   │
+│  │  │ Freighter Wallet (via @stellar/freighter-api)    │ │   │
+│  │  └──────────────────────────────────────────────────┘ │   │
 │  └──────────────────────────────────────────────────────┘   │
 └───────────────────────┬─────────────────────────────────────┘
                         │ HTTP / WebSocket
@@ -21,11 +24,11 @@ StellarHunt is a three-tier gamified blockchain application. The system consists
 │                 NestJS Backend (Port 3001)                   │
 │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
 │  │ Auth       │  │ Puzzle     │  │ Rewards / NFT Claim  │  │
-│  │ Module     │  │ Modules    │  │ Modules              │  │
+│  │ Module     │  │ Modules    │  │ (StellarHandlerSvc)  │  │
 │  └────────────┘  └────────────┘  └──────────────────────┘  │
 │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
-│  │ Progress   │  │ Leaderboard│  │ Multiplayer (Socket) │  │
-│  │ Module     │  │ Module     │  │ Module               │  │
+│  │ Progress   │  │ Multiplayer│  │ In-App Notifications │  │
+│  │ Module     │  │ (Socket)   │  │ Module               │  │
 │  └────────────┘  └────────────┘  └──────────────────────┘  │
 │                        │                                    │
 │            ┌───────────┴───────────┐                        │
@@ -34,15 +37,15 @@ StellarHunt is a three-tier gamified blockchain application. The system consists
 │     │PostgreSQL│           │  Redis   │                    │
 │     └──────────┘           └──────────┘                    │
 └─────────────────────────────────────────────────────────────┘
-                        │ StarkNet RPC
+                        │ Soroban RPC
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   StarkNet (L2)                              │
+│                   Stellar / Soroban Network                  │
 │  ┌──────────────────────┐  ┌──────────────────────────────┐ │
-│  │  StellarHunt         │  │  StellarHuntNFT            │ │
-│  │  - Questions/Levels  │  │  - ERC-1155 Badges          │ │
-│  │  - Answer Validation │  │  - Level-Based Minting      │ │
-│  │  - Progress Tracking │  │  - Metadata Management      │ │
+│  │  StellarHunts        │  │  StellarHunts NFT            │ │
+│  │  - Question Lifecycle│  │  - Level Badges              │ │
+│  │  - SHA256 Validation │  │  - Role-gated Minting        │ │
+│  │  - Level Progression │  │  - Badge Ownership Track     │ │
 │  └──────────────────────┘  └──────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -50,11 +53,11 @@ StellarHunt is a three-tier gamified blockchain application. The system consists
 ## Directory Structure
 
 ```
-StellarHunt/
+StellarHunts/
 │
 ├── frontend/                    Next.js 14 application
 ├── backend/                     NestJS API server
-└── onchain/                     Cairo smart contracts
+└── onchain/                     Soroban smart contracts (Rust)
 ```
 
 ## Frontend Architecture
@@ -68,8 +71,7 @@ StellarHunt/
 | State (Global) | Zustand | Game state, user session, progress tracking |
 | State (Server) | TanStack Query | API caching, optimistic updates |
 | Auth | NextAuth.js | OAuth, wallet linking, JWT sessions |
-| Forms | Formik + Yup | Form state management and validation |
-| Blockchain | starknet.js + get-starknet | Wallet connection, contract interaction |
+| Blockchain | `@stellar/stellar-sdk` + `@stellar/freighter-api` | Wallet connection, contract invocation |
 | HTTP | Axios | API client with interceptors |
 | UI Components | Radix UI + shadcn/ui | Accessible primitives, design system |
 
@@ -78,17 +80,11 @@ StellarHunt/
 ```
 /                                   Homepage
 /game                               Puzzle game interface
-/leaderboard                        Global rankings
 /puzzles/roadmap                    Puzzle progression timeline
 /invite-friends                     Referral program
 /ref/[referralId]                   Referral landing page
 /admin/puzzle-review                Admin puzzle management
 /admin/puzzle-submission            Admin puzzle creation
-/faq                                Frequently asked questions
-/terms                              Terms of service
-/privacy                            Privacy policy
-/about                              About page
-/profile                            User profile
 /api/auth/[...nextauth]             Auth API routes
 /api/referrals/*                    Referral API routes
 ```
@@ -97,14 +93,16 @@ StellarHunt/
 
 Application state is split across two concerns:
 
-**Zustand (useGameStore)** — Persisted to localStorage for game-specific state:
+**Zustand** — Persisted to localStorage for game-specific state:
 - User authentication status
 - Current puzzle difficulty and progress
 - Completed puzzles and difficulty levels
 - Score tracking and NFT collection
 
+> `@reduxjs/toolkit` is listed as a dependency but is not currently wired up.
+> See [ADR-0002](adr/0002-zustand-alongside-redux-toolkit.md) for the rationale.
+
 **TanStack Query** — Server state caching for:
-- Leaderboard data
 - Puzzle content
 - Referral statistics
 - API-driven data with automatic invalidation
@@ -112,11 +110,11 @@ Application state is split across two concerns:
 ### Data Flow (Game Loop)
 
 ```
-1. User connects StarkNet wallet via get-starknet
+1. User connects Stellar wallet via Freighter
 2. NextAuth.js creates session (JWT)
 3. Frontend loads puzzles via API (TanStack Query)
 4. User submits answers → API validates → Score updated
-5. On level completion → API triggers on-chain NFT minting
+5. On level completion → Backend triggers on-chain Soroban NFT mint
 6. Zustand store persists updated progress locally
 ```
 
@@ -141,96 +139,86 @@ Application state is split across two concerns:
 
 NestJS modules are organized by domain concern. Each module encapsulates its controller, service, entities, DTOs, and tests.
 
+The table below lists modules that are **actually registered** in `app.module.ts`. Modules present in `backend/src/` but not yet wired into AppModule are noted separately.
+
 **Core / Infrastructure**
 - `ConfigModule` — Environment configuration loading
 - `TypeOrmModule` — Database connection and entity registration
-- `RateLimiterModule` — Request throttling with Redis-backed guards
 - `AnalyticsModule` — Event tracking and usage metrics
-- `MaintenanceModeModule` — Service availability control
-- `MigrationModule` — Database migration orchestration
-- `AuditLogModule` — System audit logging
-- `TokenVerificationModule` — Token validation utilities
 
 **Authentication & Users**
 - `AuthModule` — JWT authentication, registration, login, wallet linking
-- `UserModule` — User CRUD and profile management
-- `UserSettingsModule` — User preferences
-- `UserActivityLogModule` — Audit trail for user actions
 - `UserReportCardModule` — Per-user performance summaries
-- `UserInventoryModule` — NFT and badge ownership tracking
+- `UserActivityLogModule` — Audit trail for user actions
 - `UserRankingModule` — Ranking calculations
-- `WalletModule` — StarkNet wallet address management
+- `UserInventoryModule` — NFT and badge ownership tracking
 
 **Puzzle & Content**
 - `PuzzleModule` — Core puzzle CRUD and game logic
-- `PuzzleCategoryModule` — Puzzle categorization and grouping
 - `PuzzleSubmissionModule` — Answer submission handling
 - `PuzzleDependencyModule` — Prerequisite puzzle management
-- `PuzzleDraftModule` — Puzzle authoring workflow
-- `PuzzleVersioningModule` — Puzzle revision history
-- `PuzzleReviewModule` — Admin review workflow
 - `PuzzleTranslationModule` — Multi-language support
-- `PuzzleCommentModule` — User discussion on puzzles
-- `PuzzleAccessLogModule` — Access tracking
-- `PuzzleTestCaseModule` — Test case management
-- `PuzzleForkModule` — Puzzle forking and remixing
 - `ContentModule` — Educational articles and resources
 - `ContentRatingModule` — User content ratings
-- `QuizModule` — Quiz-style challenges
 
 **Gamification & Rewards**
 - `RewardsModule` — Reward distribution and claim tracking
 - `RewardShopModule` — Reward marketplace
-- `NFTClaimModule` — On-chain NFT minting orchestration
-- `NFTMarketplaceStubModule` — Mock marketplace for testing
-- `AchievementsModule` — Achievement definitions and tracking
-- `BadgeModule` — Badge management
-- `MilestoneModule` — Milestone progression
-- `StreakModule` — Daily/consecutive activity tracking
-- `DailyRewardModule` — Login bonus system
+- `NFTClaimModule` — On-chain Soroban NFT minting orchestration (StellarHandlerService)
 - `TimeTrialModule` — Timed challenge mode
-- `PromoCodeModule` — Promotional code redemption
 
 **Social & Multiplayer**
 - `MultiplayerQueueModule` — Socket.IO matchmaking
-- `ReferralModule` — Referral program tracking
 - `ReportsModule` — User reporting and moderation
-- `FeedbackModule` — User feedback collection
 - `InAppNotificationsModule` — Notification delivery
 - `ActivityModule` — Social activity feed
 - `UserReactionModule` — Emoji/like reactions
-- `GeostatsModule` — Geographic player statistics
 
-**Progress & Analytics**
+**Progress & Integrations**
 - `ProgressModule` — User progression tracking
-- `SessionModule` — Session lifecycle
-- `HintModule` — Puzzle hint management
 - `ApiKeyModule` — API key management for integrations
-- `AdminModule` — Admin dashboard backend
+
+**Modules present in `backend/src/` but not yet registered in AppModule**
+
+The following directories exist and may be under active development:
+`AuditLogModule`, `BadgeModule`, `DailyRewardModule`, `FeedbackModule`,
+`GeostatsModule`, `HintModule`, `MaintenanceModeModule`, `MigrationModule`,
+`MilestoneModule`, `NFTMarketplaceStubModule`, `PromoCodeModule`,
+`PuzzleAccessLogModule`, `PuzzleCategoryModule`, `PuzzleCommentModule`,
+`PuzzleDraftModule`, `PuzzleForkModule`, `PuzzleReviewModule`,
+`PuzzleTestCaseModule`, `PuzzleVersioningModule`, `QuizModule`,
+`ReferralModule`, `SessionModule`, `StreakModule`,
+`TokenVerificationModule`, `UserModule`, `UserSettingsModule`,
+`UserTokenHistoryModule`, `WalletModule`, `AdminModule`.
+
+> There is **no** `LeaderboardModule` in the source tree. The leaderboard
+> endpoint lives inside `StreakModule` (`GET /streaks/leaderboard`).
 
 ### Database
 
 Primary database: **PostgreSQL** managed through TypeORM with code-first entity definitions.
 
-Key entities: `User`, `Puzzle`, `Category`, `Reward`, `RewardClaim`, `TimeTrial`, `Session`, `Progress`, `Hint`, `Achievement`, `Badge`, `Streak`, `Referral`, `Notification`, `UserActivityLog`.
+Key entities: `User`, `Puzzle`, `Category`, `Reward`, `RewardClaim`, `TimeTrial`, `Progress`.
 
 Configuration via environment variables:
 
 ```env
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
-DATABASE_NAME=stellarshunt
+DATABASE_NAME=stellarshunts
 DATABASE_SYNC=true       # Auto-sync entities (dev only)
-DATABASE_LOAD=true        # Auto-load entities
+DATABASE_LOAD=true       # Auto-load entities
 ```
 
 ### API Design
 
 - **RESTful** endpoints organized by resource (no global prefix — e.g., `/puzzle-categories`, `/rewards`, `/auth`)
-- **Authentication** via JWT tokens (Bearer header) or session cookies
+- **Authentication** via JWT tokens (Bearer header)
 - **Swagger** documentation at `http://localhost:3001/api/docs`
 - **Rate limiting** applied to auth and claim endpoints
 - **WebSocket** connections for multiplayer queue via Socket.IO
+
+See [`docs/api.md`](api.md) for the full endpoint reference table.
 
 ## Onchain Architecture
 
@@ -238,41 +226,41 @@ DATABASE_LOAD=true        # Auto-load entities
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Language | Cairo 2.8.4 | Smart contract development |
-| Framework | StarkNet | L2 blockchain |
-| Standards | OpenZeppelin (ERC-1155) | NFT implementation |
-| Testing | StarkNet Foundry (snforge) | Contract testing |
-| Build | Scarb | Package manager and build tool |
+| Language | Rust (soroban-sdk 22.x) | Smart contract development |
+| Framework | Soroban | Stellar smart contract runtime |
+| Build | Cargo workspace | Multi-crate workspace |
+| Testing | `cargo test` | Native Rust unit tests |
+| CLI | Stellar CLI | Deploy / invoke helpers |
 
 ### Contracts
 
-**StellarHunt** (`stellar_hunt.cairo`)
+**StellarHunts** (`stellar_hunts/src/lib.rs`)
 The core game contract managing:
 - Question lifecycle (add, get, update)
-- Answer submission with Poseidon-hashed validation
+- Answer submission with SHA256-hashed validation
 - Player level progression (Easy → Medium → Hard → Master)
 - Hint requests per question
 - Level completion tracking and NFT minting triggers
-- NFT contract address configuration
+- NFT contract address configuration (admin)
 
 Key state:
-```cairo
+```rust
 struct Question {
     question_id: u64,
-    question: ByteArray,
-    hashed_answer: felt252,
+    question: Bytes,
+    hashed_answer: BytesN<32>,
     level: Levels,
-    hint: ByteArray,
+    hint: Bytes,
 }
 
 struct PlayerProgress {
-    address: ContractAddress,
+    address: Address,
     current_level: Levels,
     is_initialized: bool,
 }
 
 struct LevelProgress {
-    player: ContractAddress,
+    player: Address,
     level: Levels,
     last_question_index: u8,
     is_completed: bool,
@@ -281,32 +269,28 @@ struct LevelProgress {
 }
 ```
 
-**StellarHuntNFT** (`stellar_hunt_nft.cairo`)
-ERC-1155 implementation for level-based badge NFTs:
-- Four token IDs mapped to levels (1=Easy, 2=Medium, 3=Hard, 4=Master)
-- Role-based access control for minting (only StellarHunt contract)
-- Metadata URI management
-- Level badge query functions
+**StellarHunts NFT** (`stellar_hunts_nft/src/lib.rs`)
+Per-level badge ownership contract:
+- Four level variants mapped to token positions (Easy, Medium, Hard, Master)
+- Admin + minter registry (default minter = the StellarHunts game contract)
+- Badge ownership query via `has_level_badge`
+- Mint authorization enforced cross-contract via `env.invoker()` check
 
-**Mock1155Receiver** (`mock_1155_receiver.cairo`)
-Test helper contract implementing the ERC-1155 receiver interface for safe transfer validation.
-
-### Interfaces
-
-The `IStellarHunt` interface defines the public API surface for the main contract, including question management, answer submission, player progress queries, and NFT claiming.
+**Mock Receiver** (`stellar_hunts_receiver/src/lib.rs`)
+Test helper for integration tests.
 
 ### Utility Functions
 
-- **hash_byte_array()** — Deterministic Poseidon hashing of `ByteArray` inputs for on-chain answer verification without storing plaintext answers.
+- **answer hashing** — Soroban `env.crypto().sha256(&Bytes)` returns `BytesN<32>` for on-chain answer verification without storing plaintext answers.
 
 ### Data Flow (Minting)
 
 ```
-1. Player submits correct answer → StellarHunt.submit_answer()
-2. Contract validates hash, updates LevelProgress
-3. If level complete → StellarHuntNFT.mint_level_badge() called
-4. Player receives ERC-1155 token with level-specific ID
-5. NFT metadata reflects difficulty tier and completion stats
+1. Player submits correct answer → StellarHunts.submit_answer()
+2. Contract validates SHA256 hash, updates LevelProgress
+3. If level complete → cross-contract call to StellarHuntsNFT.mint_level_badge()
+4. NFT contract verifies env.invoker() == registered minter, mints badge
+5. Player receives a per-level badge entry in NFT contract storage
 ```
 
 ## Authentication Flow
@@ -335,12 +319,11 @@ The `IStellarHunt` interface defines the public API surface for the main contrac
 
 ## Security Considerations
 
-- **Answer Privacy** — Puzzle answers are Poseidon-hashed on-chain; plaintext never stored
+- **Answer Privacy** — Puzzle answers are SHA256-hashed on-chain; plaintext never stored
 - **JWT Authentication** — All API routes (except auth endpoints) require valid JWT
 - **Rate Limiting** — Configurable throttling on auth, claim, and submission endpoints
-- **Duplicate Prevention** — Unique constraints prevent double claims on rewards
-- **Soft Deletes** — Entities use `isActive` flags rather than hard deletion
-- **Role-Based Access** — Admin endpoints are guarded with role checks
+- **Duplicate Prevention** — Badge storage is keyed per `(Address, Levels)` preventing double-mint
+- **Role-Gated Minting** — NFT contract verifies `env.invoker()` is in its minter registry before minting
 - **Input Validation** — All API inputs validated via class-validator decorators
 
 ## Development Workflow
@@ -351,7 +334,7 @@ cd backend && npm run start:dev    # API → localhost:3001
 cd frontend && npm run dev         # UI  → localhost:3000
 
 # Test onchain contracts
-cd onchain && snforge test
+cd onchain && cargo test --workspace
 
 # Run backend tests
 cd backend && npm test

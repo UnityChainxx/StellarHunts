@@ -1,55 +1,62 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from "typeorm"
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 
-@Entity("puzzles")
-@Index(["title", "category"], { unique: true })
+@Entity('puzzles')
+@Index(['title', 'category'], { unique: true })
 export class Puzzle {
-  @PrimaryGeneratedColumn("uuid")
-  id: string
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ length: 255 })
-  title: string
+  title: string;
 
-  @Column({ type: "text", nullable: true })
-  description: string
+  @Column({ type: 'text', nullable: true })
+  description: string;
 
   @Column({
-    type: "enum",
-    enum: ["easy", "medium", "hard", "expert"],
-    default: "medium",
+    type: 'enum',
+    enum: ['easy', 'medium', 'hard', 'expert'],
+    default: 'medium',
   })
-  difficulty: "easy" | "medium" | "hard" | "expert"
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
 
   @Column({ length: 100 })
-  category: string
+  category: string;
 
-  @Column({ type: "json" })
+  @Column({ type: 'json' })
   content: {
-    question: string
-    answer: string
-    hints?: string[]
-    explanation?: string
-    options?: string[]
-    type: "text" | "multiple_choice" | "code" | "math" | "logic"
-  }
+    question: string;
+    answer: string;
+    hints?: string[];
+    explanation?: string;
+    options?: string[];
+    type: 'text' | 'multiple_choice' | 'code' | 'math' | 'logic';
+  };
 
-  @Column({ type: "json", nullable: true })
+  @Column({ type: 'json', nullable: true })
   metadata: {
-    author?: string
-    source?: string
-    createdAt?: string
-    estimatedTime?: number
-    points?: number
-  }
+    author?: string;
+    source?: string;
+    createdAt?: string;
+    estimatedTime?: number;
+    points?: number;
+  };
 
-  @Column({ type: "simple-array", nullable: true })
-  tags: string[]
+  @Column({ type: 'simple-array', nullable: true })
+  tags: string[];
 
   @Column({ default: true })
-  isActive: boolean
+  isActive: boolean;
 
   @CreateDateColumn()
-  createdAt: Date
+  createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date
+  updatedAt: Date;
 }

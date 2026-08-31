@@ -32,11 +32,12 @@ export class PuzzleTranslationService {
       where: { puzzle: { id: puzzleId }, language },
       relations: ['puzzle'],
     });
-    if (!translation) throw new NotFoundException('Translation not found for given language');
+    if (!translation)
+      throw new NotFoundException('Translation not found for given language');
     return translation;
   }
 
   async findAll(puzzleId: string) {
     return this.translationRepo.find({ where: { puzzle: { id: puzzleId } } });
   }
-} 
+}

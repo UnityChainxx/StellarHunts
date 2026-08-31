@@ -4,9 +4,7 @@ import { NftItem } from './entities/nft-item.entity';
 
 @Controller('nft-marketplace')
 export class NftMarketplaceStubController {
-  constructor(
-    private readonly marketplaceService: NftMarketplaceStubService,
-  ) {}
+  constructor(private readonly marketplaceService: NftMarketplaceStubService) {}
 
   @Get('list')
   listAllNfts(): NftItem[] {

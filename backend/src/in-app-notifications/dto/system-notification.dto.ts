@@ -15,7 +15,10 @@ export class SystemNotificationDto {
   @MaxLength(2000, { message: 'Notification message must be 2000 characters or fewer' })
   message: string;
 
-  @ApiProperty({ description: 'Type of notification', enum: InAppNotificationType })
+  @ApiProperty({
+    description: 'Type of notification',
+    enum: InAppNotificationType,
+  })
   @IsEnum(InAppNotificationType)
   type: InAppNotificationType;
 }

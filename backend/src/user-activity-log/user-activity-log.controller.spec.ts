@@ -9,7 +9,9 @@ describe('UserActivityLogController', () => {
       controllers: [UserActivityLogController],
     }).compile();
 
-    controller = module.get<UserActivityLogController>(UserActivityLogController);
+    controller = module.get<UserActivityLogController>(
+      UserActivityLogController,
+    );
   });
 
   it('should be defined', () => {

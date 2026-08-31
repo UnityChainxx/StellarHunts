@@ -27,7 +27,7 @@ const WhyJoinSection = () => {
     {
       icon: Palette,
       title: "Own Unique NFTs",
-      description: "Earn and collect exclusive NFTs that showcase your achievements and knowledge in the StarkNet ecosystem.",
+      description: "Earn and collect exclusive NFTs that showcase your achievements and knowledge in the Stellar ecosystem.",
       stats: { value: "50+", label: "Unique NFT Designs" },
       delay: 0.2
     },
@@ -41,7 +41,7 @@ const WhyJoinSection = () => {
     {
       icon: Zap,
       title: "Web3 Innovation",
-      description: "Experience the future of gaming with cutting-edge blockchain technology and StarkNet integration.",
+      description: "Experience the future of gaming with cutting-edge blockchain technology and Stellar + Soroban integration.",
       stats: { value: "100%", label: "On-Chain Experience" },
       delay: 0.6
     }
@@ -106,8 +106,6 @@ const WhyJoinSection = () => {
         ))}
       </div>
 
-      {/* Stats banner */}
-      {/* Stats banner */}
       {/* Stats banner */}
       <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 p-8 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 backdrop-blur-sm border border-white/10">
         {statsData.map((stat, index) => (

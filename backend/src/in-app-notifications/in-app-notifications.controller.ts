@@ -33,7 +33,9 @@ import { RateLimit } from '../common/decorators/rate-limit.decorator';
 @ApiBearerAuth()
 @UseGuards(RateLimitGuard)
 export class InAppNotificationsController {
-  constructor(private readonly notificationsService: InAppNotificationsService) {}
+  constructor(
+    private readonly notificationsService: InAppNotificationsService,
+  ) {}
 
   @Get()
   @RateLimit({ limit: 30, windowMs: 60_000 })
@@ -111,7 +113,10 @@ export class InAppNotificationsController {
     @Query('userId', ParseIntPipe) userId: number, // In real app, this would come from JWT token
     @Body() markReadDto: MarkReadDto,
   ) {
-    return this.notificationsService.archiveNotifications(userId, markReadDto.notificationIds);
+    return this.notificationsService.archiveNotifications(
+      userId,
+      markReadDto.notificationIds,
+    );
   }
 
   @Delete(':id')

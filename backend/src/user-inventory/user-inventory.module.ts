@@ -8,11 +8,9 @@ import { NFT } from './entities/nft';
 import { Badge } from './entities/badge';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Inventory, User, NFT, Badge]),
-  ],
+  imports: [TypeOrmModule.forFeature([Inventory, User, NFT, Badge])],
   controllers: [UserInventoryController],
   providers: [UserInventoryService],
-  exports: [UserInventoryService], 
+  exports: [UserInventoryService],
 })
 export class UserInventoryModule {}

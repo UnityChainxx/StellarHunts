@@ -4,16 +4,16 @@ import { SkillLevel } from "../entities/queue.entity"
 
 export class JoinQueueDto {
   @ApiProperty({
-    description: "User ID joining the queue",
-    example: "123e4567-e89b-12d3-a456-426614174000",
+    description: 'User ID joining the queue',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsUUID()
   @IsNotEmpty()
-  userId: string
+  userId: string;
 
   @ApiProperty({
-    description: "Username of the player",
-    example: "player123",
+    description: 'Username of the player',
+    example: 'player123',
   })
   @IsString()
   @IsNotEmpty()
@@ -26,12 +26,12 @@ export class JoinQueueDto {
     example: SkillLevel.INTERMEDIATE,
   })
   @IsEnum(SkillLevel)
-  skillLevel: SkillLevel
+  skillLevel: SkillLevel;
 
   @ApiPropertyOptional({
-    description: "Game mode preference",
-    example: "classic",
-    default: "classic",
+    description: 'Game mode preference',
+    example: 'classic',
+    default: 'classic',
   })
   @IsString()
   @IsOptional()
@@ -39,7 +39,7 @@ export class JoinQueueDto {
   gameMode?: string = "classic"
 
   @ApiPropertyOptional({
-    description: "Maximum wait time in seconds",
+    description: 'Maximum wait time in seconds',
     example: 300,
     minimum: 30,
     maximum: 1800,
@@ -48,25 +48,25 @@ export class JoinQueueDto {
   @Min(30)
   @Max(1800)
   @IsOptional()
-  maxWaitTime?: number
+  maxWaitTime?: number;
 
   @ApiPropertyOptional({
-    description: "Preferred opponents (user IDs)",
-    example: ["456e7890-e89b-12d3-a456-426614174001"],
+    description: 'Preferred opponents (user IDs)',
+    example: ['456e7890-e89b-12d3-a456-426614174001'],
   })
   @IsArray()
   @IsUUID(4, { each: true })
   @ArrayMaxSize(10, { message: 'Preferred opponents list must contain 10 or fewer entries' })
   @IsOptional()
-  preferredOpponents?: string[]
+  preferredOpponents?: string[];
 
   @ApiPropertyOptional({
-    description: "Opponents to avoid (user IDs)",
-    example: ["789e0123-e89b-12d3-a456-426614174002"],
+    description: 'Opponents to avoid (user IDs)',
+    example: ['789e0123-e89b-12d3-a456-426614174002'],
   })
   @IsArray()
   @IsUUID(4, { each: true })
   @ArrayMaxSize(10, { message: 'Avoid opponents list must contain 10 or fewer entries' })
   @IsOptional()
-  avoidOpponents?: string[]
+  avoidOpponents?: string[];
 }

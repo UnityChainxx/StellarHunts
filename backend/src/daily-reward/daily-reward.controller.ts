@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { DailyRewardService } from './daily-reward.service';
 import { DailyCheckinDto } from './dto/daily-checkin.dto';
 
@@ -7,7 +7,7 @@ export class DailyRewardController {
   constructor(private readonly dailyRewardService: DailyRewardService) {}
 
   @Post('daily-checkin')
-  @UsePipes(new ValidationPipe({ transform: true }))
+  // Relies on the global validation pipe (issue #340).
   dailyCheckIn(@Body() dailyCheckinDto: DailyCheckinDto) {
     return this.dailyRewardService.dailyCheckIn(dailyCheckinDto.userId);
   }

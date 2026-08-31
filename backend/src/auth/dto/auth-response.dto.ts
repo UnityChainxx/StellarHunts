@@ -1,43 +1,43 @@
-import { ApiProperty } from "@nestjs/swagger"
+import { ApiProperty } from '@nestjs/swagger';
 
 // Step 1: Create a nested DTO for the user
 export class UserDto {
   @ApiProperty()
-  id: string
+  id: string;
 
   @ApiProperty()
-  name: string
+  name: string;
 
   @ApiProperty()
-  email: string
+  email: string;
 
   @ApiProperty()
-  createdAt: Date
+  createdAt: Date;
 }
 
 // Step 2: Use UserDto in your response
 export class AuthResponseDto {
   @ApiProperty({
-    description: "JWT access token",
-    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    description: 'JWT access token',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
-  accessToken: string
+  accessToken: string;
 
   @ApiProperty({
-    description: "Token type",
-    example: "Bearer",
+    description: 'Token type',
+    example: 'Bearer',
   })
-  tokenType: string
+  tokenType: string;
 
   @ApiProperty({
-    description: "Token expiration time in seconds",
+    description: 'Token expiration time in seconds',
     example: 900,
   })
-  expiresIn: number
+  expiresIn: number;
 
   @ApiProperty({
-    description: "User information",
+    description: 'User information',
     type: () => UserDto,
   })
-  user: UserDto
+  user: UserDto;
 }

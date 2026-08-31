@@ -6,12 +6,9 @@ import { PuzzleDependencyService } from './puzzle-dependency.service';
 import { PuzzleDependencyController } from './puzzle-dependency.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([PuzzleDependency, PuzzleCompletion])
-  ],
+  imports: [TypeOrmModule.forFeature([PuzzleDependency, PuzzleCompletion])],
   controllers: [PuzzleDependencyController],
   providers: [PuzzleDependencyService],
-  exports: [PuzzleDependencyService], 
+  exports: [PuzzleDependencyService],
 })
 export class PuzzleDependencyModule {}
-

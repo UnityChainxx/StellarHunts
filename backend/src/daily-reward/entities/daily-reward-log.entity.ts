@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 @Entity('daily_reward_logs')
 export class DailyRewardLog {
@@ -6,7 +12,7 @@ export class DailyRewardLog {
   id: string;
 
   @Index()
-  @Column()
+  @Column({ length: 128 })
   userId: string;
 
   @Column({ default: 1 })

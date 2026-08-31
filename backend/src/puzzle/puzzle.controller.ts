@@ -1,11 +1,30 @@
 import {
-  Controller, Post, Get, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, HttpStatus
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { PuzzleService } from './puzzle.service';
 import { CreatePuzzleDto } from './dto/create-puzzle.dto';
 import { UpdatePuzzleDto } from './dto/update-puzzle.dto';
-// import { AdminAuthGuard } from '../auth/admin-auth.guard'; // Placeholder for admin guard
+import { JwtAuthGuard } from '../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../admin/guards/roles.guard';
+import { Roles } from '../admin/roles.decorator';
+import { AdminRole } from '../admin/admin-role.enum';
 
 @ApiTags('Puzzles')
 @Controller()
@@ -16,7 +35,8 @@ export class PuzzleController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new puzzle (admin)' })
   @ApiResponse({ status: 201, description: 'Puzzle created.' })
-  // @UseGuards(AdminAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   create(@Body() createPuzzleDto: CreatePuzzleDto) {
     return this.puzzleService.create(createPuzzleDto);
   }
@@ -25,7 +45,8 @@ export class PuzzleController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all puzzles (admin)' })
   @ApiResponse({ status: 200, description: 'List of puzzles.' })
-  // @UseGuards(AdminAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   findAllAdmin() {
     return this.puzzleService.findAllAdmin();
   }
@@ -34,7 +55,8 @@ export class PuzzleController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get puzzle by ID (admin)' })
   @ApiResponse({ status: 200, description: 'Puzzle found.' })
-  // @UseGuards(AdminAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   findOneAdmin(@Param('id') id: string) {
     return this.puzzleService.findOneAdmin(id);
   }
@@ -43,7 +65,8 @@ export class PuzzleController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update puzzle by ID (admin)' })
   @ApiResponse({ status: 200, description: 'Puzzle updated.' })
-  // @UseGuards(AdminAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   update(@Param('id') id: string, @Body() updatePuzzleDto: UpdatePuzzleDto) {
     return this.puzzleService.update(id, updatePuzzleDto);
   }
@@ -53,7 +76,8 @@ export class PuzzleController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete puzzle by ID (admin)' })
   @ApiResponse({ status: 204, description: 'Puzzle deleted.' })
-  // @UseGuards(AdminAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.puzzleService.remove(id);
   }

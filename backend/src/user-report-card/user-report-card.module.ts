@@ -5,6 +5,6 @@ import { UserReportCardService } from './user-report-card.service';
 @Module({
   controllers: [UserReportCardController],
   providers: [UserReportCardService],
-  exports: [UserReportCardService], 
+  exports: [UserReportCardService],
 })
 export class UserReportCardModule {}

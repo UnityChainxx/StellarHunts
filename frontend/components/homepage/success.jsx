@@ -1,4 +1,5 @@
 // pages/success.js
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -21,10 +22,39 @@ export default function NFTSuccessPage() {
     return () => clearTimeout(timeout);
   }, []);
 
+  if (!router.isReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-white bg-gray-900">
+        <p>Loading transaction details...</p>
+      </div>
+    );
+  }
+
+  const isConfirmed = router.query.status === 'confirmed';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-white bg-gray-900">
         <p>Loading NFT details...</p>
+      </div>
+    );
+  }
+
+  if (!isConfirmed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-emerald-900 text-white flex items-center justify-center px-6">
+        <div className="bg-gray-800 p-8 rounded-2xl shadow-xl max-w-md w-full text-center space-y-4">
+          <h1 className="text-3xl font-bold text-amber-400">Transaction pending</h1>
+          <p className="text-gray-300">
+            We only show the NFT success screen after the on-chain transaction is confirmed.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-xl transition"
+          >
+            Go to Homepage
+          </button>
+        </div>
       </div>
     );
   }
@@ -35,9 +65,11 @@ export default function NFTSuccessPage() {
         <h1 className="text-3xl font-bold text-green-400">🎉 NFT Minted Successfully!</h1>
 
         <div className="mt-4">
-          <img
+          <Image
             src={mockNFT.image}
-            alt={mockNFT.name}
+            alt={mockNFT.name || 'Minted NFT'}
+            width={400}
+            height={400}
             className="w-full rounded-xl shadow-lg"
           />
           <p className="mt-4 text-lg font-semibold">{mockNFT.name}</p>

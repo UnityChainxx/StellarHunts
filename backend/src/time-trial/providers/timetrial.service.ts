@@ -1,11 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TimeTrial } from '../time-trial.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class TimetrialService {
-    constructor(
+  constructor(
     @InjectRepository(TimeTrial)
     private trialRepo: Repository<TimeTrial>,
   ) {}
@@ -25,7 +29,8 @@ export class TimetrialService {
 
     const endTime = new Date();
     const timeLimitInMinutes = 5; // configurable
-    const diff = (endTime.getTime() - new Date(trial.startTime).getTime()) / 60000;
+    const diff =
+      (endTime.getTime() - new Date(trial.startTime).getTime()) / 60000;
 
     if (diff > timeLimitInMinutes) {
       throw new BadRequestException('Time limit exceeded');

@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
   Unique,
 } from 'typeorm';
-import { PromoCode } from 'src/promo-code/entities/promo-code.entities'
+import { PromoCode } from 'src/promo-code/entities/promo-code.entities';
 import { User } from 'src/auth/entities/user.entity';
 
 @Entity('promo_code_redemptions')

@@ -6,9 +6,7 @@ import { ForkedPuzzle } from './entities/forked-puzzle.entity';
 import { PuzzleVersion } from '../puzzle-versioning/entities/puzzle-version.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ForkedPuzzle, PuzzleVersion]),
-  ],
+  imports: [TypeOrmModule.forFeature([ForkedPuzzle, PuzzleVersion])],
   controllers: [PuzzleForkController],
   providers: [PuzzleForkService],
 })

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { PuzzleForkService } from './puzzle-fork.service';
 import { CreateForkDto } from './dto/create-fork.dto';
 
@@ -12,7 +12,7 @@ export class PuzzleForkController {
    * Ex: @UseGuards(AdminGuard)
    */
   @Post('fork')
-  @UsePipes(new ValidationPipe({ transform: true }))
+  // Relies on the global validation pipe (issue #340).
   forkPuzzle(@Body() createForkDto: CreateForkDto) {
     return this.puzzleForkService.fork(createForkDto);
   }

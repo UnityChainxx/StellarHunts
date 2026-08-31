@@ -1,21 +1,24 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
-import { Repository } from "typeorm"
-import { Category } from "./entities/category.entity"
-import { CategoryPuzzle } from "./entities/puzzle.entity" // Updated import
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Repository } from 'typeorm';
+import { Category } from './entities/category.entity';
+import { CategoryPuzzle } from './entities/puzzle.entity'; // Updated import
 import {
   CreateCategoryDto,
   UpdateCategoryDto,
   CreatePuzzleDto,
   UpdatePuzzleDto,
   PuzzlesByCategoryResponseDto,
-} from "./dto/puzzle-category.dto"
-import { InjectRepository } from "@nestjs/typeorm"
+} from './dto/puzzle-category.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { sanitizeText } from '../common/sanitize-text';
 
 @Injectable()
 export class PuzzleCategoryService {
   constructor(
-    @InjectRepository(Category) private categoryRepository: Repository<Category>,
-    @InjectRepository(CategoryPuzzle) private puzzleRepository: Repository<CategoryPuzzle>,
+    @InjectRepository(Category)
+    private categoryRepository: Repository<Category>,
+    @InjectRepository(CategoryPuzzle)
+    private puzzleRepository: Repository<CategoryPuzzle>,
   ) {}
 
   /**
@@ -24,14 +27,14 @@ export class PuzzleCategoryService {
    */
   async getPuzzlesByCategory(): Promise<PuzzlesByCategoryResponseDto[]> {
     const categories = await this.categoryRepository
-      .createQueryBuilder("category")
-      .leftJoinAndSelect("category.puzzles", "puzzle")
-      .where("category.isActive = :isActive", { isActive: true })
-      .andWhere("puzzle.isActive = :puzzleActive", { puzzleActive: true })
-      .orderBy("category.sortOrder", "ASC")
-      .addOrderBy("category.name", "ASC")
-      .addOrderBy("puzzle.title", "ASC")
-      .getMany()
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.puzzles', 'puzzle')
+      .where('category.isActive = :isActive', { isActive: true })
+      .andWhere('puzzle.isActive = :puzzleActive', { puzzleActive: true })
+      .orderBy('category.sortOrder', 'ASC')
+      .addOrderBy('category.name', 'ASC')
+      .addOrderBy('puzzle.title', 'ASC')
+      .getMany();
 
     return categories.map((category) => ({
       id: category.id,
@@ -43,7 +46,7 @@ export class PuzzleCategoryService {
       sortOrder: category.sortOrder,
       puzzles: category.puzzles || [],
       puzzleCount: category.puzzles ? category.puzzles.length : 0,
-    }))
+    }));
   }
 
   /**
@@ -52,8 +55,8 @@ export class PuzzleCategoryService {
   async getAllCategories(): Promise<Category[]> {
     return this.categoryRepository.find({
       where: { isActive: true },
-      order: { sortOrder: "ASC", name: "ASC" },
-    })
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
   }
 
   /**
@@ -63,14 +66,14 @@ export class PuzzleCategoryService {
     // Changed parameter type to string
     const category = await this.categoryRepository.findOne({
       where: { id, isActive: true },
-      relations: ["puzzles"],
-    })
+      relations: ['puzzles'],
+    });
 
     if (!category) {
-      throw new NotFoundException(`Category with ID ${id} not found`)
+      throw new NotFoundException(`Category with ID ${id} not found`);
     }
 
-    return category
+    return category;
   }
 
   /**
@@ -79,32 +82,37 @@ export class PuzzleCategoryService {
   async getCategoryBySlug(slug: string): Promise<Category> {
     const category = await this.categoryRepository.findOne({
       where: { slug, isActive: true },
-      relations: ["puzzles"],
-    })
+      relations: ['puzzles'],
+    });
 
     if (!category) {
-      throw new NotFoundException(`Category with slug ${slug} not found`)
+      throw new NotFoundException(`Category with slug ${slug} not found`);
     }
 
-    return category
+    return category;
   }
 
   /**
    * Create a new category
    */
-  async createCategory(createCategoryDto: CreateCategoryDto): Promise<Category> {
-    const category = this.categoryRepository.create(createCategoryDto)
-    return this.categoryRepository.save(category)
+  async createCategory(
+    createCategoryDto: CreateCategoryDto,
+  ): Promise<Category> {
+    const category = this.categoryRepository.create(createCategoryDto);
+    return this.categoryRepository.save(category);
   }
 
   /**
    * Update a category
    */
-  async updateCategory(id: string, updateCategoryDto: UpdateCategoryDto): Promise<Category> {
+  async updateCategory(
+    id: string,
+    updateCategoryDto: UpdateCategoryDto,
+  ): Promise<Category> {
     // Changed parameter type
-    const category = await this.getCategoryById(id)
-    Object.assign(category, updateCategoryDto)
-    return this.categoryRepository.save(category)
+    const category = await this.getCategoryById(id);
+    Object.assign(category, updateCategoryDto);
+    return this.categoryRepository.save(category);
   }
 
   /**
@@ -112,9 +120,9 @@ export class PuzzleCategoryService {
    */
   async deleteCategory(id: string): Promise<void> {
     // Changed parameter type
-    const category = await this.getCategoryById(id)
-    category.isActive = false
-    await this.categoryRepository.save(category)
+    const category = await this.getCategoryById(id);
+    category.isActive = false;
+    await this.categoryRepository.save(category);
   }
 
   /**
@@ -123,9 +131,9 @@ export class PuzzleCategoryService {
   async getAllPuzzles(): Promise<CategoryPuzzle[]> {
     return this.puzzleRepository.find({
       where: { isActive: true },
-      relations: ["categories"],
-      order: { title: "ASC" },
-    })
+      relations: ['categories'],
+      order: { title: 'ASC' },
+    });
   }
 
   /**
@@ -135,46 +143,61 @@ export class PuzzleCategoryService {
     // Changed parameter type
     const puzzle = await this.puzzleRepository.findOne({
       where: { id, isActive: true },
-      relations: ["categories"],
-    })
+      relations: ['categories'],
+    });
 
     if (!puzzle) {
-      throw new NotFoundException(`Puzzle with ID ${id} not found`)
+      throw new NotFoundException(`Puzzle with ID ${id} not found`);
     }
 
-    return puzzle
+    return puzzle;
   }
 
   /**
    * Create a new puzzle
    */
-  async createPuzzle(createPuzzleDto: CreatePuzzleDto): Promise<CategoryPuzzle> {
-    const puzzle = this.puzzleRepository.create(createPuzzleDto)
+  async createPuzzle(
+    createPuzzleDto: CreatePuzzleDto,
+  ): Promise<CategoryPuzzle> {
+    const puzzle = this.puzzleRepository.create({
+      ...createPuzzleDto,
+      title: sanitizeText(createPuzzleDto.title),
+      description: sanitizeText(createPuzzleDto.description),
+    });
 
     // Handle category relationships if categoryIds are provided
     if (createPuzzleDto.categoryIds && createPuzzleDto.categoryIds.length > 0) {
-      const categories = await this.categoryRepository.findByIds(createPuzzleDto.categoryIds)
-      puzzle.categories = categories
+      const categories = await this.categoryRepository.findByIds(
+        createPuzzleDto.categoryIds,
+      );
+      puzzle.categories = categories;
     }
 
-    return this.puzzleRepository.save(puzzle)
+    return this.puzzleRepository.save(puzzle);
   }
 
   /**
    * Update a puzzle
    */
-  async updatePuzzle(id: string, updatePuzzleDto: UpdatePuzzleDto): Promise<CategoryPuzzle> {
+  async updatePuzzle(
+    id: string,
+    updatePuzzleDto: UpdatePuzzleDto,
+  ): Promise<CategoryPuzzle> {
     // Changed parameter type
-    const puzzle = await this.getPuzzleById(id)
-    Object.assign(puzzle, updatePuzzleDto)
+    const puzzle = await this.getPuzzleById(id);
+    Object.assign(puzzle, updatePuzzleDto);
+    puzzle.title = sanitizeText(puzzle.title);
+    puzzle.description = sanitizeText(puzzle.description);
 
     // Handle category relationships if categoryIds are provided
     if (updatePuzzleDto.categoryIds) {
-      const categories = await this.categoryRepository.findByIds(updatePuzzleDto.categoryIds)
-      puzzle.categories = categories
+      const categories = await this.categoryRepository.findByIds(
+        updatePuzzleDto.categoryIds,
+      );
+      puzzle.categories = categories;
     }
 
-    return this.puzzleRepository.save(puzzle)
+    return this.puzzleRepository.save(puzzle);
   }
 
   /**
@@ -182,9 +205,9 @@ export class PuzzleCategoryService {
    */
   async deletePuzzle(id: string): Promise<void> {
     // Changed parameter type
-    const puzzle = await this.getPuzzleById(id)
-    puzzle.isActive = false
-    await this.puzzleRepository.save(puzzle)
+    const puzzle = await this.getPuzzleById(id);
+    puzzle.isActive = false;
+    await this.puzzleRepository.save(puzzle);
   }
 
   /**
@@ -194,14 +217,14 @@ export class PuzzleCategoryService {
     // Changed parameter type
     const category = await this.categoryRepository.findOne({
       where: { id: categoryId, isActive: true },
-      relations: ["puzzles"],
-    })
+      relations: ['puzzles'],
+    });
 
     if (!category) {
-      throw new NotFoundException(`Category with ID ${categoryId} not found`)
+      throw new NotFoundException(`Category with ID ${categoryId} not found`);
     }
 
-    return category.puzzles.filter((puzzle) => puzzle.isActive)
+    return category.puzzles.filter((puzzle) => puzzle.isActive);
   }
 
   /**
@@ -210,9 +233,9 @@ export class PuzzleCategoryService {
   async getPuzzlesByDifficulty(difficulty: string): Promise<CategoryPuzzle[]> {
     return this.puzzleRepository.find({
       where: { difficulty, isActive: true },
-      relations: ["categories"],
-      order: { title: "ASC" },
-    })
+      relations: ['categories'],
+      order: { title: 'ASC' },
+    });
   }
 
   /**
@@ -220,76 +243,79 @@ export class PuzzleCategoryService {
    */
   async searchPuzzles(searchTerm: string): Promise<CategoryPuzzle[]> {
     return this.puzzleRepository
-      .createQueryBuilder("puzzle")
-      .leftJoinAndSelect("puzzle.categories", "category")
-      .where("puzzle.isActive = :isActive", { isActive: true })
-      .andWhere("(puzzle.title ILIKE :searchTerm OR puzzle.description ILIKE :searchTerm)", {
-        searchTerm: `%${searchTerm}%`,
-      })
-      .orderBy("puzzle.title", "ASC")
-      .getMany()
+      .createQueryBuilder('puzzle')
+      .leftJoinAndSelect('puzzle.categories', 'category')
+      .where('puzzle.isActive = :isActive', { isActive: true })
+      .andWhere(
+        '(puzzle.title ILIKE :searchTerm OR puzzle.description ILIKE :searchTerm)',
+        {
+          searchTerm: `%${searchTerm}%`,
+        },
+      )
+      .orderBy('puzzle.title', 'ASC')
+      .getMany();
   }
 
   /**
-   * Seed initial categories for StellarHunt
+   * Seed initial categories for StellarHunts
    */
   async seedInitialCategories(): Promise<void> {
-    const existingCategories = await this.categoryRepository.count()
+    const existingCategories = await this.categoryRepository.count();
 
     if (existingCategories > 0) {
-      return // Categories already exist
+      return; // Categories already exist
     }
 
     const initialCategories = [
       {
-        name: "Blockchain Basics",
+        name: 'Blockchain Basics',
         description:
-          "Learn the fundamentals of blockchain technology, including concepts like decentralization, consensus mechanisms, and cryptographic principles.",
-        slug: "blockchain-basics",
-        icon: "🔗",
-        color: "#3B82F6",
+          'Learn the fundamentals of blockchain technology, including concepts like decentralization, consensus mechanisms, and cryptographic principles.',
+        slug: 'blockchain-basics',
+        icon: '🔗',
+        color: '#3B82F6',
         sortOrder: 1,
       },
       {
-        name: "Smart Contracts",
+        name: 'Smart Contracts',
         description:
-          "Explore smart contract development, deployment, and interaction. Learn about contract security, gas optimization, and best practices.",
-        slug: "smart-contracts",
-        icon: "📜",
-        color: "#10B981",
+          'Explore smart contract development, deployment, and interaction. Learn about contract security, gas optimization, and best practices.',
+        slug: 'smart-contracts',
+        icon: '📜',
+        color: '#10B981',
         sortOrder: 2,
       },
       {
-        name: "StarkNet Deep Dive",
+        name: 'Soroban Deep Dive',
         description:
-          "Master StarkNet-specific concepts including Cairo programming, STARK proofs, L2 scaling, and StarkNet ecosystem tools.",
-        slug: "starknet-deep-dive",
-        icon: "⚡",
-        color: "#8B5CF6",
+          'Master Stellar / Soroban specific concepts including Rust smart contract design, ledger primitives, transaction models, and the Stellar ecosystem toolkit.',
+        slug: 'soroban-deep-dive',
+        icon: '⚡',
+        color: '#8B5CF6',
         sortOrder: 3,
       },
       {
-        name: "NFT Fundamentals",
+        name: 'NFT Fundamentals',
         description:
-          "Understand NFT standards, metadata, IPFS, and the complete lifecycle of creating, minting, and trading NFTs.",
-        slug: "nft-fundamentals",
-        icon: "🎨",
-        color: "#F59E0B",
+          'Understand NFT standards, metadata, IPFS, and the complete lifecycle of creating, minting, and trading NFTs.',
+        slug: 'nft-fundamentals',
+        icon: '🎨',
+        color: '#F59E0B',
         sortOrder: 4,
       },
       {
-        name: "DeFi Concepts",
+        name: 'DeFi Concepts',
         description:
-          "Learn about decentralized finance including liquidity pools, yield farming, AMMs, and DeFi protocols.",
-        slug: "defi-concepts",
-        icon: "💰",
-        color: "#EF4444",
+          'Learn about decentralized finance including liquidity pools, yield farming, AMMs, and DeFi protocols.',
+        slug: 'defi-concepts',
+        icon: '💰',
+        color: '#EF4444',
         sortOrder: 5,
       },
-    ]
+    ];
 
     for (const categoryData of initialCategories) {
-      await this.categoryRepository.save(categoryData)
+      await this.categoryRepository.save(categoryData);
     }
   }
 }

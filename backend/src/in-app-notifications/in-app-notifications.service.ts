@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { InAppNotification, InAppNotificationType } from './entities/in-app-notification.entity';
+import {
+  InAppNotification,
+  InAppNotificationType,
+} from './entities/in-app-notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { SystemNotificationDto } from './dto/system-notification.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
@@ -18,10 +21,16 @@ export class InAppNotificationsService {
   /**
    * Get all notifications for a specific user
    */
-  async getUserNotifications(userId: number, type?: InAppNotificationType): Promise<InAppNotification[]> {
+  async getUserNotifications(
+    userId: number,
+    type?: InAppNotificationType,
+  ): Promise<InAppNotification[]> {
     const queryBuilder = this.notificationRepository
       .createQueryBuilder('notification')
-      .where('(notification.recipientUserId = :userId OR notification.recipientUserId IS NULL)', { userId })
+      .where(
+        '(notification.recipientUserId = :userId OR notification.recipientUserId IS NULL)',
+        { userId },
+      )
       .andWhere('notification.isArchived = :isArchived', { isArchived: false })
       .orderBy('notification.createdAt', 'DESC');
 
@@ -39,15 +48,17 @@ export class InAppNotificationsService {
     return this.notificationRepository.count({
       where: [
         { recipientUserId: userId, isRead: false, isArchived: false },
-        { recipientUserId: null, isRead: false, isArchived: false } // System-wide notifications
-      ]
+        { recipientUserId: null, isRead: false, isArchived: false }, // System-wide notifications
+      ],
     });
   }
 
   /**
    * Create a new notification for a specific user
    */
-  async createNotification(createNotificationDto: CreateNotificationDto): Promise<InAppNotification> {
+  async createNotification(
+    createNotificationDto: CreateNotificationDto,
+  ): Promise<InAppNotification> {
     if (createNotificationDto.userId) {
       return this.broadcasterService.sendToUser(createNotificationDto.userId, {
         title: createNotificationDto.title,
@@ -68,22 +79,29 @@ export class InAppNotificationsService {
   /**
    * Create a system-wide notification
    */
-  async createSystemNotification(systemNotificationDto: SystemNotificationDto): Promise<InAppNotification[]> {
+  async createSystemNotification(
+    systemNotificationDto: SystemNotificationDto,
+  ): Promise<InAppNotification[]> {
     return this.broadcasterService.broadcastToAllUsers(systemNotificationDto);
   }
 
   /**
    * Mark specific notifications as read
    */
-  async markAsRead(userId: number, markReadDto: MarkReadDto): Promise<{ success: boolean; readAt: Date }> {
+  async markAsRead(
+    userId: number,
+    markReadDto: MarkReadDto,
+  ): Promise<{ success: boolean; readAt: Date }> {
     const readAt = new Date();
-    
+
     await this.notificationRepository
       .createQueryBuilder()
       .update(InAppNotification)
       .set({ isRead: true, readAt })
       .where('id IN (:...ids)', { ids: markReadDto.notificationIds })
-      .andWhere('(recipientUserId = :userId OR recipientUserId IS NULL)', { userId })
+      .andWhere('(recipientUserId = :userId OR recipientUserId IS NULL)', {
+        userId,
+      })
       .execute();
 
     return { success: true, readAt };
@@ -92,14 +110,18 @@ export class InAppNotificationsService {
   /**
    * Mark all notifications as read for a user
    */
-  async markAllAsRead(userId: number): Promise<{ success: boolean; readAt: Date }> {
+  async markAllAsRead(
+    userId: number,
+  ): Promise<{ success: boolean; readAt: Date }> {
     const readAt = new Date();
-    
+
     await this.notificationRepository
       .createQueryBuilder()
       .update(InAppNotification)
       .set({ isRead: true, readAt })
-      .where('(recipientUserId = :userId OR recipientUserId IS NULL)', { userId })
+      .where('(recipientUserId = :userId OR recipientUserId IS NULL)', {
+        userId,
+      })
       .andWhere('isRead = :isRead', { isRead: false })
       .execute();
 
@@ -109,15 +131,20 @@ export class InAppNotificationsService {
   /**
    * Archive specific notifications
    */
-  async archiveNotifications(userId: number, notificationIds: number[]): Promise<{ success: boolean; archivedAt: Date }> {
+  async archiveNotifications(
+    userId: number,
+    notificationIds: number[],
+  ): Promise<{ success: boolean; archivedAt: Date }> {
     const archivedAt = new Date();
-    
+
     await this.notificationRepository
       .createQueryBuilder()
       .update(InAppNotification)
       .set({ isArchived: true, archivedAt })
       .where('id IN (:...ids)', { ids: notificationIds })
-      .andWhere('(recipientUserId = :userId OR recipientUserId IS NULL)', { userId })
+      .andWhere('(recipientUserId = :userId OR recipientUserId IS NULL)', {
+        userId,
+      })
       .execute();
 
     return { success: true, archivedAt };
@@ -126,16 +153,21 @@ export class InAppNotificationsService {
   /**
    * Delete a notification
    */
-  async deleteNotification(userId: number, notificationId: number): Promise<InAppNotification> {
+  async deleteNotification(
+    userId: number,
+    notificationId: number,
+  ): Promise<InAppNotification> {
     const notification = await this.notificationRepository.findOne({
       where: [
         { id: notificationId, recipientUserId: userId },
-        { id: notificationId, recipientUserId: null } // System notifications
-      ]
+        { id: notificationId, recipientUserId: null }, // System notifications
+      ],
     });
 
     if (!notification) {
-      throw new NotFoundException(`Notification with ID ${notificationId} not found`);
+      throw new NotFoundException(
+        `Notification with ID ${notificationId} not found`,
+      );
     }
 
     await this.notificationRepository.remove(notification);

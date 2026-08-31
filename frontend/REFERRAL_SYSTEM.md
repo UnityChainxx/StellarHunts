@@ -2,7 +2,7 @@
 
 ## Overview
 
-The referral system encourages users to invite friends to join StellarHunt. Users can share their referral links, track invited friends, and earn rewards for successful referrals.
+The referral system encourages users to invite friends to join StellarHunts. Users can share their referral links, track invited friends, and earn rewards for successful referrals.
 
 ## Features
 

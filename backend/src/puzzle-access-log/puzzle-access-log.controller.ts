@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, Param, Query, ParseIntPipe, DefaultValuePipe, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { PuzzleAccessLogService } from './puzzle-access-log.service';
 import { LogAccessDto } from './dto/log-access.dto';
 
@@ -7,7 +16,8 @@ export class PuzzleAccessLogController {
   constructor(private readonly accessLogService: PuzzleAccessLogService) {}
 
   @Post('log')
-  logAccess(@Body(new ValidationPipe()) dto: LogAccessDto) {
+  // Relies on the global validation pipe (issue #340).
+  logAccess(@Body() dto: LogAccessDto) {
     return this.accessLogService.logAccess(dto);
   }
 

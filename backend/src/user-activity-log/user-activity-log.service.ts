@@ -29,7 +29,8 @@ export class UserActivityLogService {
     const query = this.logRepo.createQueryBuilder('log');
 
     if (userId) query.andWhere('log.userId = :userId', { userId });
-    if (actionType) query.andWhere('log.actionType = :actionType', { actionType });
+    if (actionType)
+      query.andWhere('log.actionType = :actionType', { actionType });
     if (startDate) query.andWhere('log.timestamp >= :startDate', { startDate });
     if (endDate) query.andWhere('log.timestamp <= :endDate', { endDate });
 

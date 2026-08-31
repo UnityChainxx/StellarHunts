@@ -20,7 +20,11 @@ export class WalletService {
   }
 
   // Mock signature verification
-  async verifySignature(address: string, signature: string, message: string): Promise<boolean> {
+  async verifySignature(
+    address: string,
+    signature: string,
+    message: string,
+  ): Promise<boolean> {
     // Stub: Always returns true for now
     return true;
   }

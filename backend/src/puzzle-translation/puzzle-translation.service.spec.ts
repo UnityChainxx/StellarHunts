@@ -17,7 +17,7 @@ describe('PuzzleTranslationService', () => {
   let repo: Repository<PuzzleTranslation>;
 
   const mockRepo = {
-    create: jest.fn().mockImplementation(dto => ({ ...dto })),
+    create: jest.fn().mockImplementation((dto) => ({ ...dto })),
     save: jest.fn().mockResolvedValue(mockTranslation),
     findOne: jest.fn(),
     find: jest.fn(),
@@ -35,7 +35,9 @@ describe('PuzzleTranslationService', () => {
     }).compile();
 
     service = module.get<PuzzleTranslationService>(PuzzleTranslationService);
-    repo = module.get<Repository<PuzzleTranslation>>(getRepositoryToken(PuzzleTranslation));
+    repo = module.get<Repository<PuzzleTranslation>>(
+      getRepositoryToken(PuzzleTranslation),
+    );
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -45,9 +47,17 @@ describe('PuzzleTranslationService', () => {
   });
 
   it('should create a translation', async () => {
-    const dto = { puzzleId: 'puzzle-uuid', language: 'en', title: 'Test Title', description: 'Test Description' };
+    const dto = {
+      puzzleId: 'puzzle-uuid',
+      language: 'en',
+      title: 'Test Title',
+      description: 'Test Description',
+    };
     const result = await service.create(dto);
-    expect(repo.create).toHaveBeenCalledWith({ ...dto, puzzle: { id: dto.puzzleId } });
+    expect(repo.create).toHaveBeenCalledWith({
+      ...dto,
+      puzzle: { id: dto.puzzleId },
+    });
     expect(repo.save).toHaveBeenCalled();
     expect(result).toEqual(mockTranslation);
   });
@@ -72,7 +82,9 @@ describe('PuzzleTranslationService', () => {
 
   it('should throw if translation not found for language', async () => {
     mockRepo.findOne.mockResolvedValueOnce(undefined);
-    await expect(service.findByPuzzleAndLanguage('puzzle-uuid', 'fr')).rejects.toThrow();
+    await expect(
+      service.findByPuzzleAndLanguage('puzzle-uuid', 'fr'),
+    ).rejects.toThrow();
   });
 
   it('should find all translations for a puzzle', async () => {
@@ -80,4 +92,4 @@ describe('PuzzleTranslationService', () => {
     const result = await service.findAll('puzzle-uuid');
     expect(result).toEqual([mockTranslation]);
   });
-}); 
+});

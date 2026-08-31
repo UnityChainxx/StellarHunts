@@ -68,4 +68,4 @@ export class CreateContentsTable1700000000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropTable('contents');
   }
-} 
+}

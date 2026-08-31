@@ -22,7 +22,7 @@ describe('NftMarketplaceStubService', () => {
       const nfts = service.findAll();
 
       expect(Array.isArray(nfts)).toBe(true);
-      expect(nfts.length).toBe(4); 
+      expect(nfts.length).toBe(4);
       const firstNft = nfts[0];
       expect(firstNft).toBeInstanceOf(Object);
       expect(firstNft).toHaveProperty('id');

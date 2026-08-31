@@ -1,9 +1,14 @@
-import { Injectable } from "@nestjs/common"
-import type { Repository } from "typeorm"
-import type { UserMilestone } from "../entities/user-milestone.entity"
-import { type MilestoneTemplate, MilestoneType, MilestoneCategory } from "../entities/milestone-template.entity"
-import type { UserProgressService } from "./user-progress.service"
-import type { MilestoneTemplateService } from "./milestone-template.service"
+import { Injectable } from '@nestjs/common';
+import type { Repository, EntityManager } from 'typeorm';
+import { UserMilestone } from '../entities/user-milestone.entity';
+import {
+  type MilestoneTemplate,
+  MilestoneType,
+  MilestoneCategory,
+} from '../entities/milestone-template.entity';
+import type { UserProgressService } from './user-progress.service';
+import type { MilestoneTemplateService } from './milestone-template.service';
+import { isUniqueViolation } from '../../common/security/unique-violation';
 
 @Injectable()
 export class MilestoneAssignmentService {
@@ -13,99 +18,147 @@ export class MilestoneAssignmentService {
     private readonly templateService: MilestoneTemplateService,
   ) {}
 
-  async checkAndAssignMilestones(userId: string, category?: MilestoneCategory): Promise<UserMilestone[]> {
+  /**
+   * Check every relevant template and assign any newly-earned milestones.
+   * `manager` is passed through when the caller runs inside a progression
+   * transaction (issue #302) so assignment commits atomically with the
+   * progress updates that triggered it.
+   */
+  async checkAndAssignMilestones(
+    userId: string,
+    category?: MilestoneCategory,
+    manager?: EntityManager,
+  ): Promise<UserMilestone[]> {
     const templates = category
       ? await this.templateService.getTemplatesByCategory(category)
-      : await this.templateService.getActiveTemplates()
+      : await this.templateService.getActiveTemplates();
 
-    const newAchievements: UserMilestone[] = []
+    const newAchievements: UserMilestone[] = [];
 
     for (const template of templates) {
-      const hasAchieved = await this.hasUserAchievedMilestone(userId, template.id)
-      if (hasAchieved) continue
+      const hasAchieved = await this.hasUserAchievedMilestone(
+        userId,
+        template.id,
+        manager,
+      );
+      if (hasAchieved) continue;
 
-      const shouldAssign = await this.shouldAssignMilestone(userId, template)
+      const shouldAssign = await this.shouldAssignMilestone(
+        userId,
+        template,
+        manager,
+      );
       if (shouldAssign.eligible) {
-        const milestone = await this.assignMilestone(userId, template, shouldAssign.achievedValue, shouldAssign.context)
-        newAchievements.push(milestone)
+        const milestone = await this.assignMilestone(
+          userId,
+          template,
+          shouldAssign.achievedValue,
+          shouldAssign.context,
+          manager,
+        );
+        newAchievements.push(milestone);
       }
     }
 
-    return newAchievements
+    return newAchievements;
   }
 
   private async shouldAssignMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     switch (template.milestoneType) {
       case MilestoneType.COUNT_BASED:
-        return this.checkCountBasedMilestone(userId, template)
+        return this.checkCountBasedMilestone(userId, template, manager);
 
       case MilestoneType.STREAK_BASED:
-        return this.checkStreakBasedMilestone(userId, template)
+        return this.checkStreakBasedMilestone(userId, template, manager);
 
       case MilestoneType.TIME_BASED:
-        return this.checkTimeBasedMilestone(userId, template)
+        return this.checkTimeBasedMilestone(userId, template);
 
       case MilestoneType.PERCENTAGE_BASED:
-        return this.checkPercentageBasedMilestone(userId, template)
+        return this.checkPercentageBasedMilestone(userId, template);
 
       case MilestoneType.CUSTOM:
-        return this.checkCustomMilestone(userId, template)
+        return this.checkCustomMilestone(userId, template);
 
       default:
-        return { eligible: false }
+        return { eligible: false };
     }
   }
 
   private async checkCountBasedMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
-    if (!template.requiredCount) return { eligible: false }
+    if (!template.requiredCount) return { eligible: false };
 
-    let progressKey: string
+    let progressKey: string;
     switch (template.category) {
       case MilestoneCategory.PUZZLE:
-        progressKey = "puzzles_completed"
-        break
+        progressKey = 'puzzles_completed';
+        break;
       case MilestoneCategory.SOCIAL:
-        progressKey = "social_interactions"
-        break
+        progressKey = 'social_interactions';
+        break;
       case MilestoneCategory.ENGAGEMENT:
-        progressKey = "engagement_actions"
-        break
+        progressKey = 'engagement_actions';
+        break;
       default:
-        return { eligible: false }
+        return { eligible: false };
     }
 
-    const progress = await this.progressService.getProgress(userId, template.category, progressKey)
-    if (!progress) return { eligible: false }
+    const progress = await this.progressService.getProgress(
+      userId,
+      template.category,
+      progressKey,
+      manager,
+    );
+    if (!progress) return { eligible: false };
 
     return {
       eligible: progress.currentValue >= template.requiredCount,
       achievedValue: progress.currentValue,
       context: { progressKey, totalValue: progress.totalValue },
-    }
+    };
   }
 
   private async checkStreakBasedMilestone(
     userId: string,
     template: MilestoneTemplate,
+    manager?: EntityManager,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
-    if (!template.requiredStreak) return { eligible: false }
+    if (!template.requiredStreak) return { eligible: false };
 
-    const currentStreak = await this.progressService.getProgress(userId, MilestoneCategory.STREAK, "current_streak")
-    const longestStreak = await this.progressService.getProgress(userId, MilestoneCategory.STREAK, "longest_streak")
+    const currentStreak = await this.progressService.getProgress(
+      userId,
+      MilestoneCategory.STREAK,
+      'current_streak',
+      manager,
+    );
+    const longestStreak = await this.progressService.getProgress(
+      userId,
+      MilestoneCategory.STREAK,
+      'longest_streak',
+      manager,
+    );
 
-    const maxStreak = Math.max(currentStreak?.currentValue || 0, longestStreak?.currentValue || 0)
+    const maxStreak = Math.max(
+      currentStreak?.currentValue || 0,
+      longestStreak?.currentValue || 0,
+    );
 
     return {
       eligible: maxStreak >= template.requiredStreak,
       achievedValue: maxStreak,
-      context: { currentStreak: currentStreak?.currentValue, longestStreak: longestStreak?.currentValue },
-    }
+      context: {
+        currentStreak: currentStreak?.currentValue,
+        longestStreak: longestStreak?.currentValue,
+      },
+    };
   }
 
   private async checkTimeBasedMilestone(
@@ -114,7 +167,7 @@ export class MilestoneAssignmentService {
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     // Implementation for time-based milestones
     // This could check for things like "active for 30 days"
-    return { eligible: false } // Placeholder
+    return { eligible: false }; // Placeholder
   }
 
   private async checkPercentageBasedMilestone(
@@ -123,32 +176,32 @@ export class MilestoneAssignmentService {
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     // Implementation for percentage-based milestones
     // This could check for things like "90% puzzle completion rate"
-    return { eligible: false } // Placeholder
+    return { eligible: false }; // Placeholder
   }
 
   private async checkCustomMilestone(
     userId: string,
     template: MilestoneTemplate,
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
-    if (!template.customCriteria) return { eligible: false }
+    if (!template.customCriteria) return { eligible: false };
 
     try {
-      const criteria = JSON.parse(template.customCriteria)
+      const criteria = JSON.parse(template.customCriteria);
 
       // Handle time-based custom milestones
       if (criteria.timeCondition) {
-        return this.checkTimeCondition(userId, criteria.timeCondition)
+        return this.checkTimeCondition(userId, criteria.timeCondition);
       }
 
       // Handle completion time milestones
       if (criteria.completionTime) {
-        return this.checkCompletionTime(userId, criteria.completionTime)
+        return this.checkCompletionTime(userId, criteria.completionTime);
       }
 
-      return { eligible: false }
+      return { eligible: false };
     } catch (error) {
-      console.error("Error parsing custom criteria:", error)
-      return { eligible: false }
+      console.error('Error parsing custom criteria:', error);
+      return { eligible: false };
     }
   }
 
@@ -158,7 +211,7 @@ export class MilestoneAssignmentService {
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     // This would need to be implemented based on your activity tracking
     // For now, returning false as placeholder
-    return { eligible: false }
+    return { eligible: false };
   }
 
   private async checkCompletionTime(
@@ -167,7 +220,7 @@ export class MilestoneAssignmentService {
   ): Promise<{ eligible: boolean; achievedValue?: number; context?: any }> {
     // This would need to be implemented based on your puzzle completion tracking
     // For now, returning false as placeholder
-    return { eligible: false }
+    return { eligible: false };
   }
 
   private async assignMilestone(
@@ -175,58 +228,100 @@ export class MilestoneAssignmentService {
     template: MilestoneTemplate,
     achievedValue?: number,
     context?: any,
+    manager?: EntityManager,
   ): Promise<UserMilestone> {
-    const milestone = this.userMilestoneRepository.create({
+    const repo =
+      manager?.getRepository(UserMilestone) ?? this.userMilestoneRepository;
+
+    const milestone = repo.create({
       userId,
       milestoneTemplateId: template.id,
       achievedAt: new Date(),
       achievedValue,
       achievementContext: context ? JSON.stringify(context) : null,
-    })
+    });
 
-    return this.userMilestoneRepository.save(milestone)
+    try {
+      return await repo.save(milestone);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        // A concurrent request already assigned this milestone — return the
+        // existing record instead of throwing (idempotent progression, #302).
+        return repo.findOneOrFail({
+          where: { userId, milestoneTemplateId: template.id },
+        });
+      }
+      throw error;
+    }
   }
 
-  private async hasUserAchievedMilestone(userId: string, templateId: string): Promise<boolean> {
-    const existing = await this.userMilestoneRepository.findOne({
+  private async hasUserAchievedMilestone(
+    userId: string,
+    templateId: string,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const repo =
+      manager?.getRepository(UserMilestone) ?? this.userMilestoneRepository;
+    const existing = await repo.findOne({
       where: { userId, milestoneTemplateId: templateId },
-    })
-    return !!existing
+    });
+    return !!existing;
   }
 
   async getUserMilestones(userId: string): Promise<UserMilestone[]> {
     return this.userMilestoneRepository.find({
       where: { userId },
-      relations: ["milestoneTemplate"],
-      order: { achievedAt: "DESC" },
-    })
+      relations: ['milestoneTemplate'],
+      order: { achievedAt: 'DESC' },
+    });
   }
 
-  async markMilestoneAsViewed(userId: string, milestoneId: string): Promise<void> {
-    await this.userMilestoneRepository.update({ id: milestoneId, userId }, { isViewed: true })
+  async markMilestoneAsViewed(
+    userId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    await this.userMilestoneRepository.update(
+      { id: milestoneId, userId },
+      { isViewed: true },
+    );
   }
 
-  async markMilestoneAsNotified(userId: string, milestoneId: string): Promise<void> {
-    await this.userMilestoneRepository.update({ id: milestoneId, userId }, { isNotified: true })
+  async markMilestoneAsNotified(
+    userId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    await this.userMilestoneRepository.update(
+      { id: milestoneId, userId },
+      { isNotified: true },
+    );
   }
 
   // Method to be called when a user completes a puzzle
-  async onPuzzleCompleted(userId: string, puzzleMetadata?: any): Promise<UserMilestone[]> {
+  async onPuzzleCompleted(
+    userId: string,
+    puzzleMetadata?: any,
+    manager?: EntityManager,
+  ): Promise<UserMilestone[]> {
     // Update progress
-    await this.progressService.incrementPuzzleCount(userId, puzzleMetadata)
+    await this.progressService.incrementPuzzleCount(userId, puzzleMetadata, manager);
 
     // Check and assign puzzle-related milestones
-    return this.checkAndAssignMilestones(userId, MilestoneCategory.PUZZLE)
+    return this.checkAndAssignMilestones(userId, MilestoneCategory.PUZZLE, manager);
   }
 
   // Method to be called when a user's streak changes
-  async onStreakUpdated(userId: string, currentStreak: number, longestStreak: number): Promise<UserMilestone[]> {
+  async onStreakUpdated(
+    userId: string,
+    currentStreak: number,
+    longestStreak: number,
+    manager?: EntityManager,
+  ): Promise<UserMilestone[]> {
     // Update progress
-    await this.progressService.updateCurrentStreak(userId, currentStreak)
-    await this.progressService.updateLongestStreak(userId, longestStreak)
+    await this.progressService.updateCurrentStreak(userId, currentStreak, manager);
+    await this.progressService.updateLongestStreak(userId, longestStreak, manager);
 
     // Check and assign streak-related milestones
-    return this.checkAndAssignMilestones(userId, MilestoneCategory.STREAK)
+    return this.checkAndAssignMilestones(userId, MilestoneCategory.STREAK, manager);
   }
 
   // Method for custom milestone triggers
@@ -235,11 +330,19 @@ export class MilestoneAssignmentService {
     category: MilestoneCategory,
     eventType: string,
     eventData?: any,
+    manager?: EntityManager,
   ): Promise<UserMilestone[]> {
     // Record custom progress
-    await this.progressService.recordCustomProgress(userId, category, eventType, 1, eventData)
+    await this.progressService.recordCustomProgress(
+      userId,
+      category,
+      eventType,
+      1,
+      eventData,
+      manager,
+    );
 
     // Check and assign related milestones
-    return this.checkAndAssignMilestones(userId, category)
+    return this.checkAndAssignMilestones(userId, category, manager);
   }
 }

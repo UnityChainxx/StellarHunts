@@ -1,8 +1,7 @@
 import localFont from "next/font/local";
 import "./globals.css";
 
-// import StoreProvider from "@/store/StoreProvider";
-import Providers from "@/lib/queryClient";
+import Providers from "@/lib/Providers";
 import Navbar from "@/components/Navbar";
 
 const geistSans = localFont({
@@ -17,7 +16,7 @@ const geistMono = localFont({
 });
 
 export const metadata = {
-  title: "StellarHunt",
+  title: "StellarHunts",
   description: "Solve puzzles and claim NFT rewards!",
 };
 
@@ -28,10 +27,8 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          {/* <StoreProvider> */}
           <Navbar />
           {children}
-          {/* </StoreProvider> */}
         </Providers>
       </body>
     </html>

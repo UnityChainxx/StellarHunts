@@ -1,4 +1,10 @@
-import { IsString, IsArray, IsOptional, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  IsNumber,
+  Min,
+} from 'class-validator';
 
 export class SubmitAnswerDto {
   @IsString()
@@ -18,5 +24,6 @@ export class SubmitQuizDto {
 
   @IsOptional()
   @IsNumber()
-  timeTaken?: number; // in seconds
+  @Min(0)
+  timeTaken?: number; // in seconds — negative values are rejected (issue #364)
 }

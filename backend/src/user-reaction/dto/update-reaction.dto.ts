@@ -1,4 +1,6 @@
-import { PartialType, OmitType } from "@nestjs/mapped-types"
-import { CreateReactionDto } from "./create-reaction.dto"
+import { PartialType, OmitType } from '@nestjs/mapped-types';
+import { CreateReactionDto } from './create-reaction.dto';
 
-export class UpdateReactionDto extends PartialType(OmitType(CreateReactionDto, ["userId", "contentId"] as const)) {}
+export class UpdateReactionDto extends PartialType(
+  OmitType(CreateReactionDto, ['userId', 'contentId'] as const),
+) {}

@@ -23,6 +23,8 @@ export const usePuzzleReviews = () => {
     sortBy: "createdAt",
     sortOrder: "DESC",
   });
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 

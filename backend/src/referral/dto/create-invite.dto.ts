@@ -1,16 +1,16 @@
-import { IsEmail, IsString, IsOptional, IsDateString } from "class-validator"
+import { IsEmail, IsString, IsOptional, IsDateString } from 'class-validator';
 
 export class CreateInviteDto {
   @IsEmail()
-  email: string
+  email: string;
 
   @IsString()
-  referralCode: string
+  referralCode: string;
 
   @IsOptional()
   @IsDateString()
-  expiresAt?: string
+  expiresAt?: string;
 
   @IsOptional()
-  metadata?: any
+  metadata?: any;
 }

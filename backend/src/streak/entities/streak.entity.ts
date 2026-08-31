@@ -9,7 +9,7 @@ export class Streak {
   @PrimaryGeneratedColumn("uuid")
   id: string
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", length: 128 })
   userId: string
 
   @Column({ type: "int", default: 0 })

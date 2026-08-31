@@ -15,11 +15,17 @@ export class CreateNotificationDto {
   @MaxLength(2000, { message: 'Notification message must be 2000 characters or fewer' })
   message: string;
 
-  @ApiProperty({ description: 'Type of notification', enum: InAppNotificationType })
+  @ApiProperty({
+    description: 'Type of notification',
+    enum: InAppNotificationType,
+  })
   @IsEnum(InAppNotificationType)
   type: InAppNotificationType;
 
-  @ApiProperty({ description: 'ID of the user who should receive this notification', required: false })
+  @ApiProperty({
+    description: 'ID of the user who should receive this notification',
+    required: false,
+  })
   @IsNumber()
   @IsOptional()
   userId?: number;

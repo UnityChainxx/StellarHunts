@@ -12,7 +12,8 @@ export class ActivityService {
   ) {}
 
   async getUserActivities(userId: string, filter: FilterActivityDto) {
-    const query = this.activityRepo.createQueryBuilder('activity')
+    const query = this.activityRepo
+      .createQueryBuilder('activity')
       .where('activity.userId = :userId', { userId });
 
     if (filter.type) {
@@ -46,8 +47,16 @@ export class ActivityService {
     };
   }
 
-  async logActivity(userId: string, type: string, metadata: Record<string, any> = {}) {
-    const activity = this.activityRepo.create({ user: { id: userId }, type, metadata });
+  async logActivity(
+    userId: string,
+    type: string,
+    metadata: Record<string, any> = {},
+  ) {
+    const activity = this.activityRepo.create({
+      user: { id: userId },
+      type,
+      metadata,
+    });
     return this.activityRepo.save(activity);
   }
 }

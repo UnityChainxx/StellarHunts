@@ -24,7 +24,7 @@ export class StreakActivity {
   @JoinColumn({ name: "streakId" })
   streak: Streak
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", length: 128 })
   userId: string
 
   @Column({ type: "date" })

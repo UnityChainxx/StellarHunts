@@ -1,0 +1,77 @@
+# cargo-deny configuration
+# Schema target: cargo-deny 0.16+ (post PR #611).
+#   https://github.com/EmbarkStudios/cargo-deny/pull/611
+#
+# This file is read by CI:
+#     cargo deny --locked check advisories licenses bans sources
+# running with `working-directory: onchain`.
+#
+# Several policy-level keys were REMOVED in PR #611. Defaults are now:
+#   - vulnerabilities always denied
+#   - unlicensed crates denied
+#   - copyleft denied
+# We don't re-state them so the schema check stays happy.
+
+[graph]
+# Include dev-dependencies so violations in test toolchains are caught too.
+exclude-dev = false
+
+[advisories]
+# Use the canonical RustSec advisory DB.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Transitive unmaintained (derivative, paste via soroban-sdk-macros 22.x) and
+# unsound crates can't realistically be excluded — soroban-sdk is the SDK we
+# ship from. cargo-deny v0.16+ defaults are stricter than v0.14, so silence
+# here and tighten to "workspace" / "transitive" once upstream drops these.
+unmaintained = "none"
+unsound = "none"
+# Yanked releases still surface as a warning — cheap to fix on call.
+yanked = "warn"
+# Ignore specific advisories by ID (use sparingly, document each in the PR).
+ignore = []
+
+[licenses]
+# Allow these SPDX identifiers. Anything else is denied by default.
+# Trimmed to the licenses our actual dependency tree uses today so cargo-deny
+# doesn't emit "license-not-encountered" warnings; add more as needed.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "Unicode-3.0",
+    "Unlicense",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+]
+# Confidence threshold for license detection (0.0 – 1.0).
+confidence-threshold = 0.8
+
+[bans]
+# Multiple versions of the same crate are reported as a warning. The current
+# soroban-sdk-macros 22.x dependency pulls two versions of `darling`
+# (0.20.11 and 0.23.0) transitively, and we cannot realistically override
+# that without forking soroban-sdk. Promote to "deny" once soroban-sdk
+# collapses this duplication.
+multiple-versions = "warn"
+# Highlight crates that are specifically banned.
+deny = []
+# Crates explicitly allowed despite conflicting with the bans rules above.
+allow = []
+# Skip certain crates or trees from bans check.
+skip = []
+skip-tree = []
+# `wildcards` (for `use foo::*` glob imports) is a separate rustc/+nightly
+# lint and is NOT configurable via cargo-deny. Cargo-deny only audits
+# crate dependencies; source-level glob imports are out of scope.
+
+[sources]
+# Only allow crates from the official crates.io registry.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[output]
+# Easier-to-read graph output in CI logs.
+feature-depth = 1

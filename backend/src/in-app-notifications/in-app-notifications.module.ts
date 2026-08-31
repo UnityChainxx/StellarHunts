@@ -7,9 +7,7 @@ import { NotificationsGateway } from './in-app-notifications.gateway';
 import { InAppNotification } from './entities/in-app-notification.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([InAppNotification]),
-  ],
+  imports: [TypeOrmModule.forFeature([InAppNotification])],
   controllers: [InAppNotificationsController],
   providers: [InAppNotificationsService, BroadcasterService, NotificationsGateway],
   exports: [InAppNotificationsService, BroadcasterService],

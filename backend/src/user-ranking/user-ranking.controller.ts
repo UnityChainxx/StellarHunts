@@ -10,7 +10,11 @@ export class UserRankingController {
 
   @Get(':id/rank')
   @ApiOperation({ summary: 'Get user rank' })
-  @ApiResponse({ status: 200, description: 'Returns user rank data', type: UserRankDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns user rank data',
+    type: UserRankDto,
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserRank(@Param('id') userId: string): Promise<UserRankDto> {
     return this.userRankingService.getUserRank(userId);

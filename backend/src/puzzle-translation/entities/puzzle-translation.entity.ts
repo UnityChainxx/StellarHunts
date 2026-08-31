@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Unique, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  Unique,
+  Index,
+} from 'typeorm';
 import { Puzzle } from '../../puzzle/puzzle.entity';
 
 @Entity('puzzle_translations')
@@ -19,4 +26,4 @@ export class PuzzleTranslation {
 
   @Column('text')
   description: string;
-} 
+}

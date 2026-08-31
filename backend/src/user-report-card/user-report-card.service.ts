@@ -28,7 +28,9 @@ export class UserReportCardService {
         advanced: Math.floor(Math.random() * 3),
       };
       reportCard.recentAchievements = this.generateRandomAchievements();
-      reportCard.createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
+      reportCard.createdAt = new Date(
+        Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000,
+      );
       reportCard.updatedAt = new Date();
 
       // Calculate progress percentage based on completed puzzles
@@ -43,19 +45,17 @@ export class UserReportCardService {
       'First NFT Earned',
       'Speed Solver',
       '7-Day Streak',
-      'StarkNet Explorer',
+      'Stellar Explorer',
       'Puzzle Master',
       'Early Bird',
       'Night Owl',
       'Perfect Score',
       'Team Player',
-      'Knowledge Seeker'
+      'Knowledge Seeker',
     ];
-    
+
     const count = Math.floor(Math.random() * 4) + 1;
-    return possibleAchievements
-      .sort(() => 0.5 - Math.random())
-      .slice(0, count);
+    return possibleAchievements.sort(() => 0.5 - Math.random()).slice(0, count);
   }
 
   private calculateProgress(reportCard: ReportCard): number {
@@ -63,17 +63,20 @@ export class UserReportCardService {
     const totalPossiblePuzzles = 50; // Assuming 50 total puzzles in the game
     const puzzleWeight = 0.7;
     const rewardWeight = 0.3;
-    
-    const puzzleProgress = (reportCard.completedPuzzles / totalPossiblePuzzles) * 100;
-    const rewardProgress = (reportCard.rewardsEarned / (totalPossiblePuzzles * 0.5)) * 100;
-    
-    const totalProgress = (puzzleProgress * puzzleWeight) + (rewardProgress * rewardWeight);
+
+    const puzzleProgress =
+      (reportCard.completedPuzzles / totalPossiblePuzzles) * 100;
+    const rewardProgress =
+      (reportCard.rewardsEarned / (totalPossiblePuzzles * 0.5)) * 100;
+
+    const totalProgress =
+      puzzleProgress * puzzleWeight + rewardProgress * rewardWeight;
     return Math.min(Math.round(totalProgress * 100) / 100, 100);
   }
 
   async findByUserId(userId: string): Promise<ReportCardDto> {
     const reportCard = this.reportCards.get(userId);
-    
+
     if (!reportCard) {
       throw new NotFoundException(`Report card for user ${userId} not found`);
     }
@@ -81,7 +84,9 @@ export class UserReportCardService {
     return this.mapToDto(reportCard);
   }
 
-  async createReportCard(createDto: CreateReportCardDto): Promise<ReportCardDto> {
+  async createReportCard(
+    createDto: CreateReportCardDto,
+  ): Promise<ReportCardDto> {
     const existingCard = this.reportCards.get(createDto.userId);
     if (existingCard) {
       return this.mapToDto(existingCard);
@@ -94,7 +99,11 @@ export class UserReportCardService {
     reportCard.rewardsEarned = createDto.rewardsEarned || 0;
     reportCard.totalTimeSpent = 0;
     reportCard.streakDays = 0;
-    reportCard.categoryBreakdown = { beginner: 0, intermediate: 0, advanced: 0 };
+    reportCard.categoryBreakdown = {
+      beginner: 0,
+      intermediate: 0,
+      advanced: 0,
+    };
     reportCard.recentAchievements = [];
     reportCard.createdAt = new Date();
     reportCard.updatedAt = new Date();
@@ -104,9 +113,13 @@ export class UserReportCardService {
     return this.mapToDto(reportCard);
   }
 
-  async updateProgress(userId: string, puzzlesCompleted?: number, rewardsEarned?: number): Promise<ReportCardDto> {
+  async updateProgress(
+    userId: string,
+    puzzlesCompleted?: number,
+    rewardsEarned?: number,
+  ): Promise<ReportCardDto> {
     const reportCard = this.reportCards.get(userId);
-    
+
     if (!reportCard) {
       throw new NotFoundException(`Report card for user ${userId} not found`);
     }
@@ -114,7 +127,7 @@ export class UserReportCardService {
     if (puzzlesCompleted !== undefined) {
       reportCard.completedPuzzles = puzzlesCompleted;
     }
-    
+
     if (rewardsEarned !== undefined) {
       reportCard.rewardsEarned = rewardsEarned;
     }
@@ -127,7 +140,9 @@ export class UserReportCardService {
   }
 
   async getAllReportCards(): Promise<ReportCardDto[]> {
-    return Array.from(this.reportCards.values()).map(card => this.mapToDto(card));
+    return Array.from(this.reportCards.values()).map((card) =>
+      this.mapToDto(card),
+    );
   }
 
   private mapToDto(reportCard: ReportCard): ReportCardDto {

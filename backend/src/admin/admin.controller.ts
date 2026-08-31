@@ -1,4 +1,11 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { LoginAdminDto } from './dto/login-admin.dto';
@@ -15,7 +22,10 @@ export class AdminController {
   @Post('login')
   @ApiOperation({ summary: 'Admin login' })
   async login(@Body() dto: LoginAdminDto) {
-    const admin = await this.adminService.validateAdmin(dto.email, dto.password);
+    const admin = await this.adminService.validateAdmin(
+      dto.email,
+      dto.password,
+    );
     if (!admin) {
       return { message: 'Invalid credentials' };
     }

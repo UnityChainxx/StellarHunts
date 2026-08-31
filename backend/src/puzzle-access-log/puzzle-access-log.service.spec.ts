@@ -31,12 +31,17 @@ describe('PuzzleAccessLogService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PuzzleAccessLogService,
-        { provide: getRepositoryToken(PuzzleAccessLog), useValue: mockAccessLogRepository },
+        {
+          provide: getRepositoryToken(PuzzleAccessLog),
+          useValue: mockAccessLogRepository,
+        },
       ],
     }).compile();
 
     service = module.get<PuzzleAccessLogService>(PuzzleAccessLogService);
-    repo = module.get<Repository<PuzzleAccessLog>>(getRepositoryToken(PuzzleAccessLog));
+    repo = module.get<Repository<PuzzleAccessLog>>(
+      getRepositoryToken(PuzzleAccessLog),
+    );
     jest.clearAllMocks();
   });
 
@@ -58,19 +63,22 @@ describe('PuzzleAccessLogService', () => {
   it('getMostAccessedPuzzles should return aggregated data', async () => {
     const expectedData = [{ puzzleId: 'p1', accessCount: '10' }];
     mockQueryBuilder.getRawMany.mockResolvedValue(expectedData);
-    
+
     const result = await service.getMostAccessedPuzzles();
     expect(repo.createQueryBuilder).toHaveBeenCalledWith('log');
     expect(result).toEqual(expectedData);
   });
-  
+
   it('getUniqueUsersPerPuzzle should return a count of distinct users', async () => {
     const puzzleId = 'p1';
     const expectedCount = { count: '5' };
     mockQueryBuilder.getRawOne.mockResolvedValue(expectedCount);
 
     const result = await service.getUniqueUsersPerPuzzle(puzzleId);
-    expect(repo.createQueryBuilder().where).toHaveBeenCalledWith('log.puzzleId = :puzzleId', { puzzleId });
+    expect(repo.createQueryBuilder().where).toHaveBeenCalledWith(
+      'log.puzzleId = :puzzleId',
+      { puzzleId },
+    );
     expect(result).toEqual({ uniqueUserCount: 5 });
   });
 

@@ -1,4 +1,3 @@
-
 import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
 
 export class CreatePuzzleVersionDto {

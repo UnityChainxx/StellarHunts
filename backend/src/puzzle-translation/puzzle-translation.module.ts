@@ -10,4 +10,4 @@ import { PuzzleTranslationController } from './puzzle-translation.controller';
   controllers: [PuzzleTranslationController],
   exports: [PuzzleTranslationService],
 })
-export class PuzzleTranslationModule {} 
+export class PuzzleTranslationModule {}

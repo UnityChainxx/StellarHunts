@@ -26,7 +26,7 @@ const NFTRewardsShowcase = () => {
     {
       name: "Cryptic Codex",
       description:
-        "Ancient scrolls containing the secrets of StarkNet mysteries.",
+        "Ancient scrolls containing the secrets of Stellar / Soroban mysteries.",
       rarity: "Rare",
       requirements: ["Solve 5 Medium Puzzles", "Top 100 Leaderboard"],
       locked: true,
@@ -42,7 +42,7 @@ const NFTRewardsShowcase = () => {
     },
     {
       name: "Genesis Key",
-      description: "The ultimate symbol of mastery over the StarkNet realm.",
+      description: "The ultimate symbol of mastery over the Stellar universe.",
       rarity: "Legendary",
       requirements: ["First Place on Leaderboard", "100% Completion"],
       locked: true,
@@ -55,7 +55,7 @@ const NFTRewardsShowcase = () => {
     { value: "12", label: "Total NFTs" },
     { value: "4,231", label: "Claimed" },
     { value: "892", label: "Holders" },
-    { value: "3.2 ETH", label: "Floor Price" },
+    { value: "3.2 XLM", label: "Floor Price" },
   ];
 
   return (
@@ -67,7 +67,7 @@ const NFTRewardsShowcase = () => {
         </h2>
         <p className="max-w-2xl mx-auto text-gray-400">
           Complete challenges and unlock exclusive NFTs. Each reward tells a
-          unique story of your achievements in the StarkNet universe.
+          unique story of your achievements in the Stellar universe.
         </p>
       </div>
 
