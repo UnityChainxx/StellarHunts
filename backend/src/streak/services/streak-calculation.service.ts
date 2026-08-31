@@ -6,6 +6,9 @@ export interface StreakCalculationConfig {
   resetAfterDays: number; // Days of inactivity before streak resets
 }
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
 @Injectable()
 export class StreakCalculationService {
   private readonly defaultConfig: StreakCalculationConfig = {
@@ -34,43 +37,42 @@ export class StreakCalculationService {
       };
     }
 
-    // Sort dates in descending order (most recent first)
-    const sortedDates = activityDates
-      .map((date) => this.normalizeDate(date, fullConfig.timezoneOffset))
-      .sort((a, b) => b.getTime() - a.getTime());
+    // Normalize each activity to its calendar day. Day indexes are computed
+    // from epoch milliseconds (shifted by the user's timezone offset), so a
+    // day is always exactly 24h and DST transitions cannot split or merge
+    // days. Deduplicate so multiple activities on the same day count once.
+    const byDay = new Map<number, Date>();
+    for (const date of activityDates) {
+      const dayIndex = this.getDayIndex(date, fullConfig.timezoneOffset);
+      const existing = byDay.get(dayIndex);
+      if (!existing || date.getTime() > existing.getTime()) {
+        byDay.set(dayIndex, date);
+      }
+    }
+    const dayIndexes = [...byDay.keys()].sort((a, b) => b - a);
+    const uniqueDates = dayIndexes.map((index) => byDay.get(index) as Date);
 
-    // Remove duplicates (same day activities)
-    const uniqueDates = Array.from(
-      new Set(sortedDates.map((date) => date.toDateString())),
-    ).map((dateString) => new Date(dateString));
-
-    const today = this.normalizeDate(new Date(), fullConfig.timezoneOffset);
-    const mostRecentActivity = uniqueDates[0];
+    // The server clock is the reference point for "today".
+    const todayIndex = this.getDayIndex(new Date(), fullConfig.timezoneOffset);
+    const mostRecentIndex = dayIndexes[0];
 
     // Check if streak should be reset
-    const daysSinceLastActivity = this.getDaysDifference(
-      mostRecentActivity,
-      today,
-    );
+    const daysSinceLastActivity = todayIndex - mostRecentIndex;
     const shouldReset = daysSinceLastActivity > fullConfig.resetAfterDays;
 
     if (shouldReset) {
       return {
         currentStreak: 0,
-        longestStreak: this.calculateLongestStreak(uniqueDates),
+        longestStreak: this.calculateLongestStreak(dayIndexes),
         streakStartDate: null,
         shouldReset: true,
       };
     }
 
     // Calculate current streak
-    const currentStreak = this.calculateCurrentStreak(
-      uniqueDates,
-      today,
-      fullConfig,
-    );
+    const currentStreak = this.calculateCurrentStreak(dayIndexes, todayIndex);
     const longestStreak = Math.max(
-      this.calculateLongestStreak(uniqueDates),
+      this.calculateLongestStreak(dayIndexes),
       currentStreak,
     );
 
@@ -87,59 +89,48 @@ export class StreakCalculationService {
     };
   }
 
+  /**
+   * Count consecutive days ending at (or the day before) today.
+   * A gap of more than one day breaks the streak, so a missed day is
+   * reflected as a shorter (or zero) current streak.
+   */
   private calculateCurrentStreak(
-    sortedUniqueDates: Date[],
-    today: Date,
-    config: StreakCalculationConfig,
+    dayIndexes: number[],
+    todayIndex: number,
   ): number {
-    if (sortedUniqueDates.length === 0) return 0;
+    if (dayIndexes.length === 0) return 0;
 
     let streak = 0;
-    let expectedDate = today;
+    let expectedIndex = todayIndex;
 
-    // Check if today has activity or if we're within grace period
-    const mostRecentActivity = sortedUniqueDates[0];
-    const daysSinceLastActivity = this.getDaysDifference(
-      mostRecentActivity,
-      today,
-    );
+    for (let i = 0; i < dayIndexes.length; i++) {
+      const diff = expectedIndex - dayIndexes[i];
 
-    // If last activity was today or yesterday, start counting
-    if (daysSinceLastActivity <= 1) {
-      for (let i = 0; i < sortedUniqueDates.length; i++) {
-        const activityDate = sortedUniqueDates[i];
-        const daysDiff = this.getDaysDifference(activityDate, expectedDate);
-
-        if (daysDiff === 0) {
-          // Activity on expected date
-          streak++;
-          expectedDate = this.subtractDays(expectedDate, 1);
-        } else if (daysDiff === 1 && i === 0) {
-          // First activity was yesterday, still counts
-          streak++;
-          expectedDate = this.subtractDays(activityDate, 1);
-        } else {
-          // Gap in streak
-          break;
-        }
+      if (diff === 0) {
+        // Activity on the expected day.
+        streak++;
+        expectedIndex -= 1;
+      } else if (diff === 1 && i === 0) {
+        // Most recent activity was yesterday; the streak is still alive.
+        streak++;
+        expectedIndex = dayIndexes[i] - 1;
+      } else {
+        // Gap in the streak.
+        break;
       }
     }
 
     return streak;
   }
 
-  private calculateLongestStreak(sortedUniqueDates: Date[]): number {
-    if (sortedUniqueDates.length === 0) return 0;
+  private calculateLongestStreak(dayIndexes: number[]): number {
+    if (dayIndexes.length === 0) return 0;
 
     let longestStreak = 1;
     let currentStreak = 1;
 
-    for (let i = 1; i < sortedUniqueDates.length; i++) {
-      const currentDate = sortedUniqueDates[i];
-      const previousDate = sortedUniqueDates[i - 1];
-      const daysDiff = this.getDaysDifference(currentDate, previousDate);
-
-      if (daysDiff === 1) {
+    for (let i = 1; i < dayIndexes.length; i++) {
+      if (dayIndexes[i - 1] - dayIndexes[i] === 1) {
         currentStreak++;
         longestStreak = Math.max(longestStreak, currentStreak);
       } else {
@@ -150,22 +141,15 @@ export class StreakCalculationService {
     return longestStreak;
   }
 
-  private normalizeDate(date: Date, timezoneOffset: number): Date {
-    const normalized = new Date(date);
-    normalized.setHours(0, 0, 0, 0);
-    normalized.setHours(normalized.getHours() - timezoneOffset);
-    return normalized;
-  }
-
-  private getDaysDifference(date1: Date, date2: Date): number {
-    const oneDay = 24 * 60 * 60 * 1000;
-    return Math.round(Math.abs((date1.getTime() - date2.getTime()) / oneDay));
-  }
-
-  private subtractDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() - days);
-    return result;
+  /**
+   * Calendar day index for a date, shifted by the user's timezone offset.
+   * Pure epoch arithmetic — a day is always 24h, so DST transitions (23h or
+   * 25h days) cannot skew the result.
+   */
+  private getDayIndex(date: Date, timezoneOffsetHours: number): number {
+    return Math.floor(
+      (date.getTime() + timezoneOffsetHours * MS_PER_HOUR) / MS_PER_DAY,
+    );
   }
 
   getDaysUntilReset(
@@ -173,8 +157,12 @@ export class StreakCalculationService {
     config: Partial<StreakCalculationConfig> = {},
   ): number {
     const fullConfig = { ...this.defaultConfig, ...config };
-    const today = this.normalizeDate(new Date(), fullConfig.timezoneOffset);
-    const daysSinceActivity = this.getDaysDifference(lastActivityDate, today);
+    const todayIndex = this.getDayIndex(new Date(), fullConfig.timezoneOffset);
+    const lastActivityIndex = this.getDayIndex(
+      lastActivityDate,
+      fullConfig.timezoneOffset,
+    );
+    const daysSinceActivity = Math.max(0, todayIndex - lastActivityIndex);
     return Math.max(0, fullConfig.resetAfterDays - daysSinceActivity);
   }
 }

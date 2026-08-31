@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
@@ -19,7 +20,7 @@ export class StreakController {
 
   @Post('activity')
   @HttpCode(HttpStatus.CREATED)
-  async recordActivity(recordDto: RecordActivityDto) {
+  async recordActivity(@Body() recordDto: RecordActivityDto) {
     // In a real app, you'd get userId from JWT token
     const req = { user: { id: 'user-id-placeholder' } }; // Mock request object
     const userId = req.user.id;
