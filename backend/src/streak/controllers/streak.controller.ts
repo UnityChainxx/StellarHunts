@@ -1,14 +1,20 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
+  Body,
   Param,
   Query,
   HttpStatus,
   HttpCode,
   ParseIntPipe,
   DefaultValuePipe,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../../common/guards/ownership.guard';
+import { Ownership } from '../../common/decorators/ownership.decorator';
 import type { StreakService } from '../services/streak.service';
 import type { RecordActivityDto } from '../dto/record-activity.dto';
 import type { StreakCalculationConfig } from '../services/streak-calculation.service';
@@ -19,7 +25,7 @@ export class StreakController {
 
   @Post('activity')
   @HttpCode(HttpStatus.CREATED)
-  async recordActivity(recordDto: RecordActivityDto) {
+  async recordActivity(@Body() recordDto: RecordActivityDto) {
     // In a real app, you'd get userId from JWT token
     const req = { user: { id: 'user-id-placeholder' } }; // Mock request object
     const userId = req.user.id;
@@ -34,6 +40,8 @@ export class StreakController {
   }
 
   @Get('user/:userId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserStreak(
     @Param('userId') userId: string,
     @Query('timezoneOffset', new DefaultValuePipe(0), ParseIntPipe)
@@ -86,6 +94,8 @@ export class StreakController {
   }
 
   @Get('user/:userId/history')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   async getUserStreakHistory(
     @Param('userId') userId: string,
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,

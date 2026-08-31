@@ -15,9 +15,33 @@ export const useReferral = (userId = null) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     if (userId) {
+      const fetchReferralData = async (userId) => {
+        if (!userId) return;
+        setLoading(true);
+        setError(null);
+        try {
+          const response = await axios.get(`/api/referrals/${userId}`, {
+            withCredentials: true,
+            signal: controller.signal
+          });
+          setReferralStats(response.data.stats);
+          setInvitedUsers(response.data.invitedUsers);
+        } catch (err) {
+          if (!axios.isCancel(err)) {
+            console.error("Failed to fetch referral data:", err);
+            setError("Failed to load referral data");
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
       fetchReferralData(userId);
     }
+    return () => {
+      controller.abort();
+    };
   }, [userId]);
 
   // Generate referral link for current user

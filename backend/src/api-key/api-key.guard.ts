@@ -23,10 +23,15 @@ export class APIKeyGuard implements CanActivate {
       throw new UnauthorizedException('API Key missing');
     }
 
-    const isValid = this.apiKeyService.validateApiKey(apiKey);
+    // Match against the route pattern (e.g. `/api-keys/protected`) so
+    // scope checks are stable regardless of the global `/api/v1` prefix.
+    const endpoint =
+      (request.route?.path as string | undefined) ?? request.path;
+
+    const isValid = this.apiKeyService.validateApiKey(apiKey, endpoint);
 
     if (!isValid) {
-      this.logger.warn(`Invalid API Key: ${apiKey}`);
+      this.logger.warn('Invalid API Key for requested endpoint.');
       throw new UnauthorizedException('Invalid API Key');
     }
 
