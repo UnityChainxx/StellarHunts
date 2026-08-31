@@ -33,7 +33,19 @@ export class UserService {
 
   async linkWallet(id: string, dto: LinkWalletDto): Promise<User> {
     const user = await this.getUserById(id);
+    const existing = await this.usersRepo.findOne({
+      where: { walletAddress: dto.walletAddress },
+    });
+    if (existing && existing.id !== id) {
+      throw new ConflictException('Wallet already linked to another account');
+    }
     user.walletAddress = dto.walletAddress;
+    return this.usersRepo.save(user);
+  }
+
+  async unlinkWallet(id: string): Promise<User> {
+    const user = await this.getUserById(id);
+    user.walletAddress = null;
     return this.usersRepo.save(user);
   }
 

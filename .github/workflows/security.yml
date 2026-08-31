@@ -26,18 +26,18 @@ jobs:
         language: [javascript-typescript]
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@a35ac6e6798d72df5475948b28efb89edc2e19ca # v4.37.9
         with:
           languages: ${{ matrix.language }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+        uses: github/codeql-action/autobuild@a35ac6e6798d72df5475948b28efb89edc2e19ca # v4.37.9
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@a35ac6e6798d72df5475948b28efb89edc2e19ca # v4.37.9
         with:
           category: /language:${{ matrix.language }}
 
@@ -50,7 +50,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       # Requires the repository's "Dependency graph" setting to be enabled
       # (Settings → Code security and analysis). Until that is flipped, the
@@ -59,7 +59,7 @@ jobs:
       # blocking gate as soon as the setting is enabled.
       - name: Review dependency changes
         continue-on-error: true
-        uses: actions/dependency-review-action@v5
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           fail-on-scopes: runtime, development
@@ -102,7 +102,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
@@ -119,13 +119,13 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@a35ac6e6798d72df5475948b28efb89edc2e19ca # v4.37.9
         with:
           sarif_file: gitleaks.sarif
 
       - name: Upload SARIF artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: gitleaks-sarif
           path: gitleaks.sarif

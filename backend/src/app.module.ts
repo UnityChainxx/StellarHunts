@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { CsrfMiddleware } from './common/security/csrf.middleware';
+import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -12,14 +13,18 @@ import { TimeTrial } from './time-trial/time-trial.entity';
 import { Puzzle } from './puzzle/puzzle.entity';
 import { Category } from './puzzle-category/entities/category.entity';
 import { Report } from './report/entities/report.entity';
+import { AuditLog } from './audit-log/entities/audit-log.entity';
+import { Admin } from './admin/admin.entity';
+import { PuzzleReview } from './puzzle-review/puzzle-review/entities/puzzle-review.entity';
+import { ReviewModeration } from './puzzle-review/puzzle-review/entities/review-moderation.entity';
+import { DraftPuzzle } from './puzzle-draft/entities/draft-puzzle.entity';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 import { AchievementModule } from './achievement/achievement.module';
 import { ActivityModule } from './activity/activity.module';
-import { AdminModule } from './admin/admin.module';
-import { AnalyticModule } from './analytic/analytic.module';
+import { AnalyticsModule } from './analytic/analytic.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuthModule } from './auth/auth.module';
@@ -54,10 +59,9 @@ import { PuzzleVersioningModule } from './puzzle-versioning/puzzle-versioning.mo
 import { QuizModule } from './quiz/quiz.module';
 import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { ReferralModule } from './referral/referral.module';
-import { ReportModule } from './report/report.module';
-import { RewardModule } from './reward/reward.module';
+import { ReportsModule } from './report/report.module';
 import { RewardShopModule } from './reward-shop/reward-shop.module';
-import { SessionModule } from './session/session.module';
+import { RewardsModule } from './reward/reward.module';
 import { StreakModule } from './streak/streak.module';
 import { TimeTrialModule } from './time-trial/time-trial.module';
 import { TokenVerificationModule } from './token-verification/token-verification.module';
@@ -66,10 +70,11 @@ import { UserInventoryModule } from './user-inventory/user-inventory.module';
 import { UserModule } from './user/user.module';
 import { UserRankingModule } from './user-ranking/user-ranking.module';
 import { UserReactionModule } from './user-reaction/user-reaction.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
+import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
+import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
-import { UserSettingsModule } from './user-settings/user-settings.module';
-import { UserTokenHistoryModule } from './user-token-history/user-token-history.module';
-import { WalletModule } from './wallet/wallet.module';
+import { HealthModule } from './health/health.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
 import { GracefulShutdownService } from './graceful-shutdown.service';
 
@@ -135,19 +140,27 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         username: configService.get('database.user'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
-        entities: [User, TimeTrial, Puzzle, Category, Report],
-        migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
-        synchronize: configService.get('database.synchronize') === true,
-        autoLoadEntities: configService.get('database.autoload') === true,
-        migrationsRun: configService.get('database.migrationsRun') === true,
+        entities: [
+          User,
+          TimeTrial,
+          Puzzle,
+          Category,
+          Report,
+          AuditLog,
+          Admin,
+          PuzzleReview,
+          ReviewModeration,
+          DraftPuzzle,
+        ],
+        synchronize: configService.get('database.synchronize'),
+        autoLoadEntities: configService.get('database.autoload'),
       }),
     }),
     AchievementModule,
     ActivityModule,
-    AdminModule,
-    AnalyticModule,
+    AnalyticsModule,
     ApiKeyModule,
-    AuditLogModule,
+    HealthModule,
     AuthModule,
     BadgeModule,
     CacheModule,
@@ -171,19 +184,18 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     PuzzleCommentModule,
     PuzzleDependencyModule,
     PuzzleDraftModule,
-    PuzzleForkModule,
     PuzzleModule,
     PuzzleReviewModule,
+    AuditLogModule,
     PuzzleSubmissionModule,
     PuzzleTranslationModule,
     PuzzleVersioningModule,
     QuizModule,
     RateLimiterModule.forRoot(),
     ReferralModule,
-    ReportModule,
-    RewardModule,
+    ReportsModule,
     RewardShopModule,
-    SessionModule,
+    RewardsModule,
     StreakModule,
     TimeTrialModule,
     TokenVerificationModule,
@@ -200,4 +212,8 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
   controllers: [AppController],
   providers: [AppService, GracefulShutdownService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}

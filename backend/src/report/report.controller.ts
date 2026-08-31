@@ -14,8 +14,10 @@ import {
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesGuard } from 'src/common/gaurds/roles.gaurds';
+import { AdminRole } from '../admin/admin-role.enum';
+import { JwtAuthGuard } from '../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../admin/guards/roles.guard';
+import { Roles } from '../admin/roles.decorator';
 
 @Controller('report')
 // Stricter than the global policy (issue #340): report payloads are small,
@@ -25,26 +27,33 @@ import { RolesGuard } from 'src/common/gaurds/roles.gaurds';
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
-  @UseGuards(RolesGuard)
-  @Roles('user')
+  // Reports are user-generated; the actor id comes from the request when
+  // available and falls back to the service default otherwise.
   @Post()
   create(@Body() createReportDto: CreateReportDto, @Req() req: any) {
     const userId = req.user?.id ?? req.user?.sub ?? 1;
     return this.reportService.create(createReportDto, userId);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  // Admin-only endpoints. JwtAuthGuard authenticates the admin token
+  // (admin-jwt strategy) and RolesGuard enforces the AdminRole. Every
+  // mutation below writes an immutable audit record (see ReportService).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @Get()
   findAll() {
     return this.reportService.findAll();
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @Post(':id/resolve')
-  resolve(@Param('id') id: string, @Body('adminNote') adminNote?: string) {
-    return this.reportService.resolve(+id, adminNote);
+  resolve(
+    @Param('id') id: string,
+    @Body('adminNote') adminNote: string | undefined,
+    @Req() req: any,
+  ) {
+    return this.reportService.resolve(+id, adminNote, this.actorId(req));
   }
 
   @Get(':id')
@@ -52,13 +61,25 @@ export class ReportController {
     return this.reportService.findOne(+id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateReportDto: UpdateReportDto) {
-    return this.reportService.update(+id, updateReportDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateReportDto: UpdateReportDto,
+    @Req() req: any,
+  ) {
+    return this.reportService.update(+id, updateReportDto, this.actorId(req));
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.ADMIN)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reportService.remove(+id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.reportService.remove(+id, this.actorId(req));
+  }
+
+  private actorId(req: any): string {
+    return String(req.user?.id ?? 'system');
   }
 }

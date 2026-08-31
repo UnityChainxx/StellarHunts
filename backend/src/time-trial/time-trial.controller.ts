@@ -1,5 +1,8 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { TimetrialService } from './providers/timetrial.service';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import {
   ApiBody,
   ApiOperation,
@@ -14,6 +17,8 @@ export class TimeTrialController {
   constructor(private readonly timeTrialService: TimetrialService) {}
 
   @Post('start')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ body: 'userId' })
   @ApiOperation({ summary: 'Start a new time trial for a puzzle' })
   @ApiBody({
     schema: {
@@ -57,6 +62,8 @@ export class TimeTrialController {
   }
 
   @Get('results/:userId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get all time trial results for a user' })
   @ApiParam({
     name: 'userId',
