@@ -39,8 +39,31 @@ async function bootstrap(): Promise<void> {
     exclude: ['docs', 'docs-json', 'docs/(.*)'],
   });
 
+  const corsOrigin = configService.get<string>('appConfig.cors.origin') ?? '*';
+  const credentials = configService.get<boolean>('appConfig.cors.credentials') ?? true;
+
   app.enableCors({
-    origin: configService.get<string>('appConfig.cors.origin') ?? '*',
+    origin: (origin, callback) => {
+      if (credentials && corsOrigin === '*') {
+        const allowlist = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : [];
+        if (!origin || allowlist.includes(origin) || origin === 'http://localhost:3000') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      } else {
+        if (corsOrigin === '*') {
+          callback(null, true);
+        } else {
+          const allowlist = corsOrigin.split(',');
+          if (!origin || allowlist.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        }
+      }
+    },
     methods: configService.get<string[]>('appConfig.cors.methods') ?? [
       'GET',
       'POST',
@@ -51,8 +74,7 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: configService.get<string[]>(
       'appConfig.cors.allowedHeaders',
     ) ?? ['Content-Type', 'Authorization'],
-    credentials:
-      configService.get<boolean>('appConfig.cors.credentials') ?? true,
+    credentials,
   });
 
   app.use(helmet({

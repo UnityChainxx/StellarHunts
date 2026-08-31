@@ -791,3 +791,20 @@ fn test_levels_discriminants_stable() {
     assert_eq!(crate::Levels::Hard as u32, 3);
     assert_eq!(crate::Levels::Master as u32, 4);
 }
+
+#[test]
+fn test_unauthorized_add_question_fails() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    client.init(&admin);
+
+    env.mock_all_auths();
+    // Call as normal user
+    let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.add_question(&Levels::Easy, &Bytes::from_slice(&env, b"q"), &Bytes::from_slice(&env, b"a"), &Bytes::from_slice(&env, b"h"));
+    }));
+    assert!(should_panic.is_err());
+}

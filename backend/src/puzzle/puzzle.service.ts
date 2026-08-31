@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Puzzle } from './puzzle.entity';
@@ -34,6 +34,9 @@ export class PuzzleService {
 
   async update(id: string, updatePuzzleDto: UpdatePuzzleDto): Promise<Puzzle> {
     const puzzle = await this.findOneAdmin(id);
+    if (puzzle.isActive && updatePuzzleDto.solution && updatePuzzleDto.solution !== puzzle.solution) {
+      throw new BadRequestException('Cannot edit the solution of an active/published puzzle in place. Use versioned answer data.');
+    }
     Object.assign(puzzle, updatePuzzleDto);
     puzzle.title = sanitizeText(puzzle.title);
     puzzle.description = sanitizeText(puzzle.description);

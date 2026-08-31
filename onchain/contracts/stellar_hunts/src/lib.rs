@@ -67,6 +67,7 @@ pub enum DataKey {
     PlayerProgress(Address),
     PlayerLevelProgress(Address, Levels),
     SchemaVersion,
+    Paused,
 }
 
 // ---------------------------------------------------------------------
@@ -102,6 +103,7 @@ pub enum Error {
     MissingNftContract = 9,
     AttemptTooSoon = 10,
     LevelImmutable = 11,
+    ContractPaused = 12,
 }
 
 // ---------------------------------------------------------------------
@@ -333,6 +335,9 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn submit_answer(env: Env, caller: Address, question_id: u64, answer: Bytes) -> bool {
+        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
         caller.require_auth();
 
         if !env
@@ -467,6 +472,9 @@ impl StellarHunts {
     }
 
     pub fn claim_level_completion_nft(env: Env, caller: Address, level: Levels) {
+        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
         caller.require_auth();
 
         if !env
@@ -590,6 +598,20 @@ impl StellarHunts {
 
     pub fn next_level(_env: Env, level: Levels) -> Levels {
         level.next()
+    }
+
+    pub fn pause(env: Env) {
+        require_admin(&env);
+        env.storage().instance().set(&DataKey::Paused, &true);
+    }
+
+    pub fn unpause(env: Env) {
+        require_admin(&env);
+        env.storage().instance().set(&DataKey::Paused, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
     }
 
     pub fn get_schema_version(e: Env) -> u32 {
