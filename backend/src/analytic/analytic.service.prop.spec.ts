@@ -261,11 +261,7 @@ describe('AnalyticService — property-based', () => {
           // Service that receives both batches
           const svcCombined = freshService();
           for (const r of combined) {
-            await svcCombined.recordPuzzleSolveAsync(
-              r.userId,
-              r.puzzleId,
-              r.solveTime,
-            );
+            await svcCombined.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
           }
           const solvedCombined = await svcCombined.getMostSolvedPuzzlesAsync();
 

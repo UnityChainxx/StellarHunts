@@ -37,18 +37,21 @@ const MAX_LIMIT = 100;
 @Injectable()
 export class AnalyticService {
   private readonly logger = new Logger(AnalyticService.name);
-
-  private readonly fallbackRows: Array<{
-    user_id: string;
-    puzzle_id: string;
-    solve_time: number;
-    solved_at: Date;
+  private readonly memoryEvents: Array<{
+    userId: string;
+    puzzleId: string;
+    solveTime: number;
+    solvedAt: Date;
   }> = [];
 
   constructor(@Inject(PG_POOL) private readonly pool?: Pool) {}
 
-  async recordPuzzleSolve(userId: string, puzzleId: string, solveTime: number): Promise<void> {
-    return this.recordPuzzleSolveAsync(userId, puzzleId, solveTime);
+  recordPuzzleSolve(
+    userId: string,
+    puzzleId: string,
+    solveTime: number,
+  ): void {
+    void this.recordPuzzleSolveAsync(userId, puzzleId, solveTime);
   }
 
   async recordPuzzleSolveAsync(
@@ -60,7 +63,7 @@ export class AnalyticService {
       `Recording solve: User ${userId}, Puzzle ${puzzleId}, Time ${solveTime}`,
     );
     if (!this.pool) {
-      this.fallbackRows.push({ user_id: userId, puzzle_id: puzzleId, solve_time: solveTime, solved_at: new Date() });
+      this.memoryEvents.push({ userId, puzzleId, solveTime, solvedAt: new Date() });
       return;
     }
     await this.pool.query(
@@ -80,9 +83,8 @@ export class AnalyticService {
     offset?: number,
   ): Promise<Array<{ puzzleId: string; solveCount: number }>> {
     this.logger.log('Fetching most solved puzzles...');
-    const hasLimit = limit !== undefined && limit !== null;
-    const hasOffset = offset !== undefined && offset !== null;
-    const sql = hasLimit
+    const effectiveLimit = limit === undefined ? undefined : Math.max(0, Math.floor(limit));
+    const sql = effectiveLimit !== undefined
       ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
          ORDER BY solve_count DESC LIMIT $1 OFFSET $2`
       : hasOffset
@@ -90,10 +92,16 @@ export class AnalyticService {
            ORDER BY solve_count DESC OFFSET $1`
         : `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
            ORDER BY solve_count DESC`;
-    const params = hasLimit ? [limit, offset ?? 0] : hasOffset ? [offset] : [];
-    const { rows } = !this.pool
-      ? { rows: this.applyPagination(this.aggregateFallback(), limit, offset) }
-      : await this.pool.query(sql, params);
+    if (!this.pool) {
+      const counts = new Map<string, number>();
+      for (const event of this.memoryEvents) counts.set(event.puzzleId, (counts.get(event.puzzleId) ?? 0) + 1);
+      return [...counts.entries()]
+        .map(([puzzleId, solveCount]) => ({ puzzleId, solveCount }))
+        .sort((a, b) => b.solveCount - a.solveCount)
+        .slice(offset ?? 0, effectiveLimit === undefined ? undefined : (offset ?? 0) + effectiveLimit);
+    }
+    const params = effectiveLimit !== undefined ? [effectiveLimit, offset ?? 0] : offset ? [offset] : [];
+    const { rows } = await this.pool.query(sql, params);
     return rows.map((r) => ({
       puzzleId: r.puzzle_id as string,
       solveCount: Number(r.solve_count),
@@ -120,13 +128,15 @@ export class AnalyticService {
    */
   async getAverageSolveTimeAsync(puzzleId: string): Promise<number> {
     this.logger.log(`Fetching average solve time for puzzle ${puzzleId}...`);
-    const { rows } = !this.pool
-      ? { rows: [this.aggregateFallbackAverage(puzzleId)] }
-      : await this.pool.query<{
-          solve_count: string;
-          total_solve_time: string;
-        }>(
-          `SELECT COUNT(*) AS solve_count,
+    if (!this.pool) {
+      const events = this.memoryEvents.filter((event) => event.puzzleId === puzzleId);
+      return events.length ? events.reduce((sum, event) => sum + event.solveTime, 0) / events.length : 0;
+    }
+    const { rows } = await this.pool.query<{
+      solve_count: string;
+      total_solve_time: string;
+    }>(
+      `SELECT COUNT(*) AS solve_count,
               COALESCE(SUM(solve_time), 0) AS total_solve_time
        FROM analytic_events
        WHERE puzzle_id = $1`,
@@ -146,19 +156,25 @@ export class AnalyticService {
     userId: string,
   ): Promise<Map<string, UserPuzzleEngagement>> {
     this.logger.log(`Fetching puzzle history for user ${userId}...`);
-    const { rows } = this.pool
-      ? await this.pool.query(
-          `SELECT puzzle_id,
-                  COUNT(*) AS solve_count,
-                  COUNT(*) AS attempts,
-                  COALESCE(SUM(solve_time), 0) AS total_solve_time,
-                  MAX(solved_at) AS last_solved
-           FROM analytic_events
-           WHERE user_id = $1
-           GROUP BY puzzle_id`,
-          [userId],
-        )
-      : { rows: this.aggregateFallbackForUser(userId) };
+    if (!this.pool) {
+      const result = new Map<string, UserPuzzleEngagement>();
+      for (const event of this.memoryEvents.filter((item) => item.userId === userId)) {
+        const current = result.get(event.puzzleId) ?? { solveCount: 0, totalSolveTime: 0 };
+        result.set(event.puzzleId, { solveCount: current.solveCount + 1, totalSolveTime: current.totalSolveTime + event.solveTime, attempts: current.solveCount + 1, lastSolved: event.solvedAt });
+      }
+      return result;
+    }
+    const { rows } = await this.pool.query(
+      `SELECT puzzle_id,
+              COUNT(*) AS solve_count,
+              COUNT(*) AS attempts,
+              COALESCE(SUM(solve_time), 0) AS total_solve_time,
+              MAX(solved_at) AS last_solved
+       FROM analytic_events
+       WHERE user_id = $1
+       GROUP BY puzzle_id`,
+      [userId],
+    );
     const result = new Map<string, UserPuzzleEngagement>();
     for (const row of rows) {
       result.set(row.puzzle_id, {

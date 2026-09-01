@@ -17,7 +17,11 @@ const RARITY_GRADIENTS = {
 const getRarityColor = (rarity) =>
   RARITY_GRADIENTS[rarity] || "from-gray-400 to-gray-600";
 
-// Wrapped in React.memo so unchanged cards avoid unnecessary reconciliation.
+// Displays a single NFT with rarity gradient, lock state, and claim action.
+// Wrapped in React.memo so that when a parent re-renders (e.g. the wallet
+// store updating) and passes the same `nft` reference to every card in
+// a gallery, the heavy gradient DOM tree doesn't get re-reconciled for
+// every card. Default shallow prop comparison is sufficient.
 const NFTCard = ({ nft, onClaim = undefined }) => {
   const [isHovered, setIsHovered] = useState(false);
 

@@ -4,11 +4,11 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Gift, 
-  Star, 
-  Users, 
-  ArrowRight, 
+import {
+  Gift,
+  Star,
+  Users,
+  ArrowRight,
   CheckCircle,
   Sparkles,
   Trophy
@@ -143,11 +143,11 @@ export default function ReferralLandingPage() {
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-white mb-4">What Awaits You</h2>
             <p className="text-gray-300 max-w-2xl mx-auto">
-              Embark on an epic digital treasure hunt where you&apos;ll solve cryptographic puzzles, 
+              Embark on an epic digital treasure hunt where you&apos;ll solve cryptographic puzzles,
               collect rare NFTs, and compete with players worldwide!
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
@@ -187,7 +187,7 @@ export default function ReferralLandingPage() {
               Ready to Start Your Adventure?
             </h3>
             <p className="text-gray-300 mb-6 max-w-xl mx-auto">
-              Join thousands of players in the ultimate StellarHunts challenge. 
+              Join thousands of players in the ultimate StellarHunts challenge.
               Your friend&apos;s referral gives you exclusive bonuses to get started!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -207,7 +207,7 @@ export default function ReferralLandingPage() {
                 Learn More
               </Button>
             </div>
-            
+
             {/* Referral Code Display */}
             <div className="mt-6 p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
               <p className="text-gray-300 text-sm mb-2">Referral Code:</p>
@@ -218,4 +218,4 @@ export default function ReferralLandingPage() {
       </div>
     </div>
   );
-} 
+}

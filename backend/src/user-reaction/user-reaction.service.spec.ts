@@ -8,13 +8,13 @@ import { jest } from '@jest/globals'; // Import jest to declare it
 describe('UserReactionService', () => {
   let service: UserReactionService;
 
-  const mockRepository = {
-    create: jest.fn<any>(),
-    save: jest.fn<any>(),
-    find: jest.fn<any>(),
-    findOne: jest.fn<any>(),
-    delete: jest.fn<any>(),
-    createQueryBuilder: jest.fn<any>(),
+  const mockRepository: Record<string, any> = {
+    create: jest.fn(),
+    save: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    delete: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   beforeEach(async () => {

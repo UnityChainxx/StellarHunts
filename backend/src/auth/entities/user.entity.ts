@@ -51,6 +51,8 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
+  activities: import('../../activity/entities/activity.entity').Activity[];
+
   @BeforeInsert()
   async hashPasswordBeforeInsert() {
     if (this.password) {

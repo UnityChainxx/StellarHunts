@@ -11,8 +11,8 @@ describe('AchievementsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AchievementService,
-        { provide: getRepositoryToken(Achievement), useValue: {} },
-        { provide: getRepositoryToken(PlayerAchievement), useValue: {} },
+        { provide: getRepositoryToken(Achievement), useValue: { find: jest.fn() } },
+        { provide: getRepositoryToken(PlayerAchievement), useValue: { findOne: jest.fn() } },
       ],
     }).compile();
 

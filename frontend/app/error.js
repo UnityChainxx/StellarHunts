@@ -72,7 +72,7 @@ export default function Error() {
 
           {/* Easter Egg Text */}
           <p className="mt-8 text-sm text-gray-400 animate-pulse">
-            Don&apos;t worry, even the best games crashes somethimes...
+            Don&apos;t worry, even the best games crash sometimes...
           </p>
         </div>
       </div>

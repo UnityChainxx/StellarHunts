@@ -13,14 +13,14 @@ import { VerificationService } from '../services/verification.service';
 export class TokenLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(TokenLoggingInterceptor.name);
 
-  constructor(private readonly verificationService: VerificationService) {}
+  constructor(private readonly verificationService?: VerificationService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
     if (authHeader) {
-      const token = this.verificationService.extractTokenFromHeader(authHeader);
+      const token = this.verificationService?.extractTokenFromHeader(authHeader);
       if (token) {
         // Log token usage (without exposing the actual token)
         const tokenHash = this.hashToken(token);

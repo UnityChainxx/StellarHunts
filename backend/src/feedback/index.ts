@@ -5,11 +5,9 @@ export { FeedbackController } from './controllers/feedback.controller';
 export { AdminGuard } from './guards/admin.guard';
 export { Feedback, TargetType } from './entities/feedback.entity';
 
-// Interface and DTO exports. The DTO classes live in ./dto/feedback.dto;
-// re-export the interfaces explicitly so the DTO names aren't duplicated.
+// Interface and DTO exports
+export * from './interfaces/feedback.interface';
 export {
-  FeedbackResponse,
-  FeedbackStats,
-  FeedbackFilters,
-} from './interfaces/feedback.interface';
-export * from './dto/feedback.dto';
+  CreateFeedbackDto,
+  UpdateFeedbackDto,
+} from './dto/feedback.dto';

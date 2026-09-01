@@ -108,36 +108,9 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         DATABASE_USER: Joi.string().required(),
         DATABASE_PASSWORD: Joi.string().required(),
         DATABASE_NAME: Joi.string().required(),
-        DATABASE_SYNC: Joi.string().valid('true', 'false').default('false'),
-        DATABASE_LOAD: Joi.string().valid('true', 'false').default('false'),
-        // Stellar / Soroban integration. In `live` mode the RPC URL and
-        // contract IDs are mandatory; in `mock` mode they may be omitted.
-        STELLAR_MODE: Joi.string().valid('mock', 'live').default('mock'),
-        STELLAR_NETWORK: Joi.string()
-          .valid('testnet', 'mainnet')
-          .default('testnet'),
-        SOROBAN_RPC_URL: Joi.string()
-          .uri()
-          .when('STELLAR_MODE', { is: 'live', then: Joi.required() }),
-        SOROBAN_NFT_CONTRACT_ID: Joi.string().when('STELLAR_MODE', {
-          is: 'live',
-          then: Joi.required(),
-        }),
-        STELLAR_HUNTS_CONTRACT_ID: Joi.string().when('STELLAR_MODE', {
-          is: 'live',
-          then: Joi.required(),
-        }),
-        STELLAR_HUNTS_NFT_CONTRACT_ID: Joi.string().when('STELLAR_MODE', {
-          is: 'live',
-          then: Joi.required(),
-        }),
-        // Redis cache. Optional so the app can boot (with degraded caching)
-        // when Redis is not configured.
-        REDIS_URL: Joi.string().uri().allow(''),
-        REDIS_HOST: Joi.string().default('localhost'),
-        REDIS_PORT: Joi.number().port().default(6379),
-        REDIS_PASSWORD: Joi.string().allow(''),
-        REDIS_DB: Joi.number().integer().min(0).default(0),
+        STELLAR_MODE: Joi.string().valid('mock', 'live').default('live'),
+        NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+        STELLAR_NETWORK: Joi.string().valid('testnet', 'pubnet').default('testnet'),
       }),
     }),
     TypeOrmModule.forRootAsync({

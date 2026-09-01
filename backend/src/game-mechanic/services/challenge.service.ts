@@ -132,7 +132,7 @@ export class ChallengeService {
     return this.challengeRepository.findOne({
       where: {
         status: ChallengeStatus.ACTIVE,
-        unlockTime: Between(today, tomorrow),
+        unlockTime: MoreThan(today),
       },
     });
   }
@@ -148,7 +148,7 @@ export class ChallengeService {
     return this.challengeRepository.findOne({
       where: {
         status: ChallengeStatus.ACTIVE,
-        unlockTime: Between(startOfWeek, endOfWeek),
+        unlockTime: MoreThan(startOfWeek),
         metadata: { type: 'weekly' },
       },
     });
