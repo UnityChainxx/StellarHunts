@@ -33,7 +33,9 @@ const solveBatchArb = fc.array(solveRecordArb, { minLength: 0, maxLength: 50 });
 
 /** Create a pristine service for each property invocation. */
 function freshService(): AnalyticService {
-  return new AnalyticService();
+  // No pool: the service uses its in-memory fallback store, which is what
+  // these properties exercise (aggregation is identical to the SQL path).
+  return new AnalyticService(undefined as any);
 }
 
 /** Count solves per puzzle across a record batch. */
@@ -116,7 +118,7 @@ describe('AnalyticService — property-based', () => {
       fc.asyncProperty(solveBatchArb, async (records) => {
         const svc = freshService();
         for (const r of records) {
-          svc.recordPuzzleSolve(r.userId, r.puzzleId, r.solveTime);
+          await svc.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
         }
         const expected = countByPuzzle(records);
         const solved = await svc.getMostSolvedPuzzlesAsync();
@@ -259,7 +261,11 @@ describe('AnalyticService — property-based', () => {
           // Service that receives both batches
           const svcCombined = freshService();
           for (const r of combined) {
-            await svc.recordPuzzleSolveAsync(r.userId, r.puzzleId, r.solveTime);
+            await svcCombined.recordPuzzleSolveAsync(
+              r.userId,
+              r.puzzleId,
+              r.solveTime,
+            );
           }
           const solvedCombined = await svcCombined.getMostSolvedPuzzlesAsync();
 

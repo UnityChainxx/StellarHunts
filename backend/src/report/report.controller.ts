@@ -14,10 +14,8 @@ import {
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
-import { AdminRole } from '../admin/admin-role.enum';
-import { JwtAuthGuard } from '../admin/guards/jwt-auth.guard';
-import { RolesGuard } from '../admin/guards/roles.guard';
-import { Roles } from '../admin/roles.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/gaurds/roles.gaurds';
 
 @Controller('report')
 // Stricter than the global policy (issue #340): report payloads are small,

@@ -83,11 +83,26 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+    userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<
+      Repository<User>
+    >;
+    jwtService = module.get<JwtService>(JwtService) as unknown as jest.Mocked<JwtService>;
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('register', () => {
-    it('returns an access token and refresh token', async () => {
-      const savedUser = {
+    const registerDto: RegisterDto = {
+      name: 'John Doe',
+      username: 'johnny_doe',
+      email: 'john@example.com',
+      password: 'SecurePass123!',
+    };
+
+    it('should successfully register a new user', async () => {
+      const mockUser = {
         id: 'user-id',
         name: 'John Doe',
         email: 'john@example.com',
@@ -143,7 +158,7 @@ describe('AuthService', () => {
         name: 'John Doe',
         email: 'john@example.com',
         isActive: true,
-        validatePassword: jest.fn(async () => true),
+        validatePassword: jest.fn<any>().mockResolvedValue(true),
       } as User & { validatePassword: jest.Mock };
 
       userRepository.findOne.mockResolvedValue(mockUser);

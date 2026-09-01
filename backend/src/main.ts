@@ -29,14 +29,17 @@ async function bootstrap(): Promise<void> {
   // tests (frontend/tests/apiRoutes.test.js and
   // backend/test/api-prefix.e2e-spec.ts).
   //
-  // Swagger UI is excluded so /docs, its JSON sibling /docs-json, and its
+  // Swagger UI is excluded so /docs, its JSON sibling /docs-json, and their
   // nested asset routes (e.g. /docs/swagger-ui-init.js) stay at canonical
-  // paths instead of being double-prefixed to /api.
+  // paths instead of being double-prefixed to /api. Nest matches each string
+  // entry against the registered handler path (path-to-regexp) before the
+  // global prefix is applied, so the `{*splat}` entries cover nested assets.
   app.setGlobalPrefix('api', {
     exclude: [
-      { path: 'docs', method: RequestMethod.ALL },
-      { path: 'docs-json', method: RequestMethod.ALL },
-      { path: 'docs/(.*)', method: RequestMethod.ALL },
+      'docs',
+      'docs/{*splat}',
+      'docs-json',
+      'docs-json/{*splat}',
     ],
   });
 

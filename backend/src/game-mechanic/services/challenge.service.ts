@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { type Repository, MoreThan, LessThan } from 'typeorm';
+import { type Repository, Between, MoreThan, LessThan } from 'typeorm';
 import { type Challenge, ChallengeStatus } from '../entities/challenge.entity';
 import type { CreateChallengeDto } from '../dto/create-challenge.dto';
 import type { UpdateChallengeDto } from '../dto/update-challenge.dto';
@@ -132,8 +132,7 @@ export class ChallengeService {
     return this.challengeRepository.findOne({
       where: {
         status: ChallengeStatus.ACTIVE,
-        unlockTime: MoreThan(today),
-        unlockTime: LessThan(tomorrow),
+        unlockTime: Between(today, tomorrow),
       },
     });
   }
@@ -149,8 +148,7 @@ export class ChallengeService {
     return this.challengeRepository.findOne({
       where: {
         status: ChallengeStatus.ACTIVE,
-        unlockTime: MoreThan(startOfWeek),
-        unlockTime: LessThan(endOfWeek),
+        unlockTime: Between(startOfWeek, endOfWeek),
         metadata: { type: 'weekly' },
       },
     });

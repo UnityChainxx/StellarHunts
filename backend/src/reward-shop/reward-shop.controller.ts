@@ -8,7 +8,6 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
-  UseGuards,
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';

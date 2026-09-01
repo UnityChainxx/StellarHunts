@@ -1,22 +1,19 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import type { Repository } from 'typeorm';
 import { MaintenanceModeService } from './maintenance-mode.service';
 import { MaintenanceConfig } from './entities/maintenance-config.entity';
 import { jest } from '@jest/globals';
 
 describe('MaintenanceModeService', () => {
   let service: MaintenanceModeService;
-  let repository: Repository<MaintenanceConfig>;
-  let configService: ConfigService;
 
   const mockRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-    delete: jest.fn(),
+    create: jest.fn<any>(),
+    save: jest.fn<any>(),
+    find: jest.fn<any>(),
+    findOne: jest.fn<any>(),
+    delete: jest.fn<any>(),
   };
 
   const mockConfigService = {
@@ -24,6 +21,10 @@ describe('MaintenanceModeService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRepository.findOne.mockResolvedValue(null);
+    mockRepository.create.mockImplementation((value: any) => value);
+    mockRepository.save.mockImplementation(async (value: any) => value);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceModeService,
@@ -39,15 +40,11 @@ describe('MaintenanceModeService', () => {
     }).compile();
 
     service = module.get<MaintenanceModeService>(MaintenanceModeService);
-    repository = module.get<Repository<MaintenanceConfig>>(
-      getRepositoryToken(MaintenanceConfig),
-    );
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    service.clearCache();
+    service?.clearCache();
   });
 
   describe('getMaintenanceStatus', () => {

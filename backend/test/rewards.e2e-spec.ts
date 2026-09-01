@@ -3,9 +3,9 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RewardsModule } from '../src/rewards/rewards.module';
-import { Reward, RewardType } from '../src/rewards/entities/reward.entity';
-import { RewardClaim } from '../src/rewards/entities/reward-claim.entity';
+import { RewardsModule } from '../src/reward/reward.module';
+import { Reward, RewardType } from '../src/reward/entities/reward.entity';
+import { RewardClaim } from '../src/reward/entities/reward-claim.entity';
 import { ValidationPipe } from '@nestjs/common';
 
 describe('RewardsModule (e2e)', () => {

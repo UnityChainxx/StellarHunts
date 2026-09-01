@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { UserRankingService } from './user-ranking.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRank } from './entities/user-ranking.entity';
 
 describe('UserRankingService', () => {
@@ -21,10 +22,7 @@ describe('UserRankingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserRankingService,
-        {
-          provide: getRepositoryToken(UserRank),
-          useValue: mockUserRankRepository,
-        },
+        { provide: getRepositoryToken(UserRank), useValue: {} },
       ],
     }).compile();
 

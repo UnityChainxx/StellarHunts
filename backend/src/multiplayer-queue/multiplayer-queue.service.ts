@@ -4,11 +4,11 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { type Repository, LessThan, MoreThan, DataSource } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { type Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
-import type { Match } from './entities/match.entity';
-import { Match as MatchEntity } from './entities/match.entity';
+import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
+import { Match } from './entities/match.entity';
 import type { JoinQueueDto } from './dto/join-queue.dto';
 import type { QueueStatusDto } from './dto/queue-status.dto';
 import type { MatchResultDto } from './dto/match-result.dto';
@@ -20,7 +20,9 @@ export class MultiplayerQueueService {
   private readonly logger = new Logger(MultiplayerQueueService.name);
 
   constructor(
+    @InjectRepository(Queue)
     private readonly queueRepository: Repository<Queue>,
+    @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
     private readonly dataSource: DataSource,
     private readonly gateway: MultiplayerQueueGateway,
@@ -420,7 +422,7 @@ export class MultiplayerQueueService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const match = manager.create(MatchEntity, {
+      const match = manager.create(Match, {
         playerIds: players.map((p) => p.userId),
         playerUsernames: players.map((p) => p.username),
         gameMode: players[0].gameMode,
