@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { apiUrl } from '@/lib/api';
-
-const API_URL = apiUrl('/rewards');
+import { apiClient } from '@/lib/api';
 
 const useRewardStore = create(
   devtools(
@@ -15,11 +13,8 @@ const useRewardStore = create(
       fetchRewards: async () => {
         set({ loading: true, error: null }, false, 'rewards/fetch/pending');
         try {
-          const response = await fetch(API_URL);
-          if (!response.ok) {
-            throw new Error(`Error: ${response.statusText}`);
-          }
-          const data = await response.json();
+          const response = await apiClient.get('/rewards');
+          const data = response.data;
           set({ rewards: data, loading: false }, false, 'rewards/fetch/fulfilled');
         } catch (error) {
           set({ loading: false, error: error.message }, false, 'rewards/fetch/rejected');

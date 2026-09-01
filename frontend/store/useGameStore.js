@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import axios from "axios";
-import { apiUrl } from "@/lib/api";
+import { apiClient } from "@/lib/api";
 
 /**
  * Returns a storage adapter that debounces `setItem` so that the
@@ -103,10 +102,9 @@ const useGameStore = create(
       // Auth actions
       register: async (username, password) => {
         try {
-          const response = await axios.post(
-            apiUrl("/auth/register"),
+          const response = await apiClient.post(
+            "/auth/register",
             { username, password },
-            { withCredentials: true },
           );
           set({ user: response.data });
           return { ok: true };
@@ -119,10 +117,9 @@ const useGameStore = create(
 
       login: async (username, password) => {
         try {
-          const response = await axios.post(
-            apiUrl("/auth/login"),
+          const response = await apiClient.post(
+            "/auth/login",
             { username, password },
-            { withCredentials: true },
           );
           set({ user: response.data });
           return { ok: true };
@@ -135,10 +132,9 @@ const useGameStore = create(
 
       logout: async () => {
         try {
-          await axios.post(
-            apiUrl("/auth/logout"),
+          await apiClient.post(
+            "/auth/logout",
             {},
-            { withCredentials: true },
           );
           set({
             user: null,
@@ -157,9 +153,7 @@ const useGameStore = create(
 
       fetchDifficultyConfig: async () => {
         try {
-          const response = await axios.get(
-            apiUrl("/game/difficulty-config"),
-          );
+          const response = await apiClient.get("/game/difficulty-config");
           set({ difficultyConfig: response.data });
         } catch (error) {
           const entry = { action: "fetchDifficultyConfig", message: error.message, time: Date.now() };
@@ -226,8 +220,8 @@ const useGameStore = create(
         set(next);
 
         try {
-          await axios.post(
-            apiUrl("/game/update"),
+          await apiClient.post(
+            "/game/update",
             {
               userId: user.id,
               completedPuzzles: newCompletedPuzzles,
@@ -236,7 +230,6 @@ const useGameStore = create(
               currentPuzzleIndex: nextPuzzleIndex,
               score: newScore,
             },
-            { withCredentials: true },
           );
         } catch (error) {
           // Restore prior state on failure.
@@ -258,13 +251,12 @@ const useGameStore = create(
         set({ nfts: nextNfts });
 
         try {
-          await axios.post(
-            apiUrl("/nft/add"),
+          await apiClient.post(
+            "/nft/add",
             {
               userId: user.id,
               nft,
             },
-            { withCredentials: true },
           );
         } catch (error) {
           set({ nfts: previousNfts });
@@ -281,11 +273,10 @@ const useGameStore = create(
         if (!user) return { items: [], page, limit, total: 0, hasMore: false };
 
         try {
-          const response = await axios.get(
-            apiUrl(`/users/${user.id}/inventory/nfts`),
+          const response = await apiClient.get(
+            `/users/${user.id}/inventory/nfts`,
             {
               params: { page, limit },
-              withCredentials: true,
             },
           );
 
@@ -319,10 +310,7 @@ const useGameStore = create(
         if (!user) return;
 
         try {
-          const response = await axios.get(
-            apiUrl(`/users/${user.id}`),
-            { withCredentials: true },
-          );
+          const response = await apiClient.get(`/users/${user.id}`);
           set(response.data);
         } catch (error) {
           const entry = { action: "loadUserData", message: error.message, time: Date.now() };
@@ -336,10 +324,9 @@ const useGameStore = create(
         if (!user) return;
 
         try {
-          await axios.post(
-            apiUrl("/game/reset"),
+          await apiClient.post(
+            "/game/reset",
             { userId: user.id },
-            { withCredentials: true },
           );
           set({
             currentDifficulty: "easy",
