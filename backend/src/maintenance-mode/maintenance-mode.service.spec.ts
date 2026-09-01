@@ -21,6 +21,10 @@ describe('MaintenanceModeService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRepository.findOne.mockResolvedValue(null);
+    mockRepository.create.mockImplementation((value: any) => value);
+    mockRepository.save.mockImplementation(async (value: any) => value);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceModeService,
@@ -48,7 +52,7 @@ describe('MaintenanceModeService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    service.clearCache();
+    service?.clearCache();
   });
 
   describe('getMaintenanceStatus', () => {

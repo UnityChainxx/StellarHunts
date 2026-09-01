@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { type Repository, MoreThan, LessThan } from 'typeorm';
+import { type Repository, Between, MoreThan, LessThan } from 'typeorm';
 import { type Challenge, ChallengeStatus } from '../entities/challenge.entity';
 import type { CreateChallengeDto } from '../dto/create-challenge.dto';
 import type { UpdateChallengeDto } from '../dto/update-challenge.dto';

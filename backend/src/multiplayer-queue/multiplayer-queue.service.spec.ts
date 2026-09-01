@@ -1,6 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import { MultiplayerQueueService } from './multiplayer-queue.service';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
 import { Match } from './entities/match.entity';
@@ -29,6 +28,9 @@ describe('MultiplayerQueueService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockQueueRepository.find.mockResolvedValue([]);
+    mockQueueRepository.delete.mockResolvedValue({ affected: 0 });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MultiplayerQueueService,
@@ -45,8 +47,6 @@ describe('MultiplayerQueueService', () => {
     }).compile();
 
     service = module.get<MultiplayerQueueService>(MultiplayerQueueService);
-    queueRepository = module.get<Repository<Queue>>(getRepositoryToken(Queue));
-    matchRepository = module.get<Repository<Match>>(getRepositoryToken(Match));
   });
 
   afterEach(() => {

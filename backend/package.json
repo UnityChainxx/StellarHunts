@@ -39,6 +39,8 @@
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.0.10",
+    "@types/passport-local": "^1.0.38",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.0.0",
     "backend": "file:",
     "bcryptjs": "^3.0.2",

@@ -12,6 +12,7 @@
 
 use crate::{StellarHunts, StellarHuntsClient};
 use soroban_sdk::testutils::Address as _;
+use soroban_sdk::testutils::Ledger;
 use soroban_sdk::{Address, Bytes, Env};
 
 fn b(env: &Env, s: &str) -> Bytes {
@@ -28,6 +29,9 @@ fn b(env: &Env, s: &str) -> Bytes {
 fn bench_submit_answer_cpu_budget() {
     let env = Env::default();
     env.mock_all_auths();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
 
     let admin = Address::generate(&env);
     let contract_id = env.register_contract(None, StellarHunts);
@@ -54,10 +58,7 @@ fn bench_submit_answer_cpu_budget() {
     let mem = budget.memory_bytes_cost();
 
     // Log diagnostics when run with --nocapture.
-    eprintln!(
-        "submit_answer budget  cpu={}  mem={} bytes",
-        cpu, mem
-    );
+    eprintln!("submit_answer budget  cpu={}  mem={} bytes", cpu, mem);
 
     // Budget ceiling: 5M CPU instructions is generous for a single
     // submit_answer call (typical is ~200-500k). If this ever trips,
@@ -83,6 +84,9 @@ fn bench_submit_answer_cpu_budget() {
 fn bench_ten_submit_answers_amortised() {
     let env = Env::default();
     env.mock_all_auths();
+    // Start on a non-zero ledger; each submission advances the ledger so
+    // the `AttemptTooSoon` check in `submit_answer` does not fire.
+    env.ledger().set_sequence_number(100_000);
 
     let admin = Address::generate(&env);
     let contract_id = env.register_contract(None, StellarHunts);
@@ -105,6 +109,7 @@ fn bench_ten_submit_answers_amortised() {
     budget.reset_default();
 
     for i in 0..per_level {
+        env.ledger().set_sequence_number(100_000 + i as u32);
         let answer = b(&env, &format!("A{}", i));
         let ok = client.submit_answer(&player, &((i as u64) + 1), &answer);
         assert!(ok);
@@ -123,57 +128,4 @@ fn bench_ten_submit_answers_amortised() {
         "amortised submit_answer CPU budget exceeded: {} avg instructions",
         avg_cpu
     );
-
-    #[test]
-fn bench_submit_answer_cpu_budget() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let admin = Address::generate(&env);
-    let contract_id = env.register_contract(None, StellarHunts);
-    let client = StellarHuntsClient::new(&env, &contract_id);
-    client.init(&admin);
-
-    client.set_question_per_level(&1u32);
-    let level = crate::Levels::Easy;
-    let question = b(&env, "Bench question");
-    let answer = b(&env, "Bench answer");
-    let hint = b(&env, "Bench hint");
-    client.add_question(&level, &question, &answer, &hint);
-
-    let player = Address::generate(&env);
-
-    // Reset the budget so we only measure the submit_answer call itself.
-    let mut budget = env.budget();
-    budget.reset_default();
-
-    let ok = client.submit_answer(&player, &1u64, &answer);
-    assert!(ok);
-
-    let cpu = budget.cpu_instruction_cost();
-    let mem = budget.memory_bytes_cost();
-
-    // Log diagnostics when run with --nocapture.
-    eprintln!(
-        "submit_answer budget  cpu={}  mem={} bytes",
-        cpu, mem
-    );
-
-    // Budget ceiling: 5M CPU instructions is generous for a single
-    // submit_answer call (typical is ~200-500k). If this ever trips,
-    // investigate what storage or crypto work is being done on the hot
-    // path.
-    assert!(
-        cpu < 5_000_000,
-        "submit_answer CPU budget exceeded: {} instructions (max 5_000_000)",
-        cpu
-    );
-
-    // Memory ceiling: 128 KB.
-    assert!(
-        mem < 131_072,
-        "submit_answer memory budget exceeded: {} bytes (max 131_072)",
-        mem
-    );
-}
 }

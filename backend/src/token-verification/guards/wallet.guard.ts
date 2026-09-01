@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { VerificationService } from '../services/verification.service';
+import { VerificationService } from '../services/verification.service';
 import type {
   WalletVerificationOptions,
   WalletTokenPayload,

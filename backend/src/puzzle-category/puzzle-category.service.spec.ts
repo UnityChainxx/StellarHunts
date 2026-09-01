@@ -2,21 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PuzzleCategoryService } from './puzzle-category.service';
 import { Category } from './entities/category.entity';
-import { Puzzle } from './entities/puzzle.entity';
+import { CategoryPuzzle as Puzzle } from './entities/puzzle.entity';
 import { NotFoundException } from '@nestjs/common';
 
 describe('PuzzleCategoryService', () => {
   let service: PuzzleCategoryService;
 
   const mockCategoryRepository = {
-    createQueryBuilder: jest.fn(() => ({
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      addOrderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    })),
+    createQueryBuilder: jest.fn(() => categoryQueryBuilder),
     find: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
@@ -30,13 +23,7 @@ describe('PuzzleCategoryService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    createQueryBuilder: jest.fn(() => ({
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    })),
+    createQueryBuilder: jest.fn(() => puzzleQueryBuilder),
   };
 
   beforeEach(async () => {
@@ -149,7 +136,7 @@ describe('PuzzleCategoryService', () => {
 
       mockCategoryRepository.findOne.mockResolvedValue(mockCategory);
 
-      const result = await service.getCategoryById(1);
+      const result = await service.getCategoryById('1');
 
       expect(result).toEqual(mockCategory);
     });
@@ -157,7 +144,7 @@ describe('PuzzleCategoryService', () => {
     it('should throw NotFoundException when category not found', async () => {
       mockCategoryRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.getCategoryById(999)).rejects.toThrow(
+      await expect(service.getCategoryById('999')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -215,7 +202,7 @@ describe('PuzzleCategoryService', () => {
         title: 'New Puzzle',
         description: 'A new puzzle',
         difficulty: 'BEGINNER',
-        categoryIds: [1, 2],
+        categoryIds: ['1', '2'],
       };
 
       const mockCategories = [
@@ -236,7 +223,7 @@ describe('PuzzleCategoryService', () => {
       const result = await service.createPuzzle(createPuzzleDto);
 
       expect(result).toEqual(mockPuzzle);
-      expect(mockCategoryRepository.findByIds).toHaveBeenCalledWith([1, 2]);
+      expect(mockCategoryRepository.findByIds).toHaveBeenCalledWith(['1', '2']);
     });
   });
 

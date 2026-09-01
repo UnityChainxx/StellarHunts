@@ -54,7 +54,7 @@ export class ActivityService {
   ) {
     const activity = this.activityRepo.create({
       user: { id: userId },
-      type,
+      type: type as ActivityType,
       metadata,
     });
     return this.activityRepo.save(activity);

@@ -1,0 +1,1782 @@
+// csp-security-review.ts
+//
+// Comprehensive Content Security Policy (CSP) security review
+// for a NestJS application.
+//
+// Security goals:
+//
+// 1. Detect 'unsafe-inline'.
+// 2. Detect 'unsafe-eval'.
+// 3. Prevent unsafe CSP configuration in production.
+// 4. Provide a secure production baseline.
+// 5. Allow development-specific CSP relaxation.
+// 6. Detect wildcard sources.
+// 7. Detect overly permissive script-src directives.
+// 8. Detect unsafe fallback directives.
+// 9. Provide automated tests.
+// 10. Provide middleware/header integration.
+//
+// ============================================================
+
+
+// ============================================================
+// IMPORTS
+// ============================================================
+
+import {
+  Injectable,
+  Logger,
+  NestMiddleware,
+} from '@nestjs/common';
+
+import {
+  Request,
+  Response,
+  NextFunction,
+} from 'express';
+
+
+// ============================================================
+// TYPES
+// ============================================================
+
+export type CspEnvironment =
+  | 'development'
+  | 'test'
+  | 'staging'
+  | 'production';
+
+export interface CspDirective {
+  name: string;
+
+  sources: string[];
+}
+
+export interface CspPolicy {
+  directives:
+    CspDirective[];
+}
+
+export interface CspFinding {
+  severity:
+    | 'critical'
+    | 'high'
+    | 'medium'
+    | 'low'
+    | 'info';
+
+  directive: string;
+
+  value: string;
+
+  message: string;
+
+  recommendation: string;
+}
+
+export interface CspReviewResult {
+  safe: boolean;
+
+  environment:
+    CspEnvironment;
+
+  findings:
+    CspFinding[];
+
+  policy:
+    string;
+}
+
+
+// ============================================================
+// ENVIRONMENT SERVICE
+// ============================================================
+
+@Injectable()
+export class CspEnvironmentService {
+
+  getEnvironment():
+    CspEnvironment {
+
+    const environment =
+      (
+        process.env.NODE_ENV ??
+        'production'
+      )
+        .trim()
+        .toLowerCase();
+
+    switch (environment) {
+
+      case 'development':
+      case 'dev':
+        return 'development';
+
+      case 'test':
+        return 'test';
+
+      case 'staging':
+      case 'stage':
+        return 'staging';
+
+      case 'production':
+      case 'prod':
+        return 'production';
+
+      default:
+        /**
+         * Fail closed.
+         */
+        return 'production';
+    }
+  }
+
+  isProduction(): boolean {
+
+    return (
+      this.getEnvironment() ===
+      'production'
+    );
+  }
+
+  isDevelopment(): boolean {
+
+    return (
+      this.getEnvironment() ===
+      'development'
+    );
+  }
+}
+
+
+// ============================================================
+// CSP PARSER
+// ============================================================
+
+@Injectable()
+export class CspParser {
+
+  parse(
+    policy: string,
+  ): CspPolicy {
+
+    if (
+      !policy ||
+      typeof policy !==
+        'string'
+    ) {
+
+      return {
+        directives: [],
+      };
+    }
+
+    const directives:
+      CspDirective[] = [];
+
+    const sections =
+      policy
+        .split(';')
+        .map(
+          (section) =>
+            section.trim(),
+        )
+        .filter(Boolean);
+
+    for (
+      const section of sections
+    ) {
+
+      const tokens =
+        section
+          .split(/\s+/)
+          .filter(Boolean);
+
+      if (
+        tokens.length === 0
+      ) {
+        continue;
+      }
+
+      const name =
+        tokens[0]
+          .toLowerCase();
+
+      directives.push({
+        name,
+
+        sources:
+          tokens.slice(1),
+      });
+    }
+
+    return {
+      directives,
+    };
+  }
+}
+
+
+// ============================================================
+// CSP REVIEWER
+// ============================================================
+
+@Injectable()
+export class CspSecurityReviewer {
+
+  private readonly logger =
+    new Logger(
+      CspSecurityReviewer.name,
+    );
+
+  constructor(
+    private readonly parser:
+      CspParser,
+
+    private readonly environment:
+      CspEnvironmentService,
+  ) {}
+
+  review(
+    policy: string,
+  ):
+    CspReviewResult {
+
+    const parsed =
+      this.parser.parse(
+        policy,
+      );
+
+    const findings:
+      CspFinding[] = [];
+
+    for (
+      const directive
+        of parsed.directives
+    ) {
+
+      this.inspectDirective(
+        directive,
+        findings,
+      );
+    }
+
+    this.inspectScriptPolicy(
+      parsed,
+      findings,
+    );
+
+    this.inspectDefaultPolicy(
+      parsed,
+      findings,
+    );
+
+    const environment =
+      this.environment
+        .getEnvironment();
+
+    /**
+     * Production should not contain unsafe-inline or
+     * unsafe-eval.
+     */
+    if (
+      environment ===
+        'production' ||
+      environment ===
+        'staging'
+    ) {
+
+      for (
+        const finding of findings
+      ) {
+
+        if (
+          finding.directive ===
+            'script-src' &&
+          (
+            finding.value ===
+              "'unsafe-inline'" ||
+            finding.value ===
+              "'unsafe-eval'"
+          )
+        ) {
+
+          finding.severity =
+            'critical';
+        }
+      }
+    }
+
+    const critical =
+      findings.some(
+        (finding) =>
+          finding.severity ===
+            'critical' ||
+          finding.severity ===
+            'high',
+      );
+
+    return {
+      safe:
+        !critical,
+
+      environment,
+
+      findings,
+
+      policy:
+        policy.trim(),
+    };
+  }
+
+  private inspectDirective(
+    directive:
+      CspDirective,
+
+    findings:
+      CspFinding[],
+  ): void {
+
+    // --------------------------------------------------------
+    // unsafe-inline
+    // --------------------------------------------------------
+
+    if (
+      directive.sources.includes(
+        "'unsafe-inline'",
+      )
+    ) {
+
+      findings.push({
+        severity:
+          directive.name ===
+            'script-src'
+            ? 'high'
+            : 'medium',
+
+        directive:
+          directive.name,
+
+        value:
+          "'unsafe-inline'",
+
+        message:
+          `'unsafe-inline' permits inline ` +
+          `scripts or styles to execute.`,
+
+        recommendation:
+          `Remove 'unsafe-inline' and use ` +
+          `nonces, hashes, or external resources ` +
+          `instead.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // unsafe-eval
+    // --------------------------------------------------------
+
+    if (
+      directive.sources.includes(
+        "'unsafe-eval'",
+      )
+    ) {
+
+      findings.push({
+        severity:
+          'high',
+
+        directive:
+          directive.name,
+
+        value:
+          "'unsafe-eval'",
+
+        message:
+          `'unsafe-eval' allows APIs such as ` +
+          `eval(), Function(), and similar dynamic ` +
+          `code execution mechanisms.`,
+
+        recommendation:
+          `Remove 'unsafe-eval'. Refactor code or ` +
+          `dependencies that require dynamic evaluation.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // Wildcard
+    // --------------------------------------------------------
+
+    if (
+      directive.sources.includes(
+        '*',
+      )
+    ) {
+
+      findings.push({
+        severity:
+          directive.name ===
+            'script-src'
+            ? 'high'
+            : 'medium',
+
+        directive:
+          directive.name,
+
+        value:
+          '*',
+
+        message:
+          `Wildcard source allows resources from ` +
+          `arbitrary origins.`,
+
+        recommendation:
+          `Replace '*' with explicit trusted origins.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // Data URLs
+    // --------------------------------------------------------
+
+    if (
+      directive.sources.includes(
+        'data:',
+      )
+    ) {
+
+      findings.push({
+        severity:
+          directive.name ===
+            'script-src'
+            ? 'high'
+            : 'low',
+
+        directive:
+          directive.name,
+
+        value:
+          'data:',
+
+        message:
+          `data: permits resources to be loaded ` +
+          `from data URLs.`,
+
+        recommendation:
+          `Remove data: unless it is strictly required.`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // Blob URLs
+    // --------------------------------------------------------
+
+    if (
+      directive.sources.includes(
+        'blob:',
+      )
+    ) {
+
+      findings.push({
+        severity:
+          directive.name ===
+            'script-src'
+            ? 'medium'
+            : 'low',
+
+        directive:
+          directive.name,
+
+        value:
+          'blob:',
+
+        message:
+          `blob: allows resource loading from ` +
+          `Blob URLs.`,
+
+        recommendation:
+          `Remove blob: unless the application explicitly ` +
+          `requires it.`,
+      });
+    }
+  }
+
+  private inspectScriptPolicy(
+    policy:
+      CspPolicy,
+
+    findings:
+      CspFinding[],
+  ): void {
+
+    const scriptSrc =
+      policy.directives.find(
+        (directive) =>
+          directive.name ===
+          'script-src',
+      );
+
+    if (
+      !scriptSrc
+    ) {
+
+      const defaultSrc =
+        policy.directives.find(
+          (directive) =>
+            directive.name ===
+            'default-src',
+        );
+
+      if (
+        !defaultSrc
+      ) {
+
+        findings.push({
+          severity:
+            'high',
+
+          directive:
+            'script-src',
+
+          value:
+            '',
+
+          message:
+            `No script-src or default-src directive ` +
+            `was found.`,
+
+          recommendation:
+            `Define an explicit script-src policy.`,
+        });
+      }
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // HTTP origins
+    // --------------------------------------------------------
+
+    for (
+      const source of
+        scriptSrc.sources
+    ) {
+
+      if (
+        source.startsWith(
+          'http:',
+        )
+      ) {
+
+        findings.push({
+          severity:
+            'high',
+
+          directive:
+            'script-src',
+
+          value:
+            source,
+
+          message:
+            `script-src allows scripts over insecure HTTP.`,
+
+          recommendation:
+            `Use HTTPS origins only.`,
+        });
+      }
+    }
+
+    // --------------------------------------------------------
+    // Missing nonce/hash
+    // --------------------------------------------------------
+
+    const hasNonce =
+      scriptSrc.sources.some(
+        (source) =>
+          source.startsWith(
+            "'nonce-",
+          ),
+      );
+
+    const hasHash =
+      scriptSrc.sources.some(
+        (source) =>
+          source.startsWith(
+            "'sha256-",
+          ) ||
+          source.startsWith(
+            "'sha384-",
+          ) ||
+          source.startsWith(
+            "'sha512-",
+          ),
+      );
+
+    const hasUnsafeInline =
+      scriptSrc.sources.includes(
+        "'unsafe-inline'",
+      );
+
+    /**
+     * If inline scripts are required, nonce/hash based
+     * authorization is preferable.
+     */
+    if (
+      hasUnsafeInline &&
+      !hasNonce &&
+      !hasHash
+    ) {
+
+      findings.push({
+        severity:
+          'high',
+
+        directive:
+          'script-src',
+
+        value:
+          "'unsafe-inline'",
+
+        message:
+          `Inline scripts are authorized without a nonce ` +
+          `or cryptographic hash.`,
+
+        recommendation:
+          `Use a per-response nonce or a SHA-256/384/512 ` +
+          `hash instead.`,
+      });
+    }
+  }
+
+  private inspectDefaultPolicy(
+    policy:
+      CspPolicy,
+
+    findings:
+      CspFinding[],
+  ): void {
+
+    const defaultSrc =
+      policy.directives.find(
+        (directive) =>
+          directive.name ===
+          'default-src',
+      );
+
+    if (
+      !defaultSrc
+    ) {
+
+      findings.push({
+        severity:
+          'medium',
+
+        directive:
+          'default-src',
+
+        value:
+          '',
+
+        message:
+          `default-src is missing.`,
+
+        recommendation:
+          `Define a restrictive default-src policy as ` +
+          `a fallback for unspecified resource types.`,
+      });
+    }
+  }
+}
+
+
+// ============================================================
+// SECURE CSP POLICY BUILDER
+// ============================================================
+
+@Injectable()
+export class SecureCspPolicyBuilder {
+
+  /**
+   * Production baseline.
+   *
+   * This policy intentionally avoids:
+   *
+   *     'unsafe-inline'
+   *
+   * and:
+   *
+   *     'unsafe-eval'
+   *
+   * from script-src.
+   *
+   * ----------------------------------------------------------
+   *
+   * Important:
+   *
+   * CSP policies must be adapted to the actual application.
+   * Do not blindly add third-party domains.
+   */
+  buildProductionPolicy():
+    string {
+
+    return [
+      "default-src 'self'",
+
+      "base-uri 'self'",
+
+      "object-src 'none'",
+
+      "frame-ancestors 'none'",
+
+      "script-src 'self'",
+
+      "style-src 'self'",
+
+      "img-src 'self' data:",
+
+      "font-src 'self'",
+
+      "connect-src 'self'",
+
+      "form-action 'self'",
+
+      "frame-src 'none'",
+
+      "worker-src 'self'",
+
+      "manifest-src 'self'",
+
+      "media-src 'self'",
+
+      "upgrade-insecure-requests",
+
+    ].join('; ');
+  }
+
+  /**
+   * Development policy.
+   *
+   * Development tools may require additional functionality.
+   *
+   * Even here, avoid unsafe-eval unless an actual development
+   * dependency requires it.
+   */
+  buildDevelopmentPolicy():
+    string {
+
+    return [
+      "default-src 'self'",
+
+      "base-uri 'self'",
+
+      "object-src 'none'",
+
+      "frame-ancestors 'none'",
+
+      "script-src 'self'",
+
+      "style-src 'self' 'unsafe-inline'",
+
+      "img-src 'self' data: blob:",
+
+      "font-src 'self'",
+
+      "connect-src 'self' ws: wss:",
+
+      "form-action 'self'",
+
+      "frame-src 'none'",
+
+      "worker-src 'self' blob:",
+
+    ].join('; ');
+  }
+
+  buildForEnvironment(
+    environment:
+      CspEnvironment,
+  ):
+    string {
+
+    if (
+      environment ===
+        'development' ||
+      environment ===
+        'test'
+    ) {
+
+      return this
+        .buildDevelopmentPolicy();
+    }
+
+    return this
+      .buildProductionPolicy();
+  }
+}
+
+
+// ============================================================
+// CSP CONFIGURATION SERVICE
+// ============================================================
+
+@Injectable()
+export class CspConfigurationService {
+
+  constructor(
+    private readonly environment:
+      CspEnvironmentService,
+
+    private readonly builder:
+      SecureCspPolicyBuilder,
+
+    private readonly reviewer:
+      CspSecurityReviewer,
+  ) {}
+
+  getPolicy():
+    string {
+
+    const env =
+      this.environment
+        .getEnvironment();
+
+    const policy =
+      this.builder
+        .buildForEnvironment(
+          env,
+        );
+
+    const review =
+      this.reviewer.review(
+        policy,
+      );
+
+    /**
+     * Production configuration should never silently
+     * contain critical findings.
+     */
+    if (
+      (
+        env ===
+          'production' ||
+        env ===
+          'staging'
+      ) &&
+      !review.safe
+    ) {
+
+      throw new Error(
+        `Unsafe CSP configuration detected in ${env}.`,
+      );
+    }
+
+    return policy;
+  }
+}
+
+
+// ============================================================
+// CSP MIDDLEWARE
+// ============================================================
+
+@Injectable()
+export class ContentSecurityPolicyMiddleware
+  implements NestMiddleware {
+
+  constructor(
+    private readonly config:
+      CspConfigurationService,
+  ) {}
+
+  use(
+    request:
+      Request,
+
+    response:
+      Response,
+
+    next:
+      NextFunction,
+  ): void {
+
+    const policy =
+      this.config.getPolicy();
+
+    response.setHeader(
+      'Content-Security-Policy',
+      policy,
+    );
+
+    next();
+  }
+}
+
+
+// ============================================================
+// CSP REPORT-ONLY MIDDLEWARE
+// ============================================================
+
+@Injectable()
+export class CspReportOnlyMiddleware
+  implements NestMiddleware {
+
+  constructor(
+    private readonly builder:
+      SecureCspPolicyBuilder,
+
+    private readonly environment:
+      CspEnvironmentService,
+  ) {}
+
+  use(
+    request:
+      Request,
+
+    response:
+      Response,
+
+    next:
+      NextFunction,
+  ): void {
+
+    const env =
+      this.environment
+        .getEnvironment();
+
+    /**
+     * Report-Only can be useful while migrating a legacy
+     * application away from unsafe-inline.
+     */
+    const policy =
+      this.builder
+        .buildForEnvironment(
+          env,
+        );
+
+    response.setHeader(
+      'Content-Security-Policy-Report-Only',
+      policy,
+    );
+
+    next();
+  }
+}
+
+
+// ============================================================
+// CSP SECURITY REPORT
+// ============================================================
+
+export interface CspViolationReport {
+
+  'document-uri'?: string;
+
+  referrer?: string;
+
+  'violated-directive'?: string;
+
+  'effective-directive'?: string;
+
+  'original-policy'?: string;
+
+  disposition?:
+    | 'enforce'
+    | 'report';
+
+  'blocked-uri'?: string;
+
+  'source-file'?: string;
+
+  'line-number'?: number;
+
+  'column-number'?: number;
+}
+
+
+// ============================================================
+// CSP REPORT SERVICE
+// ============================================================
+
+@Injectable()
+export class CspReportService {
+
+  private readonly logger =
+    new Logger(
+      CspReportService.name,
+    );
+
+  record(
+    report:
+      CspViolationReport,
+  ): void {
+
+    /**
+     * Do not log sensitive request data.
+     *
+     * CSP reports may contain URLs and source locations.
+     *
+     * Sanitize them before sending to external logging/SIEM.
+     */
+    this.logger.warn(
+      JSON.stringify({
+        type:
+          'csp-violation',
+
+        directive:
+          report[
+            'effective-directive'
+          ],
+
+        blockedUri:
+          report[
+            'blocked-uri'
+          ],
+
+        disposition:
+          report.disposition,
+
+        timestamp:
+          new Date()
+            .toISOString(),
+      }),
+    );
+  }
+}
+
+
+// ============================================================
+// CSP CONTROLLER EXAMPLE
+// ============================================================
+
+export class CspController {
+
+  constructor(
+    private readonly reports:
+      CspReportService,
+  ) {}
+
+  receiveReport(
+    report:
+      CspViolationReport,
+  ): {
+    received: boolean;
+  } {
+
+    this.reports.record(
+      report,
+    );
+
+    return {
+      received: true,
+    };
+  }
+}
+
+
+// ============================================================
+// LEGACY CSP AUDIT SERVICE
+// ============================================================
+
+@Injectable()
+export class LegacyCspAuditService {
+
+  constructor(
+    private readonly reviewer:
+      CspSecurityReviewer,
+  ) {}
+
+  audit(
+    existingPolicy:
+      string,
+  ):
+    CspReviewResult {
+
+    return this.reviewer.review(
+      existingPolicy,
+    );
+  }
+}
+
+
+// ============================================================
+// EXAMPLE LEGACY POLICIES
+// ============================================================
+
+export const UNSAFE_LEGACY_POLICY =
+  [
+    "default-src 'self'",
+
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+
+    "style-src 'self' 'unsafe-inline'",
+
+    "img-src * data:",
+
+  ].join('; ');
+
+
+export const SAFER_POLICY =
+  [
+    "default-src 'self'",
+
+    "base-uri 'self'",
+
+    "object-src 'none'",
+
+    "frame-ancestors 'none'",
+
+    "script-src 'self'",
+
+    "style-src 'self'",
+
+    "img-src 'self' data:",
+
+    "font-src 'self'",
+
+    "connect-src 'self'",
+
+    "form-action 'self'",
+
+    "frame-src 'none'",
+
+    "worker-src 'self'",
+
+  ].join('; ');
+
+
+// ============================================================
+// REVIEW TESTS
+// ============================================================
+
+describe(
+  'CspSecurityReviewer',
+  () => {
+
+    let reviewer:
+      CspSecurityReviewer;
+
+    beforeEach(() => {
+
+      process.env.NODE_ENV =
+        'production';
+
+      reviewer =
+        new CspSecurityReviewer(
+          new CspParser(),
+          new CspEnvironmentService(),
+        );
+    });
+
+    it(
+      'should detect unsafe-inline',
+      () => {
+
+        const result =
+          reviewer.review(
+            "script-src 'self' 'unsafe-inline'",
+          );
+
+        expect(
+          result.safe,
+        ).toBe(false);
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.value ===
+              "'unsafe-inline'",
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should detect unsafe-eval',
+      () => {
+
+        const result =
+          reviewer.review(
+            "script-src 'self' 'unsafe-eval'",
+          );
+
+        expect(
+          result.safe,
+        ).toBe(false);
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.value ===
+              "'unsafe-eval'",
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should detect wildcard script sources',
+      () => {
+
+        const result =
+          reviewer.review(
+            "script-src *",
+          );
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.value === '*',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should detect HTTP script sources',
+      () => {
+
+        const result =
+          reviewer.review(
+            "script-src http://example.com",
+          );
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.value ===
+              'http://example.com',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should detect missing default-src',
+      () => {
+
+        const result =
+          reviewer.review(
+            "script-src 'self'",
+          );
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.directive ===
+              'default-src',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should accept a restrictive policy',
+      () => {
+
+        const result =
+          reviewer.review(
+            SAFER_POLICY,
+          );
+
+        expect(
+          result.findings.some(
+            (finding) =>
+              finding.value ===
+                "'unsafe-inline'" ||
+              finding.value ===
+                "'unsafe-eval'",
+          ),
+        ).toBe(false);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// POLICY BUILDER TESTS
+// ============================================================
+
+describe(
+  'SecureCspPolicyBuilder',
+  () => {
+
+    let builder:
+      SecureCspPolicyBuilder;
+
+    beforeEach(() => {
+
+      builder =
+        new SecureCspPolicyBuilder();
+    });
+
+    it(
+      'should not include unsafe-inline in production script-src',
+      () => {
+
+        const policy =
+          builder
+            .buildProductionPolicy();
+
+        const script =
+          policy
+            .split(';')
+            .find(
+              (directive) =>
+                directive.trim()
+                  .startsWith(
+                    'script-src',
+                  ),
+            );
+
+        expect(
+          script,
+        ).toBeDefined();
+
+        expect(
+          script,
+        ).not.toContain(
+          "'unsafe-inline'",
+        );
+      },
+    );
+
+    it(
+      'should not include unsafe-eval in production',
+      () => {
+
+        const policy =
+          builder
+            .buildProductionPolicy();
+
+        expect(
+          policy,
+        ).not.toContain(
+          "'unsafe-eval'",
+        );
+      },
+    );
+
+    it(
+      'should provide a restrictive default-src',
+      () => {
+
+        const policy =
+          builder
+            .buildProductionPolicy();
+
+        expect(
+          policy,
+        ).toContain(
+          "default-src 'self'",
+        );
+      },
+    );
+
+    it(
+      'should disable object execution',
+      () => {
+
+        const policy =
+          builder
+            .buildProductionPolicy();
+
+        expect(
+          policy,
+        ).toContain(
+          "object-src 'none'",
+        );
+      },
+    );
+
+    it(
+      'should restrict framing',
+      () => {
+
+        const policy =
+          builder
+            .buildProductionPolicy();
+
+        expect(
+          policy,
+        ).toContain(
+          "frame-ancestors 'none'",
+        );
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// ENVIRONMENT TESTS
+// ============================================================
+
+describe(
+  'CspEnvironmentService',
+  () => {
+
+    let service:
+      CspEnvironmentService;
+
+    beforeEach(() => {
+
+      service =
+        new CspEnvironmentService();
+    });
+
+    it(
+      'should identify production',
+      () => {
+
+        process.env.NODE_ENV =
+          'production';
+
+        expect(
+          service.isProduction(),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should identify development',
+      () => {
+
+        process.env.NODE_ENV =
+          'development';
+
+        expect(
+          service.isDevelopment(),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      'should fail closed',
+      () => {
+
+        process.env.NODE_ENV =
+          'unknown';
+
+        expect(
+          service.getEnvironment(),
+        ).toBe(
+          'production',
+        );
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// MIDDLEWARE TEST
+// ============================================================
+
+describe(
+  'ContentSecurityPolicyMiddleware',
+  () => {
+
+    it(
+      'should set CSP response header',
+      () => {
+
+        const configuration =
+          new CspConfigurationService(
+            new CspEnvironmentService(),
+
+            new SecureCspPolicyBuilder(),
+
+            new CspSecurityReviewer(
+              new CspParser(),
+
+              new CspEnvironmentService(),
+            ),
+          );
+
+        const middleware =
+          new ContentSecurityPolicyMiddleware(
+            configuration,
+          );
+
+        const headers =
+          new Map<
+            string,
+            string
+          >();
+
+        const response =
+          {
+            setHeader(
+              name: string,
+              value: string,
+            ) {
+              headers.set(
+                name,
+                value,
+              );
+            },
+          } as unknown as Response;
+
+        const request =
+          {} as Request;
+
+        let nextCalled =
+          false;
+
+        middleware.use(
+          request,
+          response,
+          () => {
+            nextCalled = true;
+          },
+        );
+
+        expect(
+          headers.has(
+            'Content-Security-Policy',
+          ),
+        ).toBe(true);
+
+        expect(
+          nextCalled,
+        ).toBe(true);
+      },
+    );
+  },
+);
+
+
+// ============================================================
+// SECURITY REVIEW CHECKLIST
+// ============================================================
+
+export const CSP_SECURITY_CHECKLIST = {
+
+  unsafeInline:
+    {
+      status:
+        'must-remove-from-production',
+
+      reason:
+        'Allows inline content without nonce/hash authorization.',
+    },
+
+  unsafeEval:
+    {
+      status:
+        'must-remove-from-production',
+
+      reason:
+        'Allows dynamic JavaScript evaluation.',
+    },
+
+  wildcardScriptSources:
+    {
+      status:
+        'avoid',
+
+      reason:
+        'Allows scripts from arbitrary origins.',
+    },
+
+  httpScriptSources:
+    {
+      status:
+        'forbidden',
+
+      reason:
+        'Allows scripts over insecure HTTP.',
+    },
+
+  objectSrc:
+    {
+      status:
+        'recommended-none',
+
+      reason:
+        'Disables legacy plugin content such as Flash.',
+    },
+
+  baseUri:
+    {
+      status:
+        'recommended-self',
+
+      reason:
+        'Reduces base URL manipulation attacks.',
+    },
+
+  frameAncestors:
+    {
+      status:
+        'recommended',
+
+      reason:
+        'Helps prevent clickjacking.',
+    },
+
+  defaultSrc:
+    {
+      status:
+        'required',
+
+      reason:
+        'Provides restrictive fallback behavior.',
+    },
+
+  nonces:
+    {
+      status:
+        'recommended',
+
+      reason:
+        'Allows specific inline scripts without unsafe-inline.',
+    },
+
+  hashes:
+    {
+      status:
+        'recommended',
+
+      reason:
+        'Allows known inline scripts using cryptographic hashes.',
+    },
+
+  reportOnly:
+    {
+      status:
+        'recommended-during-migration',
+
+      reason:
+        'Allows CSP violations to be observed before enforcement.',
+    },
+};
+
+
+// ============================================================
+// MIGRATION NOTES
+// ============================================================
+
+/**
+ * ============================================================
+ * HOW TO MIGRATE AWAY FROM unsafe-inline
+ * ============================================================
+ *
+ * BEFORE:
+ *
+ *     script-src 'self' 'unsafe-inline'
+ *
+ *
+ * AFTER:
+ *
+ *     script-src 'self' 'nonce-RANDOM_VALUE'
+ *
+ *
+ * The nonce must:
+ *
+ * 1. Be generated using a cryptographically secure RNG.
+ * 2. Be unique for every HTTP response.
+ * 3. Be inserted into the CSP header.
+ * 4. Be applied to the corresponding script tag.
+ *
+ *
+ * Example concept:
+ *
+ *     <script nonce="RANDOM_VALUE">
+ *         applicationBootstrap();
+ *     </script>
+ *
+ *
+ * ============================================================
+ * HOW TO MIGRATE AWAY FROM unsafe-eval
+ * ============================================================
+ *
+ * Search the codebase for:
+ *
+ *     eval(
+ *
+ *     new Function(
+ *
+ *     Function(
+ *
+ *     setTimeout("...")
+ *
+ *     setInterval("...")
+ *
+ *
+ * Also investigate third-party dependencies that dynamically
+ * compile JavaScript.
+ *
+ *
+ * ============================================================
+ * IMPORTANT
+ * ============================================================
+ *
+ * Do not simply remove unsafe-inline from a production CSP
+ * without testing the application.
+ *
+ * Removing it can break:
+ *
+ * - inline scripts
+ * - inline styles
+ * - framework bootstrapping
+ * - third-party widgets
+ * - analytics
+ * - legacy templates
+ *
+ * The correct approach is:
+ *
+ *     1. Start with Report-Only.
+ *     2. Collect violations.
+ *     3. Identify legitimate resources.
+ *     4. Replace inline scripts with external scripts.
+ *     5. Replace inline styles with stylesheets/classes.
+ *     6. Use nonces for unavoidable inline scripts.
+ *     7. Use hashes for static inline scripts.
+ *     8. Remove unsafe-eval dependencies.
+ *     9. Remove unnecessary third-party origins.
+ *     10. Enable enforcement.
+ *
+ *
+ * ============================================================
+ * ACCEPTANCE CRITERIA
+ * ============================================================
+ *
+ * [x] Existing CSP policies can be parsed.
+ *
+ * [x] unsafe-inline is detected.
+ *
+ * [x] unsafe-eval is detected.
+ *
+ * [x] Wildcard script sources are detected.
+ *
+ * [x] HTTP script sources are detected.
+ *
+ * [x] Missing default-src is detected.
+ *
+ * [x] Production unsafe directives are treated as critical/high.
+ *
+ * [x] Production policy excludes unsafe-inline from script-src.
+ *
+ * [x] Production policy excludes unsafe-eval.
+ *
+ * [x] object-src is restricted.
+ *
+ * [x] base-uri is restricted.
+ *
+ * [x] frame-ancestors is restricted.
+ *
+ * [x] CSP middleware is provided.
+ *
+ * [x] Report-Only migration support is provided.
+ *
+ * [x] CSP violation logging is provided.
+ *
+ * [x] Automated tests are included.
+ *
+ * [x] Development and production policies are separated.
+ *
+ * [x] Unknown environments fail closed.
+ *
+ */

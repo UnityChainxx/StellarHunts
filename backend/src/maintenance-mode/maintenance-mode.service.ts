@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
@@ -107,7 +108,7 @@ export class MaintenanceModeService implements OnModuleInit {
    * Update maintenance configuration
    */
   async updateMaintenanceConfig(
-    updateDto: UpdateMaintenanceConfigDto,
+    updateDto: Partial<UpdateMaintenanceConfigDto>,
   ): Promise<MaintenanceConfig> {
     const config = await this.getMaintenanceConfig();
 

@@ -24,6 +24,8 @@ import { PuzzleReview } from './puzzle-review/puzzle-review/entities/puzzle-revi
 import { ReviewModeration } from './puzzle-review/puzzle-review/entities/review-moderation.entity';
 import { DraftPuzzle } from './puzzle-draft/entities/draft-puzzle.entity';
 
+import { CacheModule } from './cache/cache.module';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -135,7 +137,8 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     ApiKeyModule,
     HealthModule,
     AuthModule,
-    BadgeModule,
+    // Redis-backed caching + single-flight for the read-heavy endpoints
+    // (`/streaks/leaderboard`, `/analytics/puzzles/most-solved`) (#107).
     CacheModule,
     ContentModule,
     ContentRatingModule,

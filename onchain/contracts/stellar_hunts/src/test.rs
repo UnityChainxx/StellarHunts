@@ -4,8 +4,8 @@ use crate::{StellarHunts, StellarHuntsClient};
 // Brings `Address::generate` into scope as an extension trait method.
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger;
-use soroban_sdk::{Address, Bytes, BytesN, Env};
 use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+use soroban_sdk::{Address, Bytes, Env, IntoVal};
 
 /// Generate a fresh admin address (distinct from the destructured binding
 /// returned by `init_with_admin`).
@@ -16,7 +16,6 @@ fn new_admin(env: &Env) -> Address {
 fn user(env: &Env) -> Address {
     Address::generate(env)
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RateLimitConfig {
@@ -38,7 +37,10 @@ impl Default for RateLimitConfig {
 impl RateLimitConfig {
     /// Validates that a proposed update keeps all limits positive.
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.max_requests_per_day == 0 || self.max_value_per_day == 0 || self.chain_daily_limit == 0 {
+        if self.max_requests_per_day == 0
+            || self.max_value_per_day == 0
+            || self.chain_daily_limit == 0
+        {
             return Err("rate limit values must be positive");
         }
         Ok(())
@@ -58,11 +60,13 @@ mod tests {
 
     #[test]
     fn rejects_zeroed_limits() {
-        let cfg = RateLimitConfig { max_requests_per_day: 0, ..RateLimitConfig::default() };
+        let cfg = RateLimitConfig {
+            max_requests_per_day: 0,
+            ..RateLimitConfig::default()
+        };
         assert!(cfg.validate().is_err());
     }
 }
-
 
 fn b(env: &Env, s: &str) -> Bytes {
     Bytes::from_slice(env, s.as_bytes())
@@ -77,18 +81,17 @@ fn b(env: &Env, s: &str) -> Bytes {
 /// can set up further `mock_auths` for subsequent admin/player calls.
 fn init_with_admin(env: &Env) -> (Address, Address, StellarHuntsClient) {
     let admin = new_admin(env);
-    let contract_id: BytesN<32> = env.register_contract(None, StellarHunts);
-    let contract_address = Address::from_contract_id(env, &contract_id);
-    let client = StellarHuntsClient::new(env, &contract_id);
+    let contract_address = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(env, &contract_address);
 
     // Grant admin auth **only** for the `init` call.
     env.mock_auths(&[MockAuth {
-        address: admin.clone(),
-        invoke: MockAuthInvoke {
-            contract: contract_address.clone(),
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
             fn_name: "init",
-            args: Vec::new(env),
-            sub_invokes: Vec::new(env),
+            args: (&admin,).into_val(env),
+            sub_invokes: &[],
         },
     }]);
 
@@ -104,16 +107,15 @@ fn init_with_admin(env: &Env) -> (Address, Address, StellarHuntsClient) {
 fn test_set_question_per_level_admin_only() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, client) = init_with_admin(&env);
     let (admin, contract_address, client) = init_with_admin(&env);
 
     env.mock_auths(&[MockAuth {
-        address: admin.clone(),
-        invoke: MockAuthInvoke {
-            contract: contract_address.clone(),
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
             fn_name: "set_question_per_level",
-            args: Vec::new(env),
-            sub_invokes: Vec::new(env),
+            args: (&5u32,).into_val(&env),
+            sub_invokes: &[],
         },
     }]);
 
@@ -134,7 +136,10 @@ fn test_set_question_per_level_unauthorized() {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         client.set_question_per_level(&5u32);
     }));
-    assert!(result.is_err(), "non-admin should not be able to set_question_per_level");
+    assert!(
+        result.is_err(),
+        "non-admin should not be able to set_question_per_level"
+    );
 }
 
 // ---------------------------------------------------------------------
@@ -145,7 +150,6 @@ fn test_set_question_per_level_unauthorized() {
 fn test_add_and_get_question() {
     let env = Env::default();
     env.mock_all_auths();
-    let (_admin, client) = init_with_admin(&env);
     let (admin, contract_address, client) = init_with_admin(&env);
 
     let level = crate::Levels::Easy;
@@ -156,21 +160,21 @@ fn test_add_and_get_question() {
     // Set up admin auth for both admin-only calls.
     env.mock_auths(&[
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "set_question_per_level",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&5u32,).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "add_question",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (level.clone(), &question, &answer, &hint).into_val(&env),
+                sub_invokes: &[],
             },
         },
     ]);
@@ -199,7 +203,10 @@ fn test_add_question_unauthorized() {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         client.add_question(&level, &question, &answer, &hint);
     }));
-    assert!(result.is_err(), "non-admin should not be able to add_question");
+    assert!(
+        result.is_err(),
+        "non-admin should not be able to add_question"
+    );
 }
 
 // ---------------------------------------------------------------------
@@ -209,6 +216,9 @@ fn test_add_question_unauthorized() {
 #[test]
 fn test_submit_answer_correct_progresses() {
     let env = Env::default();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
     let (admin, contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
@@ -220,30 +230,30 @@ fn test_submit_answer_correct_progresses() {
     // Set up auths for admin (setup) and player (submit_answer).
     env.mock_auths(&[
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "set_question_per_level",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&1u32,).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "add_question",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (level.clone(), &question, &answer, &hint).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: player.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &player,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "submit_answer",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&player, &1u64, &answer).into_val(&env),
+                sub_invokes: &[],
             },
         },
     ]);
@@ -265,6 +275,9 @@ fn test_submit_answer_correct_progresses() {
 #[test]
 fn test_submit_answer_incorrect_does_not_progress() {
     let env = Env::default();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
     let (admin, contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
@@ -276,30 +289,30 @@ fn test_submit_answer_incorrect_does_not_progress() {
 
     env.mock_auths(&[
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "set_question_per_level",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&1u32,).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "add_question",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (level.clone(), &question, &answer, &hint).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: player.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &player,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "submit_answer",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&player, &1u64, &wrong).into_val(&env),
+                sub_invokes: &[],
             },
         },
     ]);
@@ -321,6 +334,9 @@ fn test_submit_answer_incorrect_does_not_progress() {
 #[test]
 fn test_request_hint_after_initialize() {
     let env = Env::default();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
     let (admin, contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
@@ -334,39 +350,48 @@ fn test_request_hint_after_initialize() {
 
     env.mock_auths(&[
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "set_question_per_level",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&2u32,).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: admin.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "add_question",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (level.clone(), &q1, &a1, &h1).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: player.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
+                fn_name: "add_question",
+                args: (level.clone(), &q2, &a2, &h2).into_val(&env),
+                sub_invokes: &[],
+            },
+        },
+        MockAuth {
+            address: &player,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "submit_answer",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&player, &1u64, &a1).into_val(&env),
+                sub_invokes: &[],
             },
         },
         MockAuth {
-            address: player.clone(),
-            invoke: MockAuthInvoke {
-                contract: contract_address.clone(),
+            address: &player,
+            invoke: &MockAuthInvoke {
+                contract: &contract_address,
                 fn_name: "request_hint",
-                args: Vec::new(env),
-                sub_invokes: Vec::new(env),
+                args: (&player, &1u64).into_val(&env),
+                sub_invokes: &[],
             },
         },
     ]);
@@ -394,12 +419,12 @@ fn test_set_nft_contract_address_admin_only() {
     let new_addr = Address::generate(&env);
 
     env.mock_auths(&[MockAuth {
-        address: admin.clone(),
-        invoke: MockAuthInvoke {
-            contract: contract_address.clone(),
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
             fn_name: "set_nft_contract_address",
-            args: Vec::new(env),
-            sub_invokes: Vec::new(env),
+            args: (&new_addr,).into_val(&env),
+            sub_invokes: &[],
         },
     }]);
 
@@ -491,8 +516,7 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
     // Register and initialise the NFT contract, granting the game
     // contract the minter role.
     let nft_id = env.register_contract(None, stellar_hunts_nft::StellarHuntsNft);
-    let nft_client =
-        stellar_hunts_nft::StellarHuntsNftClient::new(&env, &nft_id);
+    let nft_client = stellar_hunts_nft::StellarHuntsNftClient::new(&env, &nft_id);
     nft_client.init(
         &admin,
         &contract_id,
@@ -526,8 +550,7 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
     // was interrupted before the storage write.
     env.as_contract(&contract_id, || {
         let lp_key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        let mut lp: crate::LevelProgress =
-            env.storage().persistent().get(&lp_key).unwrap();
+        let mut lp: crate::LevelProgress = env.storage().persistent().get(&lp_key).unwrap();
         lp.nft_minted = false;
         env.storage().persistent().set(&lp_key, &lp);
     });
@@ -572,6 +595,9 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
 fn test_cross_contract_full_happy_path_nft_registered_first() {
     let env = Env::default();
     env.mock_all_auths();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
 
     // Register the NFT contract first, then the game contract — exercises
     // the "NFT deployed before the game" ordering. This works because
@@ -630,6 +656,9 @@ fn test_cross_contract_full_happy_path_nft_registered_first() {
 fn test_cross_contract_full_happy_path_game_registered_first() {
     let env = Env::default();
     env.mock_all_auths();
+    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
+    // check in `submit_answer` does not panic on first submission.
+    env.ledger().set_sequence_number(100_000);
 
     // Reverse order: game contract registered before the NFT contract.
     let game_admin = new_admin(&env);
@@ -683,6 +712,7 @@ fn test_cross_contract_full_happy_path_game_registered_first() {
 #[test]
 fn test_schema_version() {
     let e = Env::default();
+    e.mock_all_auths();
     let contract_id = e.register_contract(None, StellarHunts);
     let client = StellarHuntsClient::new(&e, &contract_id);
 

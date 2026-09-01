@@ -62,23 +62,6 @@ const queuePlayerBatchArb = fc.array(queuePlayerArb, {
   maxLength: 30,
 });
 
-/** A DTO for joining the queue (valid inputs). */
-const joinQueueDtoArb = fc.record({
-  userId: uuidArb,
-  username: usernameArb,
-  skillLevel: skillLevelArb,
-  gameMode: fc.option(gameModeArb, { nil: undefined }),
-  maxWaitTime: fc.option(fc.integer({ min: 30, max: 1800 }), {
-    nil: undefined,
-  }),
-  preferredOpponents: fc.option(fc.array(uuidArb, { maxLength: 3 }), {
-    nil: undefined,
-  }),
-  avoidOpponents: fc.option(fc.array(uuidArb, { maxLength: 3 }), {
-    nil: undefined,
-  }),
-});
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -97,10 +80,10 @@ function createMockRepos(): {
       count: jest.fn(),
     },
     matchRepository: {
-      create: jest.fn(),
-      save: jest.fn(),
-      findOne: jest.fn(),
-      count: jest.fn(),
+      create: jest.fn<any>(),
+      save: jest.fn<any>(),
+      findOne: jest.fn<any>(),
+      count: jest.fn<any>(),
     },
   };
 }
@@ -121,7 +104,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('is symmetric for neutral players (no preferences)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -159,7 +142,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns -1 when either player avoids the other', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -186,7 +169,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns 100 for mutual preferredOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -221,7 +204,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('scores avoidOpponents over preferredOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -263,7 +246,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('every player in a pair is compatible (no avoidOpponents violated)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -317,7 +300,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('never matches a player twice', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -351,7 +334,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('leftover count is at most 1 (odd group leaves 1 unmatched)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -383,7 +366,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('result is deterministic', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -421,7 +404,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('every input player appears in at least one group', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -440,7 +423,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('players in a same-mode-skill group share gameMode and skillLevel', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -476,7 +459,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('cross-skill groups only contain long-waiting players (waitTime > 120)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -511,7 +494,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('no cross-skill group created when fewer than 2 long-waiting players exist', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -545,7 +528,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('is symmetric with respect to avoidOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -565,7 +548,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns true when neither player has avoidOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -592,7 +575,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns false when one player avoids the other', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -619,7 +602,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('single player is always compatible with themselves', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -653,6 +636,7 @@ describe('MultiplayerQueueService — property-based', () => {
           fc.integer({ min: 0, max: 100 }),
           async (waitingEntries, matchesToday) => {
             const { mocks, module } = await buildModule();
+            mocks.queueRepository.find = jest.fn<any>();
 
             const now = Date.now();
             const entriesWithWait = waitingEntries.map((e) => ({
@@ -714,7 +698,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('preserves all fields through the mapping', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );

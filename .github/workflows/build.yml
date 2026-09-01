@@ -91,9 +91,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cache/scarb
-            ~/.local/share/scarb
-            ~/.scarb
             onchain/target
             **/node_modules
           key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', '**/package-lock.json') }}
@@ -141,9 +138,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cache/scarb
-            ~/.local/share/scarb
-            ~/.scarb
             onchain/target
             **/node_modules
           key: ${{ runner.os }}-cargo-${{ hashFiles('onchain/Cargo.lock', '**/package-lock.json') }}

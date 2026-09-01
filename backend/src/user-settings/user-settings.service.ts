@@ -209,6 +209,7 @@ export class UserSettingsService {
     }
 
     // Remove internal fields
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, ...exportableSettings } = userSettings;
     return exportableSettings;
   }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { utils as ethersUtils } from 'ethers';
 import { VerificationService } from './verification.service';
 import type { JwtPayload, WalletTokenPayload } from '../interfaces/token.interface';
 import * as ethers from 'ethers';
@@ -31,7 +32,7 @@ describe('VerificationService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        VerificationService,
+        { provide: VerificationService, useFactory: () => new VerificationService(jwtService, configService) },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
       ],

@@ -1,6 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import { UserReactionService } from './user-reaction.service';
 import { Reaction } from './entities/reaction.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -8,7 +7,6 @@ import { jest } from '@jest/globals'; // Import jest to declare it
 
 describe('UserReactionService', () => {
   let service: UserReactionService;
-  let repository: Repository<Reaction>;
 
   const mockRepository: Record<string, any> = {
     create: jest.fn(),
@@ -31,7 +29,6 @@ describe('UserReactionService', () => {
     }).compile();
 
     service = module.get<UserReactionService>(UserReactionService);
-    repository = module.get<Repository<Reaction>>(getRepositoryToken(Reaction));
   });
 
   afterEach(() => {

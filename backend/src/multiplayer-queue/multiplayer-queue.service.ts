@@ -431,7 +431,7 @@ export class MultiplayerQueueService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      const match = manager.create(MatchEntity, {
+      const match = manager.create(Match, {
         playerIds: players.map((p) => p.userId),
         playerUsernames: players.map((p) => p.username),
         gameMode: players[0].gameMode,
