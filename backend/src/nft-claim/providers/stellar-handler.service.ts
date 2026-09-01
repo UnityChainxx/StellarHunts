@@ -30,8 +30,19 @@ export class StellarHandlerService {
   private readonly isMockMode: boolean;
 
   constructor() {
-    this.isMockMode = process.env.STELLAR_MODE === 'mock';
-    this.validateRpcUrl();
+    const mode = process.env.STELLAR_MODE?.trim().toLowerCase();
+    const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase() || 'development';
+
+    if (mode && mode !== 'mock' && mode !== 'live') {
+      throw new Error('STELLAR_MODE must be either "mock" or "live".');
+    }
+    if (mode === 'mock' && nodeEnv === 'production') {
+      throw new Error(
+        'STELLAR_MODE=mock is not allowed when NODE_ENV=production.',
+      );
+    }
+
+    this.isMockMode = mode === 'mock';
     this.logger.log(
       `Stellar handler initialized in ${this.isMockMode ? 'mock' : 'live'} mode`,
     );
@@ -92,9 +103,7 @@ export class StellarHandlerService {
   }
 
   private async realClaimNFT(claimNFTDto: ClaimNFTDto): Promise<any> {
-    this.logger.log(
-      `Real NFT claim for user: ${claimNFTDto.userId}, NFT: ${claimNFTDto.nftId}`,
-    );
+    this.logger.log('Processing live Stellar NFT claim');
     // TODO: Wire up `@stellar/stellar-sdk` here. Sketch:
     //   const server = new StellarSdk.SorobanRpc.Server(process.env.SOROBAN_RPC_URL);
     //   const contract = new StellarSdk.Contract(process.env.SOROBAN_NFT_CONTRACT_ID);

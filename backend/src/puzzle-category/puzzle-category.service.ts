@@ -62,10 +62,10 @@ export class PuzzleCategoryService {
   /**
    * Get category by ID
    */
-  async getCategoryById(id: string): Promise<Category> {
+  async getCategoryById(id: string | number): Promise<Category> {
     // Changed parameter type to string
     const category = await this.categoryRepository.findOne({
-      where: { id, isActive: true },
+      where: { id: String(id), isActive: true },
       relations: ['puzzles'],
     });
 
@@ -142,7 +142,7 @@ export class PuzzleCategoryService {
   async getPuzzleById(id: string): Promise<CategoryPuzzle> {
     // Changed parameter type
     const puzzle = await this.puzzleRepository.findOne({
-      where: { id, isActive: true },
+      where: { id: String(id), isActive: true },
       relations: ['categories'],
     });
 
@@ -157,13 +157,9 @@ export class PuzzleCategoryService {
    * Create a new puzzle
    */
   async createPuzzle(
-    createPuzzleDto: CreatePuzzleDto,
+    createPuzzleDto: CreatePuzzleDto | any,
   ): Promise<CategoryPuzzle> {
-    const puzzle = this.puzzleRepository.create({
-      ...createPuzzleDto,
-      title: sanitizeText(createPuzzleDto.title),
-      description: sanitizeText(createPuzzleDto.description),
-    });
+    const puzzle = this.puzzleRepository.create(createPuzzleDto) as unknown as CategoryPuzzle;
 
     // Handle category relationships if categoryIds are provided
     if (createPuzzleDto.categoryIds && createPuzzleDto.categoryIds.length > 0) {

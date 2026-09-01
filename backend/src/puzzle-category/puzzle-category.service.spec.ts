@@ -8,23 +8,6 @@ import { NotFoundException } from '@nestjs/common';
 describe('PuzzleCategoryService', () => {
   let service: PuzzleCategoryService;
 
-  const categoryQueryBuilder = {
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    addOrderBy: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
-
-  const puzzleQueryBuilder = {
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
-
   const mockCategoryRepository = {
     createQueryBuilder: jest.fn(() => categoryQueryBuilder),
     find: jest.fn(),
@@ -93,7 +76,14 @@ describe('PuzzleCategoryService', () => {
         },
       ];
 
-      categoryQueryBuilder.getMany.mockResolvedValue(mockCategories);
+      mockCategoryRepository.createQueryBuilder.mockReturnValueOnce({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockCategories),
+      });
 
       const result = await service.getPuzzlesByCategory();
 

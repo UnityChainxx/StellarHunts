@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { type Repository, LessThan, MoreThan, DataSource } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
-import { Match } from './entities/match.entity';
+import { Match, Match as MatchEntity } from './entities/match.entity';
 import type { JoinQueueDto } from './dto/join-queue.dto';
 import type { QueueStatusDto } from './dto/queue-status.dto';
 import type { MatchResultDto } from './dto/match-result.dto';
@@ -164,11 +164,9 @@ export class MultiplayerQueueService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const matchesToday = await this.matchRepository.count({
-      where: {
-        createdAt: MoreThan(today),
-      },
-    });
+    const matchesToday = (await this.matchRepository.count({
+      where: { createdAt: MoreThan(today) },
+    })) ?? 0;
 
     return {
       totalInQueue: waitingEntries.length,
@@ -239,11 +237,11 @@ export class MultiplayerQueueService {
    */
   @Cron(CronExpression.EVERY_10_SECONDS)
   async processMatchmaking(): Promise<void> {
-    const waitingPlayers = await this.queueRepository.find({
+    const waitingPlayers = (await this.queueRepository.find({
       where: { status: QueueStatus.WAITING },
       order: { createdAt: 'ASC' },
       take: 200,
-    });
+    })) ?? [];
 
     if (waitingPlayers.length < 2) {
       return;
@@ -361,14 +359,25 @@ export class MultiplayerQueueService {
       groups[key].push(player);
     });
 
-    // Also try cross-skill matching for players waiting too long
+    // Also try cross-skill matching for players waiting too long. These
+    // buckets are returned separately so normal homogeneous groups remain
+    // homogeneous for callers that inspect grouping semantics.
     const longWaitingPlayers = players.filter((p) => p.waitTime > 120); // 2 minutes
     if (longWaitingPlayers.length >= 2) {
-      const crossSkillKey = `cross-skill-${longWaitingPlayers[0].gameMode}`;
-      groups[crossSkillKey] = longWaitingPlayers;
+      const modes = new Set(longWaitingPlayers.map((p) => p.gameMode));
+      for (const mode of modes) {
+        const byMode = longWaitingPlayers.filter(
+          (p) => p.gameMode === mode && p.waitTime > 120,
+        );
+        if (new Set(byMode.map((p) => p.skillLevel)).size > 1) {
+          groups[`cross-skill-${mode}`] = byMode;
+        }
+      }
     }
 
-    return Object.values(groups);
+    return Object.entries(groups)
+      .filter(([, group]) => group.length > 0)
+      .map(([, group]) => group);
   }
 
   /**

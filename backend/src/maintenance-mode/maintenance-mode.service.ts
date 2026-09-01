@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { MaintenanceConfig } from './entities/maintenance-config.entity';
 import type { UpdateMaintenanceConfigDto } from './dto/maintenance-config.dto';

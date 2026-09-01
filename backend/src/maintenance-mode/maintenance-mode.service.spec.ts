@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { MaintenanceModeService } from './maintenance-mode.service';
 import { MaintenanceConfig } from './entities/maintenance-config.entity';
 import { jest } from '@jest/globals';
@@ -8,12 +8,12 @@ import { jest } from '@jest/globals';
 describe('MaintenanceModeService', () => {
   let service: MaintenanceModeService;
 
-  const mockRepository = {
-    create: jest.fn<any>(),
-    save: jest.fn<any>(),
-    find: jest.fn<any>(),
-    findOne: jest.fn<any>(),
-    delete: jest.fn<any>(),
+  const mockRepository: any = {
+    create: jest.fn(),
+    save: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    delete: jest.fn(),
   };
 
   const mockConfigService = {
@@ -34,6 +34,14 @@ describe('MaintenanceModeService', () => {
         },
         {
           provide: ConfigService,
+          useValue: mockConfigService,
+        },
+        {
+          provide: 'ConfigService',
+          useValue: mockConfigService,
+        },
+        {
+          provide: Function,
           useValue: mockConfigService,
         },
       ],

@@ -15,16 +15,9 @@ export {
   ValidationStatus,
 } from './entities/validation-result.entity';
 
-// Interface and DTO exports. The DTO classes live in ./dto/test-case.dto;
-// re-export the interfaces explicitly so the DTO names aren't duplicated.
+// Interface and DTO exports
+export * from './interfaces/test-case.interface';
 export {
-  TestCaseInput,
-  TestCaseOutput,
-  ValidationConfig,
-  TestCaseMetadata,
-  TestCaseResponse,
-  ValidationRequest,
-  SubmittedAnswer,
-  ValidationResponse,
-} from './interfaces/test-case.interface';
-export * from './dto/test-case.dto';
+  CreateTestCaseDto,
+  UpdateTestCaseDto,
+} from './dto/test-case.dto';

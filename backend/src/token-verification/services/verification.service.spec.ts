@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { utils as ethersUtils } from 'ethers';
 import { VerificationService } from './verification.service';
 import type { JwtPayload, WalletTokenPayload } from '../interfaces/token.interface';
+import * as ethers from 'ethers';
 
 describe('VerificationService', () => {
   let service: VerificationService;
@@ -130,12 +131,14 @@ describe('VerificationService', () => {
     };
 
     it('validates a correct wallet signature', async () => {
-      jest
-        .spyOn(ethersUtils, 'verifyMessage')
-        .mockReturnValue('0xRecoveredAddress');
+      const wallet = ethers.Wallet.createRandom();
+      const message = validPayload.message;
+      const signature = await wallet.signMessage(message);
       const result = await service.validateWalletToken({
         ...validPayload,
-        address: '0xRecoveredAddress',
+        address: wallet.address,
+        signature,
+        message,
       });
 
       expect(result.isValid).toBe(true);
@@ -161,7 +164,7 @@ describe('VerificationService', () => {
     });
 
     it('returns invalid if signature recovery fails', async () => {
-      jest.spyOn(ethersUtils, 'verifyMessage').mockImplementationOnce(() => {
+      jest.spyOn(ethers, 'verifyMessage').mockImplementationOnce(() => {
         throw new Error('signature error');
       });
 
@@ -173,13 +176,12 @@ describe('VerificationService', () => {
 
     it('computes expiresAt when maxAge is set', async () => {
       const timestamp = Date.now();
-      jest
-        .spyOn(ethersUtils, 'verifyMessage')
-        .mockReturnValue('0xRecoveredAddress');
+      const wallet = ethers.Wallet.createRandom();
       const result = await service.validateWalletToken(
         {
           ...validPayload,
-          address: '0xRecoveredAddress',
+          address: wallet.address,
+          signature: await wallet.signMessage(validPayload.message),
           timestamp,
         },
         { maxAge: 60000 },

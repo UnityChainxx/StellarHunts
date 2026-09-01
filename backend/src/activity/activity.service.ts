@@ -49,7 +49,7 @@ export class ActivityService {
 
   async logActivity(
     userId: string,
-    type: string,
+    type: ActivityType,
     metadata: Record<string, any> = {},
   ) {
     const activity = this.activityRepo.create({

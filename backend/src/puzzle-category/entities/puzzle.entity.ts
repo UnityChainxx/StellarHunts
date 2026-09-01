@@ -57,3 +57,4 @@ export class CategoryPuzzle {
 
 // Import the Category entity
 import { Category } from './category.entity';
+export { CategoryPuzzle as Puzzle };

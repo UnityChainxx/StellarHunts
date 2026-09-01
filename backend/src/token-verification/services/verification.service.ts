@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { JwtService } from '@nestjs/jwt';
-import type { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { ethers } from 'ethers';
+import { verifyMessage } from 'ethers';
 import type {
   JwtPayload,
   WalletTokenPayload,
@@ -16,8 +16,8 @@ export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService = undefined as any,
+    private readonly configService: ConfigService = undefined as any,
   ) {}
 
   /**
@@ -80,7 +80,7 @@ export class VerificationService {
       }
 
       // Verify the signature
-      const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+      const recoveredAddress = verifyMessage(message, signature);
 
       if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
         return {

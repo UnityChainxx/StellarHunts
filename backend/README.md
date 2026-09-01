@@ -93,7 +93,8 @@ DATABASE_LOAD=true
 # Auth (required in production)
 JWT_SECRET=replace-with-a-long-random-string
 # Stellar / Soroban
-STELLAR_MODE=mock
+# Defaults to live; mock is only permitted outside production.
+STELLAR_MODE=live
 STELLAR_NETWORK=testnet
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 STELLAR_HUNTS_CONTRACT_ID=...
@@ -119,6 +120,8 @@ API_VERSION=v1
 | `DATABASE_SYNC`    | No       | `false`                  | `config/database.config.ts`  | Set `true` in dev to auto-sync TypeORM entities (never in prod).|
 | `DATABASE_LOAD`    | No       | `false`                  | `config/database.config.ts`  | Set `true` to auto-load entities on boot.                      |
 | `JWT_SECRET`       | Yes (prod)| _unset_                 | `src/auth/*`                 | HMAC secret for signing JWT access tokens.                     |
+| `STELLAR_MODE`     | No       | `live`                   | `src/app.module.ts` and `src/nft-claim/providers/stellar-handler.service.ts` | `live` or `mock`; mock is rejected in production. |
+| `STELLAR_NETWORK`  | No       | `testnet`               | `src/app.module.ts`         | Stellar network identifier (`testnet` or `pubnet`).            |
 | `STARKNET_MODE`    | No       | _unset_                  | `src/*`                      | `mainnet` / `sepolia` / `devnet` switch for on-chain calls.    |
 
 > The `.env` file is `.gitignore`d — never commit secrets to git.

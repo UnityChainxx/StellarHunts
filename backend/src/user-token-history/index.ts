@@ -9,14 +9,6 @@ export {
   TokenStatus,
 } from './entities/token-history.entity';
 
-// Interface and DTO exports. The DTO classes live in ./dto/token-history.dto;
-// re-export the interfaces explicitly so the DTO names aren't duplicated.
-export {
-  TokenMetadata,
-  TokenHistoryResponse,
-  TokenRevocationResult,
-  TokenHistoryFilters,
-  TokenHistoryStats,
-  UserTokenSummary,
-} from './interfaces/token-history.interface';
-export * from './dto/token-history.dto';
+// Interface and DTO exports
+export * from './interfaces/token-history.interface';
+export { CreateTokenHistoryDto } from './dto/token-history.dto';
