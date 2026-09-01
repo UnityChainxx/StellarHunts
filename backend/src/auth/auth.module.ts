@@ -8,11 +8,13 @@ import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { UserTokenHistoryModule } from '../user-token-history/user-token-history.module';
 import * as Joi from 'joi';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
+    UserTokenHistoryModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     ConfigModule.forRoot({
       isGlobal: true,

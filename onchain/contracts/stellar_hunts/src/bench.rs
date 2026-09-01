@@ -107,6 +107,7 @@ fn bench_ten_submit_answers_amortised() {
     budget.reset_default();
 
     for i in 0..per_level {
+        env.ledger().set_sequence_number(100_000 + i as u32);
         let answer = b(&env, &format!("A{}", i));
         let ok = client.submit_answer(&player, &((i as u64) + 1), &answer);
         assert!(ok);

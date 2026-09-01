@@ -10,11 +10,10 @@ import {
   xdr,
   Address,
 } from "@stellar/stellar-sdk";
+import { signTransaction } from "@stellar/freighter-api";
 import {
-  isConnected,
-  getPublicKey,
-  signTransaction,
-} from "@stellar/freighter-api";
+  useWalletConnection,
+} from "./useWalletConnection";
 
 /**
  * Default RPC endpoint for the Stellar Soroban testnet.
@@ -142,38 +141,55 @@ export function usePuzzleContract(opts = {}) {
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [lastHint, setLastHint] = useState(null);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState(null);
+
+  // ---- Wallet lifecycle (#290) --------------------------------------
+  // Reuses useWalletConnection so extension absence, rejected requests,
+  // account/network changes, unsupported networks and stale sessions are
+  // all handled in one place.
+  const {
+    status: walletStatus,
+    isExtensionInstalled,
+    address: walletAddress,
+    network: walletNetwork,
+    unsupportedNetwork,
+    error: walletError,
+    connect: connectWallet,
+    refresh: refreshWallet,
+    disconnect: disconnectWallet,
+  } = useWalletConnection();
+
+  // Derived connection state from the lifecycle hook (no local duplication).
+  const walletConnected =
+    walletStatus === "connected" || walletStatus === "connecting";
 
   // ---- Wallet helpers ------------------------------------------------
 
-  const checkWallet = useCallback(async () => {
-    try {
-      const connected = await isConnected();
-      setWalletConnected(connected);
-      if (connected) {
-        const pk = await getPublicKey();
-        setWalletAddress(pk);
-        return pk;
-      }
-      setWalletAddress(null);
-      return null;
-    } catch {
-      setWalletConnected(false);
-      setWalletAddress(null);
-      return null;
-    }
-  }, []);
+  /**
+   * Refreshes wallet state using the shared lifecycle connection hook.
+   */
+  const checkWallet = useCallback(
+    async () => {
+      await refreshWallet();
+      return walletAddress;
+    },
+    [refreshWallet, walletAddress]
+  );
 
   const ensureWallet = useCallback(async () => {
-    const pk = await checkWallet();
+    let pk = walletAddress;
+    if (!pk) {
+      // Prompt the user to connect (requestAccess) rather than failing.
+      pk = await connectWallet();
+    }
     if (!pk) {
       throw new Error(
-        "Freighter wallet is not connected. Please install & connect Freighter."
+        isExtensionInstalled === false
+          ? "Freighter extension not found. Please install & connect Freighter."
+          : "Freighter wallet is not connected. Please connect your wallet."
       );
     }
     return pk;
-  }, [checkWallet]);
+  }, [walletAddress, connectWallet, isExtensionInstalled]);
 
   // ---- Soroban helpers -----------------------------------------------
 
@@ -192,6 +208,11 @@ export function usePuzzleContract(opts = {}) {
    */
   const invokeContract = useCallback(
     async (methodName, scValArgs) => {
+      if (unsupportedNetwork) {
+        throw new Error(
+          "Unsupported network. Please switch your Freighter network to match the app's expected network."
+        );
+      }
       const publicKey = await ensureWallet();
       const { server, contractId: cId } = buildServer();
 
@@ -231,7 +252,7 @@ export function usePuzzleContract(opts = {}) {
           `Unexpected send status: ${sendResponse.status}`
       );
     },
-    [ensureWallet, buildServer, networkPassphrase]
+    [ensureWallet, buildServer, networkPassphrase, unsupportedNetwork]
   );
 
   // ---- Public actions ------------------------------------------------
@@ -332,6 +353,12 @@ export function usePuzzleContract(opts = {}) {
     lastHint,
     walletConnected,
     walletAddress,
+    isExtensionInstalled: isExtensionInstalled ?? false,
+    unsupportedNetwork,
+    walletError,
+    connectWallet,
+    disconnectWallet,
+    refreshWallet,
     submitAnswer,
     requestHint,
     clearFeedback,

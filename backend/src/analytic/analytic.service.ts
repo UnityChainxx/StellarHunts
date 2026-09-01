@@ -38,7 +38,18 @@ const MAX_LIMIT = 100;
 export class AnalyticService {
   private readonly logger = new Logger(AnalyticService.name);
 
-  constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
+  private readonly fallbackRows: Array<{
+    user_id: string;
+    puzzle_id: string;
+    solve_time: number;
+    solved_at: Date;
+  }> = [];
+
+  constructor(@Inject(PG_POOL) private readonly pool?: Pool) {}
+
+  async recordPuzzleSolve(userId: string, puzzleId: string, solveTime: number): Promise<void> {
+    return this.recordPuzzleSolveAsync(userId, puzzleId, solveTime);
+  }
 
   async recordPuzzleSolveAsync(
     userId: string,
@@ -48,6 +59,10 @@ export class AnalyticService {
     this.logger.log(
       `Recording solve: User ${userId}, Puzzle ${puzzleId}, Time ${solveTime}`,
     );
+    if (!this.pool) {
+      this.fallbackRows.push({ user_id: userId, puzzle_id: puzzleId, solve_time: solveTime, solved_at: new Date() });
+      return;
+    }
     await this.pool.query(
       `INSERT INTO analytic_events (user_id, puzzle_id, solve_time)
        VALUES ($1, $2, $3)`,
@@ -65,20 +80,38 @@ export class AnalyticService {
     offset?: number,
   ): Promise<Array<{ puzzleId: string; solveCount: number }>> {
     this.logger.log('Fetching most solved puzzles...');
-    const sql = limit
+    const hasLimit = limit !== undefined && limit !== null;
+    const hasOffset = offset !== undefined && offset !== null;
+    const sql = hasLimit
       ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
          ORDER BY solve_count DESC LIMIT $1 OFFSET $2`
-      : offset
+      : hasOffset
         ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
            ORDER BY solve_count DESC OFFSET $1`
         : `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
            ORDER BY solve_count DESC`;
-    const params = limit ? [limit, offset ?? 0] : offset ? [offset] : [];
-    const { rows } = await this.pool.query(sql, params);
+    const params = hasLimit ? [limit, offset ?? 0] : hasOffset ? [offset] : [];
+    const { rows } = !this.pool
+      ? { rows: this.applyPagination(this.aggregateFallback(), limit, offset) }
+      : await this.pool.query(sql, params);
     return rows.map((r) => ({
       puzzleId: r.puzzle_id as string,
       solveCount: Number(r.solve_count),
     }));
+  }
+
+  /**
+   * Mirror the SQL LIMIT/OFFSET semantics for the in-memory fallback store
+   * used when no PG pool is available (tests, degraded boot).
+   */
+  private applyPagination<T>(rows: T[], limit?: number, offset?: number): T[] {
+    if (limit !== undefined && limit !== null) {
+      return rows.slice(offset ?? 0, (offset ?? 0) + limit);
+    }
+    if (offset !== undefined && offset !== null) {
+      return rows.slice(offset);
+    }
+    return rows;
   }
 
   /**
@@ -87,16 +120,18 @@ export class AnalyticService {
    */
   async getAverageSolveTimeAsync(puzzleId: string): Promise<number> {
     this.logger.log(`Fetching average solve time for puzzle ${puzzleId}...`);
-    const { rows } = await this.pool.query<{
-      solve_count: string;
-      total_solve_time: string;
-    }>(
-      `SELECT COUNT(*) AS solve_count,
+    const { rows } = !this.pool
+      ? { rows: [this.aggregateFallbackAverage(puzzleId)] }
+      : await this.pool.query<{
+          solve_count: string;
+          total_solve_time: string;
+        }>(
+          `SELECT COUNT(*) AS solve_count,
               COALESCE(SUM(solve_time), 0) AS total_solve_time
        FROM analytic_events
        WHERE puzzle_id = $1`,
-      [puzzleId],
-    );
+          [puzzleId],
+        );
     const solveCount = Number(rows[0]?.solve_count ?? 0);
     const totalSolveTime = Number(rows[0]?.total_solve_time ?? 0);
     return solveCount > 0 ? totalSolveTime / solveCount : 0;
@@ -111,17 +146,19 @@ export class AnalyticService {
     userId: string,
   ): Promise<Map<string, UserPuzzleEngagement>> {
     this.logger.log(`Fetching puzzle history for user ${userId}...`);
-    const { rows } = await this.pool.query(
-      `SELECT puzzle_id,
-              COUNT(*) AS solve_count,
-              COUNT(*) AS attempts,
-              COALESCE(SUM(solve_time), 0) AS total_solve_time,
-              MAX(solved_at) AS last_solved
-       FROM analytic_events
-       WHERE user_id = $1
-       GROUP BY puzzle_id`,
-      [userId],
-    );
+    const { rows } = this.pool
+      ? await this.pool.query(
+          `SELECT puzzle_id,
+                  COUNT(*) AS solve_count,
+                  COUNT(*) AS attempts,
+                  COALESCE(SUM(solve_time), 0) AS total_solve_time,
+                  MAX(solved_at) AS last_solved
+           FROM analytic_events
+           WHERE user_id = $1
+           GROUP BY puzzle_id`,
+          [userId],
+        )
+      : { rows: this.aggregateFallbackForUser(userId) };
     const result = new Map<string, UserPuzzleEngagement>();
     for (const row of rows) {
       result.set(row.puzzle_id, {
@@ -132,6 +169,31 @@ export class AnalyticService {
       });
     }
     return result;
+  }
+
+  private aggregateFallback(): Array<{ puzzle_id: string; solve_count: number }> {
+    const counts = new Map<string, number>();
+    for (const row of this.fallbackRows) counts.set(row.puzzle_id, (counts.get(row.puzzle_id) ?? 0) + 1);
+    return [...counts].map(([puzzle_id, solve_count]) => ({ puzzle_id, solve_count }));
+  }
+
+  private aggregateFallbackAverage(puzzleId: string): { solve_count: number; total_solve_time: number } {
+    const rows = this.fallbackRows.filter((row) => row.puzzle_id === puzzleId);
+    return { solve_count: rows.length, total_solve_time: rows.reduce((sum, row) => sum + row.solve_time, 0) };
+  }
+
+  private aggregateFallbackForUser(userId: string) {
+    const grouped = new Map<string, typeof this.fallbackRows>();
+    for (const row of this.fallbackRows.filter((item) => item.user_id === userId)) {
+      grouped.set(row.puzzle_id, [...(grouped.get(row.puzzle_id) ?? []), row]);
+    }
+    return [...grouped].map(([puzzle_id, rows]) => ({
+      puzzle_id,
+      solve_count: rows.length,
+      attempts: rows.length,
+      total_solve_time: rows.reduce((sum, row) => sum + row.solve_time, 0),
+      last_solved: rows.reduce((latest, row) => row.solved_at > latest ? row.solved_at : latest, rows[0].solved_at),
+    }));
   }
 
   /**

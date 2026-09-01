@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { MultiplayerQueueService } from './multiplayer-queue.service';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
 import { Match } from './entities/match.entity';
+import { DataSource } from 'typeorm';
 import { jest } from '@jest/globals';
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ const gameModeArb = fc.constantFrom('classic', 'blitz', 'survival');
 const waitTimeArb = fc.integer({ min: 0, max: 600 });
 
 /** A single player (Queue entity shape) for testing grouping/compatibility. */
-const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
+const queuePlayerArb = fc.record({
   id: uuidArb,
   userId: uuidArb,
   username: usernameArb,
@@ -54,7 +55,7 @@ const queuePlayerArb: fc.Arbitrary<Queue> = fc.record({
   createdAt: fc.date({ min: new Date(0), max: new Date() }),
   matchedAt: fc.constant(null),
   leftAt: fc.constant(null),
-} as unknown as fc.Record<Queue>);
+});
 
 /** A batch of players in the queue. */
 const queuePlayerBatchArb = fc.array(queuePlayerArb, {
@@ -62,42 +63,24 @@ const queuePlayerBatchArb = fc.array(queuePlayerArb, {
   maxLength: 30,
 });
 
-/** A DTO for joining the queue (valid inputs). */
-const joinQueueDtoArb = fc.record({
-  userId: uuidArb,
-  username: usernameArb,
-  skillLevel: skillLevelArb,
-  gameMode: fc.option(gameModeArb, { nil: undefined }),
-  maxWaitTime: fc.option(fc.integer({ min: 30, max: 1800 }), {
-    nil: undefined,
-  }),
-  preferredOpponents: fc.option(fc.array(uuidArb, { maxLength: 3 }), {
-    nil: undefined,
-  }),
-  avoidOpponents: fc.option(fc.array(uuidArb, { maxLength: 3 }), {
-    nil: undefined,
-  }),
-});
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function createMockRepos() {
-  return {
-    queueRepository: {
-      create: jest.fn(),
-      save: jest.fn(),
-      find: jest.fn(),
-      findOne: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
+  return {    queueRepository: {
+      create: jest.fn<any>(),
+      save: jest.fn<any>(),
+      find: jest.fn<any>(),
+      findOne: jest.fn<any>(),
+      delete: jest.fn<any>(),
+      count: jest.fn<any>(),
     },
     matchRepository: {
-      create: jest.fn(),
-      save: jest.fn(),
-      findOne: jest.fn(),
-      count: jest.fn(),
+      create: jest.fn<any>(),
+      save: jest.fn<any>(),
+      findOne: jest.fn<any>(),
+      count: jest.fn<any>(),
     },
   };
 }
@@ -118,7 +101,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('is symmetric for neutral players (no preferences)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -156,7 +139,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns -1 when either player avoids the other', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -183,7 +166,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns 100 for mutual preferredOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -218,7 +201,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('scores avoidOpponents over preferredOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -260,7 +243,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('every player in a pair is compatible (no avoidOpponents violated)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -314,7 +297,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('never matches a player twice', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -348,7 +331,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('leftover count is at most 1 (odd group leaves 1 unmatched)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -380,7 +363,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('result is deterministic', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -418,7 +401,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('every input player appears in at least one group', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -437,7 +420,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('players in a same-mode-skill group share gameMode and skillLevel', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -450,8 +433,8 @@ describe('MultiplayerQueueService — property-based', () => {
             // and single-player groups (no meaningful check)
             if (group.length < 2) continue;
             // Identify if this is a cross-skill group
-            const isCrossSkill = group.some((p) => p.waitTime > 120);
-            if (isCrossSkill && group.some((p) => p.waitTime <= 120)) {
+            const isCrossSkill = group.length > 1 && group.every((p) => p.waitTime > 120);
+            if (isCrossSkill) {
               // Mixed — this is a cross-skill group, skip the strict check
               continue;
             }
@@ -470,7 +453,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('cross-skill groups only contain long-waiting players (waitTime > 120)', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -479,20 +462,17 @@ describe('MultiplayerQueueService — property-based', () => {
         fc.property(queuePlayerBatchArb, (players) => {
           const groups = groupPlayers(service, players);
           for (const group of groups) {
-            // A cross-skill group has members whose wait times straddle 120 AND
-            // the group key would be "cross-skill-…"  — we approximate by checking
-            // whether the group contains any long-waiting AND any short-waiting.
-            const hasLong = group.some((p) => p.waitTime > 120);
-            const hasShort = group.some((p) => p.waitTime <= 120);
-            if (hasLong && hasShort) {
-              // This is a cross-skill bucket — every member must wait > 120
-              // Actually it could include both long and short waiters in the
-              // cross-skill group. Let me check the implementation:
-              // `longWaitingPlayers.filter(p => p.waitTime > 120)` — so only long
-              // waiters go into the cross-skill group.
-              // But the cross-skill group OVERWRITES any existing group with the
-              // same key, so some players might appear twice (once in their
-              // skill group, once in cross-skill). That's fine.
+            // Cross-skill buckets group long-waiting players across skill
+            // levels under a `cross-skill-<gameMode>` key, so a group whose
+            // members span more than one skill level is a cross-skill group.
+            // Regular groups are keyed by `gameMode-skillLevel` and therefore
+            // always share a single skill level.
+            const distinctSkillLevels = new Set(
+              group.map((p) => p.skillLevel),
+            );
+            if (distinctSkillLevels.size > 1) {
+              // Only long-waiting players (waitTime > 120) enter the
+              // cross-skill bucket.
               for (const p of group) {
                 expect(p.waitTime).toBeGreaterThan(120);
               }
@@ -505,7 +485,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('no cross-skill group created when fewer than 2 long-waiting players exist', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -539,7 +519,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('is symmetric with respect to avoidOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -559,7 +539,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns true when neither player has avoidOpponents', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -586,7 +566,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('returns false when one player avoids the other', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -613,7 +593,7 @@ describe('MultiplayerQueueService — property-based', () => {
     });
 
     it('single player is always compatible with themselves', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -647,6 +627,7 @@ describe('MultiplayerQueueService — property-based', () => {
           fc.integer({ min: 0, max: 100 }),
           async (waitingEntries, matchesToday) => {
             const { mocks, module } = await buildModule();
+            mocks.queueRepository.find = jest.fn<any>();
 
             const now = Date.now();
             const entriesWithWait = waitingEntries.map((e) => ({
@@ -708,7 +689,7 @@ describe('MultiplayerQueueService — property-based', () => {
     }
 
     it('preserves all fields through the mapping', async () => {
-      const { mocks, module } = await buildModule();
+      const { module } = await buildModule();
       const service = module.get<MultiplayerQueueService>(
         MultiplayerQueueService,
       );
@@ -756,6 +737,7 @@ async function buildModule(): Promise<{
         provide: getRepositoryToken(Match),
         useValue: mocks.matchRepository,
       },
+      { provide: DataSource, useValue: { transaction: jest.fn() } },
     ],
   }).compile();
 

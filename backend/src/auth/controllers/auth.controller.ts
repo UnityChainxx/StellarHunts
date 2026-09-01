@@ -20,6 +20,8 @@ import { AuthType } from '../enums/auth-type.enum';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
+import { LogoutDto } from '../dto/logout.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RateLimit } from '../../rate-limiter/rate-limit.decorator';
 import { RateLimitGuard } from '../../rate-limiter/rate-limit.guard';
@@ -42,18 +44,15 @@ export class AuthController {
   })
   @ApiResponse({
     status: 201,
-    description: 'User successfully registered',
+    description:
+      "User successfully registered (or, for anti-enumeration, a generic neutral response when the email is already taken)",
     type: AuthResponseDto,
   })
   @ApiResponse({
     status: 400,
     description: 'Bad request - validation failed',
   })
-  @ApiResponse({
-    status: 409,
-    description: 'Conflict - user already exists',
-  })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto | GenericAuthMessageDto> {
     try {
       return await this.authService.register(registerDto);
     } catch (error) {
@@ -147,5 +146,60 @@ export class AuthController {
         email: req.user.email,
       },
     };
+  }
+
+  @Post('refresh')
+  @Auth(AuthType.None)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Refresh access token',
+    description:
+      'Exchange a valid refresh token for a fresh access/refresh token pair (rotation)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'New token pair issued',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid, revoked or expired refresh token',
+  })
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Logout',
+    description:
+      'Revoke the current access token (and optionally a refresh token) server-side',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired token',
+  })
+  async logout(
+    @Request() req: { user: User; headers: any },
+    @Body() logoutDto: LogoutDto,
+  ) {
+    const authHeader = req.headers?.authorization;
+    const accessToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : undefined;
+
+    return this.authService.logout(
+      req.user.id,
+      accessToken,
+      logoutDto.refreshToken,
+    );
   }
 }

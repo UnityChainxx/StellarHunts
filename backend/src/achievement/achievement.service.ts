@@ -40,9 +40,9 @@ export class AchievementService {
       `Processing game event: ${event.eventType} for player: ${event.playerId}`,
     );
 
-    const achievement = await this.achievementRepository.find();
+    const achievements = await this.achievementRepository.find();
 
-    for (const achievement of achievement) {
+    for (const achievement of achievements) {
       if (await this.shouldAwardAchievement(achievement, event)) {
         await this.awardAchievement(event.playerId, achievement.id);
       }

@@ -10,7 +10,12 @@ import {
   Logger,
   Query,
 } from '@nestjs/common';
-import { ApiKeyService, ApiKey, ApiKeyStatus } from './api-key.service';
+import {
+  ApiKeyService,
+  ApiKey,
+  ApiKeyRecord,
+  ApiKeyStatus,
+} from './api-key.service';
 import {
   IsString,
   IsNotEmpty,
@@ -51,7 +56,7 @@ export class ApiKeyController {
   @HttpCode(HttpStatus.CREATED)
   generateApiKey(@Body() generateApiKeyDto: GenerateApiKeyDto): ApiKey {
     this.logger.log(
-      `Received request to generate API key: ${JSON.stringify(generateApiKeyDto)}`,
+      `Received request to generate API key for: ${generateApiKeyDto.ownerLabel}`,
     );
     return this.apiKeyService.generateApiKey(
       generateApiKeyDto.ownerLabel,
@@ -62,20 +67,32 @@ export class ApiKeyController {
     );
   }
 
+  @Post('rotate/:key')
+  @HttpCode(HttpStatus.OK)
+  rotateApiKey(
+    @Param('key') key: string,
+    @Body() adminActionDto: AdminActionDto,
+  ): ApiKey {
+    this.logger.log(
+      `Received request to rotate API key (isAdmin: ${adminActionDto.isAdmin}).`,
+    );
+    return this.apiKeyService.rotateApiKey(key, adminActionDto.isAdmin);
+  }
+
   @Post('revoke/:key')
   @HttpCode(HttpStatus.OK)
   revokeApiKey(
     @Param('key') key: string,
     @Body() adminActionDto: AdminActionDto,
-  ): ApiKey {
+  ): ApiKeyRecord {
     this.logger.log(
-      `Received request to revoke API key ${key} (isAdmin: ${adminActionDto.isAdmin}).`,
+      `Received request to revoke API key (isAdmin: ${adminActionDto.isAdmin}).`,
     );
     return this.apiKeyService.revokeApiKey(key, adminActionDto.isAdmin);
   }
 
   @Get('all')
-  getAllApiKeys(@Query() adminActionDto: AdminActionDto): ApiKey[] {
+  getAllApiKeys(@Query() adminActionDto: AdminActionDto): ApiKeyRecord[] {
     this.logger.log(
       `Received request to get all API keys (isAdmin: ${adminActionDto.isAdmin}).`,
     );

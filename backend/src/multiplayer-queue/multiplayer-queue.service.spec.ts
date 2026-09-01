@@ -1,34 +1,35 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
 import { MultiplayerQueueService } from './multiplayer-queue.service';
 import { Queue, QueueStatus, SkillLevel } from './entities/queue.entity';
 import { Match } from './entities/match.entity';
+import { DataSource } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest } from '@jest/globals';
 
 describe('MultiplayerQueueService', () => {
   let service: MultiplayerQueueService;
-  let queueRepository: Repository<Queue>;
-  let matchRepository: Repository<Match>;
 
   const mockQueueRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-    delete: jest.fn(),
-    count: jest.fn(),
+    create: jest.fn<any>(),
+    save: jest.fn<any>(),
+    find: jest.fn<any>(),
+    findOne: jest.fn<any>(),
+    delete: jest.fn<any>(),
+    count: jest.fn<any>(),
   };
 
   const mockMatchRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    findOne: jest.fn(),
-    count: jest.fn(),
+    create: jest.fn<any>(),
+    save: jest.fn<any>(),
+    findOne: jest.fn<any>(),
+    count: jest.fn<any>(),
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockQueueRepository.find.mockResolvedValue([]);
+    mockQueueRepository.delete.mockResolvedValue({ affected: 0 });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MultiplayerQueueService,
@@ -40,12 +41,11 @@ describe('MultiplayerQueueService', () => {
           provide: getRepositoryToken(Match),
           useValue: mockMatchRepository,
         },
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
       ],
     }).compile();
 
     service = module.get<MultiplayerQueueService>(MultiplayerQueueService);
-    queueRepository = module.get<Repository<Queue>>(getRepositoryToken(Queue));
-    matchRepository = module.get<Repository<Match>>(getRepositoryToken(Match));
   });
 
   afterEach(() => {
@@ -414,7 +414,7 @@ describe('MultiplayerQueueService', () => {
 
       expect(mockQueueRepository.delete).toHaveBeenCalledTimes(1);
 
-      const deleteCall = mockQueueRepository.delete.mock.calls[0][0];
+      const deleteCall: any = mockQueueRepository.delete.mock.calls[0][0];
 
       // Should filter by status LEFT
       expect(deleteCall.status).toBe(QueueStatus.LEFT);
@@ -435,7 +435,7 @@ describe('MultiplayerQueueService', () => {
 
       await service.cleanupOldEntries();
 
-      const deleteCall = mockQueueRepository.delete.mock.calls[0][0];
+      const deleteCall: any = mockQueueRepository.delete.mock.calls[0][0];
 
       // Should only target LEFT status entries
       expect(deleteCall.status).toBe(QueueStatus.LEFT);

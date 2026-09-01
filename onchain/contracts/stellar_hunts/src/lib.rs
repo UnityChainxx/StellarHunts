@@ -67,6 +67,7 @@ pub enum DataKey {
     PlayerProgress(Address),
     PlayerLevelProgress(Address, Levels),
     SchemaVersion,
+    Paused,
 }
 
 // ---------------------------------------------------------------------
@@ -354,6 +355,9 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn submit_answer(env: Env, caller: Address, question_id: u64, answer: Bytes) -> bool {
+        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
         caller.require_auth();
 
         if !env
@@ -494,6 +498,9 @@ impl StellarHunts {
     }
 
     pub fn claim_level_completion_nft(env: Env, caller: Address, level: Levels) {
+        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+            panic_with_error!(&env, Error::ContractPaused);
+        }
         caller.require_auth();
 
         if !env
@@ -558,11 +565,12 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn get_question(env: Env, question_id: u64) -> Question {
-        env.storage()
+        match env.storage()
             .persistent()
-            .get(&DataKey::Question(question_id))
-            .ok_or(Error::QuestionNotFound)
-            .unwrap()
+            .get(&DataKey::Question(question_id)) {
+            Some(q) => q,
+            None => panic_with_error!(&env, Error::QuestionNotFound),
+        }
     }
 
     pub fn get_question_per_level(env: Env) -> u32 {
@@ -578,11 +586,13 @@ impl StellarHunts {
             .persistent()
             .get(&DataKey::QuestionsByLevel(level, index))
             .unwrap_or(0u64);
-        let q: Question = env
+        let q: Question = match env
             .storage()
             .persistent()
-            .get(&DataKey::Question(question_id))
-            .unwrap();
+            .get(&DataKey::Question(question_id)) {
+            Some(q) => q,
+            None => panic_with_error!(&env, Error::QuestionNotFound),
+        };
         q.question
     }
 
@@ -591,12 +601,18 @@ impl StellarHunts {
         if !env.storage().persistent().has(&pp_key) {
             return Levels::Easy;
         }
-        let pp: PlayerProgress = env.storage().persistent().get(&pp_key).unwrap();
+        let pp: PlayerProgress = match env.storage().persistent().get(&pp_key) {
+            Some(pp) => pp,
+            None => panic_with_error!(&env, Error::NotInitialized),
+        };
         pp.current_level
     }
 
     pub fn get_nft_contract_address(env: Env) -> Address {
-        env.storage().instance().get(&DataKey::NftContract).unwrap()
+        match env.storage().instance().get(&DataKey::NftContract) {
+            Some(addr) => addr,
+            None => panic_with_error!(&env, Error::MissingNftContract),
+        }
     }
 
     pub fn get_player_level_progress(env: Env, player: Address, level: Levels) -> LevelProgress {
@@ -617,6 +633,20 @@ impl StellarHunts {
 
     pub fn next_level(_env: Env, level: Levels) -> Levels {
         level.next()
+    }
+
+    pub fn pause(env: Env) {
+        require_admin(&env);
+        env.storage().instance().set(&DataKey::Paused, &true);
+    }
+
+    pub fn unpause(env: Env) {
+        require_admin(&env);
+        env.storage().instance().set(&DataKey::Paused, &false);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
     }
 
     pub fn get_schema_version(e: Env) -> u32 {

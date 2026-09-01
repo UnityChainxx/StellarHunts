@@ -1,8 +1,9 @@
 import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Repository } from 'typeorm';
-import type { MaintenanceConfig } from './entities/maintenance-config.entity';
+import { MaintenanceConfig } from './entities/maintenance-config.entity';
 import type { UpdateMaintenanceConfigDto } from './dto/maintenance-config.dto';
 import type { MaintenanceStatusDto } from './dto/maintenance-status.dto';
 
@@ -13,6 +14,7 @@ export class MaintenanceModeService implements OnModuleInit {
   private readonly cacheTimeout = 30000; // 30 seconds cache
 
   constructor(
+    @InjectRepository(MaintenanceConfig)
     private readonly maintenanceConfigRepository: Repository<MaintenanceConfig>,
     private readonly configService: ConfigService,
   ) {}
@@ -105,7 +107,7 @@ export class MaintenanceModeService implements OnModuleInit {
    * Update maintenance configuration
    */
   async updateMaintenanceConfig(
-    updateDto: UpdateMaintenanceConfigDto,
+    updateDto: Partial<UpdateMaintenanceConfigDto>,
   ): Promise<MaintenanceConfig> {
     const config = await this.getMaintenanceConfig();
 

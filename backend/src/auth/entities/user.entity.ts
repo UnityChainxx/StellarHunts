@@ -8,7 +8,7 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -33,8 +33,17 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ nullable: true })
+  @Column({ unique: true, nullable: true })
   lastLoginAt: Date;
+
+  @Column({ nullable: true })
+  walletAddress?: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
 
   @CreateDateColumn()
   createdAt: Date;

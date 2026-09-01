@@ -7,9 +7,22 @@ import { RateLimiterService } from '../rate-limiter/rate-limiter.service';
 
 describe('WalletController', () => {
   let controller: WalletController;
-  let service: WalletService;
+
+  const mockService = {
+    linkWallet: jest.fn(async (address: string) => ({ id: '1', address })),
+    createChallenge: jest.fn(),
+    verifySignature: jest.fn(),
+  } as {
+    linkWallet: jest.Mock;
+    createChallenge: jest.Mock;
+    verifySignature: jest.Mock;
+  };
 
   beforeEach(async () => {
+    mockService.verifySignature.mockReset().mockResolvedValue({ valid: true });
+    mockService.createChallenge.mockReset();
+    mockService.linkWallet.mockReset().mockImplementation(async (address: string) => ({ id: '1', address }));
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WalletController],
       providers: [
@@ -18,16 +31,12 @@ describe('WalletController', () => {
         RateLimitGuard,
         {
           provide: WalletService,
-          useValue: {
-            linkWallet: jest.fn().mockResolvedValue({ address: '0x123' }),
-            verifySignature: jest.fn().mockResolvedValue(true),
-          },
+          useValue: mockService,
         },
       ],
     }).compile();
 
     controller = module.get<WalletController>(WalletController);
-    service = module.get<WalletService>(WalletService);
   });
 
   it('should be defined', () => {
@@ -35,13 +44,33 @@ describe('WalletController', () => {
   });
 
   it('should link wallet', async () => {
-    const result = await controller.linkWallet({ address: '0x123' });
-    expect(result.address).toBe('0x123');
+    const result = await controller.linkWallet({ address: 'G123' });
+    expect(result.address).toBe('G123');
+  });
+
+  it('should create a challenge', async () => {
+    mockService.createChallenge.mockResolvedValueOnce({
+      message: 'challenge-msg',
+      nonce: 'n',
+      expiresAt: new Date(),
+    });
+
+    const result = await controller.createChallenge({
+      walletAddress: 'G123',
+    });
+
+    expect(mockService.createChallenge).toHaveBeenCalledWith(
+      'G123',
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(result.message).toBe('challenge-msg');
   });
 
   it('should verify signature (POST)', async () => {
     const result = await controller.verifySignature({
-      address: '0x123',
+      walletAddress: 'G123',
       signature: 'sig',
       message: 'msg',
     });
@@ -49,7 +78,8 @@ describe('WalletController', () => {
   });
 
   it('should verify signature (GET)', async () => {
-    const result = await controller.verifySignatureGet('0x123', 'sig', 'msg');
-    expect(result.valid).toBe(true);
+    mockService.verifySignature.mockResolvedValueOnce({ valid: false, error: 'x' });
+    const result = await controller.verifySignatureGet('G123', 'sig', 'msg');
+    expect(result.valid).toBe(false);
   });
 });

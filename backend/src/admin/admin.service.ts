@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Admin } from './admin.entity';
 import { CreateAdminDto } from './dto/create-admin.dto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { LoginAdminDto } from './dto/login-admin.dto';
 import { AdminRole } from './admin-role.enum';
@@ -28,6 +28,10 @@ export class AdminService {
 
   async findByEmail(email: string): Promise<Admin | undefined> {
     return this.adminRepository.findOne({ where: { email } });
+  }
+
+  async findById(id: string): Promise<Admin | undefined> {
+    return this.adminRepository.findOne({ where: { id } });
   }
 
   async validateAdmin(email: string, password: string): Promise<Admin | null> {

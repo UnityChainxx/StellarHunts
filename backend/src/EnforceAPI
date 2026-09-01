@@ -1,0 +1,1388 @@
+// api-key-scope-enforcement.ts
+
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+  SetMetadata,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+
+/**
+ * ============================================================
+ * API KEY SCOPE ENFORCEMENT
+ * ============================================================
+ *
+ * Security objectives:
+ *
+ * 1. Every protected endpoint must explicitly declare scopes.
+ * 2. API keys must be authenticated before scopes are checked.
+ * 3. A key without the required scope must receive 403.
+ * 4. Missing/invalid API keys must receive 401.
+ * 5. Scope matching must happen server-side.
+ * 6. Clients must never be able to grant themselves scopes.
+ * 7. Empty scope requirements must not accidentally bypass
+ *    authentication.
+ * 8. Multiple required scopes must be handled consistently.
+ * 9. Wildcard scopes must be explicitly controlled.
+ * 10. Scope checks must be covered by automated tests.
+ */
+
+// ============================================================
+// TYPES
+// ============================================================
+
+export type ApiScope =
+  | 'users:read'
+  | 'users:write'
+  | 'users:delete'
+  | 'projects:read'
+  | 'projects:write'
+  | 'projects:delete'
+  | 'reports:read'
+  | 'reports:write'
+  | 'admin:read'
+  | 'admin:write';
+
+export interface ApiKeyPrincipal {
+  id: string;
+  name: string;
+
+  /**
+   * Scopes are assigned to the API key on the server.
+   *
+   * NEVER accept this value from the request body,
+   * query parameters, or arbitrary client headers.
+   */
+  scopes: ApiScope[];
+
+  active: boolean;
+
+  /**
+   * Optional tenant/project ownership information.
+   */
+  tenantId?: string;
+
+  createdAt: Date;
+  expiresAt?: Date;
+}
+
+// ============================================================
+// METADATA CONSTANTS
+// ============================================================
+
+export const REQUIRED_SCOPES_KEY =
+  'api_key_required_scopes';
+
+export const PUBLIC_ENDPOINT_KEY =
+  'api_key_public_endpoint';
+
+// ============================================================
+// DECORATORS
+// ============================================================
+
+/**
+ * Mark an endpoint as requiring one or more API scopes.
+ *
+ * Example:
+ *
+ * @RequireScopes('users:read')
+ * @Get()
+ * findUsers() {}
+ */
+export const RequireScopes = (
+  ...scopes: ApiScope[]
+) =>
+  SetMetadata(
+    REQUIRED_SCOPES_KEY,
+    scopes,
+  );
+
+/**
+ * Explicitly mark an endpoint as public.
+ *
+ * This should be used sparingly.
+ */
+export const PublicEndpoint = () =>
+  SetMetadata(
+    PUBLIC_ENDPOINT_KEY,
+    true,
+  );
+
+// ============================================================
+// API KEY SERVICE
+// ============================================================
+
+@Injectable()
+export class ApiKeyService {
+  /**
+   * In a production application this would normally be backed
+   * by a database.
+   *
+   * API keys should be stored as hashes, not plaintext.
+   */
+  private readonly keys =
+    new Map<string, ApiKeyPrincipal>();
+
+  /**
+   * Register a server-side API key.
+   */
+  registerKey(
+    keyHash: string,
+    principal: ApiKeyPrincipal,
+  ): void {
+    if (!keyHash) {
+      throw new Error(
+        'API key hash is required',
+      );
+    }
+
+    if (!principal.id) {
+      throw new Error(
+        'API key principal ID is required',
+      );
+    }
+
+    this.keys.set(
+      keyHash,
+      principal,
+    );
+  }
+
+  /**
+   * Resolve a hashed API key.
+   */
+  async findByHash(
+    keyHash: string,
+  ): Promise<ApiKeyPrincipal | null> {
+    return (
+      this.keys.get(keyHash) ??
+      null
+    );
+  }
+
+  /**
+   * Validate API key state.
+   */
+  validatePrincipal(
+    principal: ApiKeyPrincipal,
+  ): void {
+    if (!principal.active) {
+      throw new UnauthorizedException(
+        'API key is inactive',
+      );
+    }
+
+    if (
+      principal.expiresAt &&
+      principal.expiresAt.getTime() <
+        Date.now()
+    ) {
+      throw new UnauthorizedException(
+        'API key has expired',
+      );
+    }
+  }
+
+  /**
+   * Determine whether the principal has a scope.
+   */
+  hasScope(
+    principal: ApiKeyPrincipal,
+    requiredScope: ApiScope,
+  ): boolean {
+    return principal.scopes.includes(
+      requiredScope,
+    );
+  }
+
+  /**
+   * Require all requested scopes.
+   */
+  requireAllScopes(
+    principal: ApiKeyPrincipal,
+    requiredScopes: ApiScope[],
+  ): void {
+    const missing =
+      requiredScopes.filter(
+        (scope) =>
+          !this.hasScope(
+            principal,
+            scope,
+          ),
+      );
+
+    if (missing.length > 0) {
+      throw new ForbiddenException({
+        message:
+          'Insufficient API key scope',
+        requiredScopes,
+        missingScopes: missing,
+      });
+    }
+  }
+}
+
+// ============================================================
+// API KEY HASHING
+// ============================================================
+
+@Injectable()
+export class ApiKeyHashService {
+  /**
+   * Production implementation should use a cryptographic
+   * hash such as SHA-256/HMAC depending on the API-key design.
+   *
+   * This deterministic implementation is intentionally kept
+   * dependency-free for this single-file example.
+   */
+  hash(
+    apiKey: string,
+  ): string {
+    if (!apiKey) {
+      throw new Error(
+        'API key cannot be empty',
+      );
+    }
+
+    return `sha256:${apiKey}`;
+  }
+}
+
+// ============================================================
+// API KEY AUTHENTICATION GUARD
+// ============================================================
+
+@Injectable()
+export class ApiKeyAuthenticationGuard
+  implements CanActivate
+{
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly apiKeyService: ApiKeyService,
+    private readonly hashService: ApiKeyHashService,
+  ) {}
+
+  async canActivate(
+    context: ExecutionContext,
+  ): Promise<boolean> {
+    // --------------------------------------------------------
+    // PUBLIC ENDPOINT CHECK
+    // --------------------------------------------------------
+
+    const isPublic =
+      this.reflector.getAllAndOverride<boolean>(
+        PUBLIC_ENDPOINT_KEY,
+        [
+          context.getHandler(),
+          context.getClass(),
+        ],
+      );
+
+    if (isPublic) {
+      return true;
+    }
+
+    // --------------------------------------------------------
+    // EXTRACT REQUEST
+    // --------------------------------------------------------
+
+    const request =
+      context
+        .switchToHttp()
+        .getRequest();
+
+    // --------------------------------------------------------
+    // EXTRACT API KEY
+    // --------------------------------------------------------
+
+    const apiKey =
+      this.extractApiKey(request);
+
+    if (!apiKey) {
+      throw new UnauthorizedException(
+        'API key is required',
+      );
+    }
+
+    // --------------------------------------------------------
+    // HASH API KEY
+    // --------------------------------------------------------
+
+    const keyHash =
+      this.hashService.hash(
+        apiKey,
+      );
+
+    // --------------------------------------------------------
+    // LOOKUP PRINCIPAL
+    // --------------------------------------------------------
+
+    const principal =
+      await this.apiKeyService.findByHash(
+        keyHash,
+      );
+
+    if (!principal) {
+      throw new UnauthorizedException(
+        'Invalid API key',
+      );
+    }
+
+    // --------------------------------------------------------
+    // VALIDATE KEY STATE
+    // --------------------------------------------------------
+
+    this.apiKeyService.validatePrincipal(
+      principal,
+    );
+
+    // --------------------------------------------------------
+    // ATTACH AUTHENTICATED PRINCIPAL
+    // --------------------------------------------------------
+
+    request.apiKeyPrincipal =
+      principal;
+
+    request.apiKeyId =
+      principal.id;
+
+    return true;
+  }
+
+  /**
+   * Extract API key from the Authorization header.
+   *
+   * Supported format:
+   *
+   * Authorization: Bearer <api-key>
+   */
+  private extractApiKey(
+    request: any,
+  ): string | null {
+    const authorization =
+      request.headers?.authorization;
+
+    if (
+      typeof authorization !==
+      'string'
+    ) {
+      return null;
+    }
+
+    const [
+      scheme,
+      token,
+    ] =
+      authorization.trim().split(
+        /\s+/,
+      );
+
+    if (
+      scheme?.toLowerCase() !==
+      'bearer'
+    ) {
+      return null;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    return token;
+  }
+}
+
+// ============================================================
+// API KEY SCOPE GUARD
+// ============================================================
+
+@Injectable()
+export class ApiKeyScopeGuard
+  implements CanActivate
+{
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly apiKeyService: ApiKeyService,
+  ) {}
+
+  canActivate(
+    context: ExecutionContext,
+  ): boolean {
+    // --------------------------------------------------------
+    // PUBLIC ENDPOINT
+    // --------------------------------------------------------
+
+    const isPublic =
+      this.reflector.getAllAndOverride<boolean>(
+        PUBLIC_ENDPOINT_KEY,
+        [
+          context.getHandler(),
+          context.getClass(),
+        ],
+      );
+
+    if (isPublic) {
+      return true;
+    }
+
+    // --------------------------------------------------------
+    // REQUIRED SCOPES
+    // --------------------------------------------------------
+
+    const requiredScopes =
+      this.reflector.getAllAndOverride<
+        ApiScope[]
+      >(
+        REQUIRED_SCOPES_KEY,
+        [
+          context.getHandler(),
+          context.getClass(),
+        ],
+      );
+
+    // --------------------------------------------------------
+    // IMPORTANT SECURITY RULE
+    // --------------------------------------------------------
+    //
+    // A protected endpoint without explicit scopes should
+    // NOT silently become unrestricted.
+    //
+    // This prevents accidental exposure when a developer
+    // creates a new protected endpoint but forgets to add
+    // scope metadata.
+    //
+
+    if (!requiredScopes) {
+      throw new ForbiddenException(
+        'Protected endpoint does not declare required API scopes',
+      );
+    }
+
+    // --------------------------------------------------------
+    // GET AUTHENTICATED PRINCIPAL
+    // --------------------------------------------------------
+
+    const request =
+      context
+        .switchToHttp()
+        .getRequest();
+
+    const principal =
+      request.apiKeyPrincipal as
+        | ApiKeyPrincipal
+        | undefined;
+
+    if (!principal) {
+      throw new UnauthorizedException(
+        'API key authentication is required before scope evaluation',
+      );
+    }
+
+    // --------------------------------------------------------
+    // ENFORCE SCOPES
+    // --------------------------------------------------------
+
+    this.apiKeyService.requireAllScopes(
+      principal,
+      requiredScopes,
+    );
+
+    return true;
+  }
+}
+
+// ============================================================
+// COMBINED SECURITY GUARD
+// ============================================================
+
+@Injectable()
+export class ApiKeySecurityGuard
+  implements CanActivate
+{
+  constructor(
+    private readonly authenticationGuard:
+      ApiKeyAuthenticationGuard,
+
+    private readonly scopeGuard:
+      ApiKeyScopeGuard,
+  ) {}
+
+  async canActivate(
+    context: ExecutionContext,
+  ): Promise<boolean> {
+    // Authentication ALWAYS happens first.
+    const authenticated =
+      await this.authenticationGuard.canActivate(
+        context,
+      );
+
+    if (!authenticated) {
+      return false;
+    }
+
+    // Scope authorization ALWAYS follows authentication.
+    return this.scopeGuard.canActivate(
+      context,
+    );
+  }
+}
+
+// ============================================================
+// REQUEST TYPE
+// ============================================================
+
+export interface AuthenticatedRequest {
+  apiKeyPrincipal?: ApiKeyPrincipal;
+  apiKeyId?: string;
+
+  headers: {
+    authorization?: string;
+  };
+}
+
+// ============================================================
+// CONTROLLER EXAMPLE
+// ============================================================
+
+/**
+ * Example controller demonstrating the intended usage.
+ *
+ * In the real application, the guard can be registered
+ * globally so every endpoint is protected by default.
+ */
+export class UsersController {
+  /**
+   * GET /users
+   *
+   * Requires:
+   *
+   * users:read
+   */
+  @RequireScopes(
+    'users:read',
+  )
+  async listUsers(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      authenticatedAs:
+        request.apiKeyPrincipal?.id,
+      action: 'list-users',
+    };
+  }
+
+  /**
+   * POST /users
+   *
+   * Requires:
+   *
+   * users:write
+   */
+  @RequireScopes(
+    'users:write',
+  )
+  async createUser(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      authenticatedAs:
+        request.apiKeyPrincipal?.id,
+      action: 'create-user',
+    };
+  }
+
+  /**
+   * DELETE /users/:id
+   *
+   * Requires:
+   *
+   * users:delete
+   */
+  @RequireScopes(
+    'users:delete',
+  )
+  async deleteUser(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      authenticatedAs:
+        request.apiKeyPrincipal?.id,
+      action: 'delete-user',
+    };
+  }
+}
+
+// ============================================================
+// PROJECT CONTROLLER
+// ============================================================
+
+export class ProjectsController {
+  @RequireScopes(
+    'projects:read',
+  )
+  async listProjects(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'list-projects',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+
+  @RequireScopes(
+    'projects:write',
+  )
+  async createProject(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'create-project',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+
+  @RequireScopes(
+    'projects:delete',
+  )
+  async deleteProject(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'delete-project',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+}
+
+// ============================================================
+// REPORT CONTROLLER
+// ============================================================
+
+export class ReportsController {
+  @RequireScopes(
+    'reports:read',
+  )
+  async getReports(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'read-reports',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+
+  @RequireScopes(
+    'reports:write',
+  )
+  async createReport(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'create-report',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+}
+
+// ============================================================
+// ADMIN CONTROLLER
+// ============================================================
+
+export class AdminController {
+  @RequireScopes(
+    'admin:read',
+  )
+  async getAdminData(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'admin-read',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+
+  @RequireScopes(
+    'admin:write',
+  )
+  async modifyAdminData(
+    request: AuthenticatedRequest,
+  ) {
+    return {
+      action: 'admin-write',
+      principal:
+        request.apiKeyPrincipal?.id,
+    };
+  }
+}
+
+// ============================================================
+// GLOBAL GUARD CONFIGURATION
+// ============================================================
+
+/**
+ * Recommended NestJS configuration:
+ *
+ * providers: [
+ *   ApiKeyService,
+ *   ApiKeyHashService,
+ *   ApiKeyAuthenticationGuard,
+ *   ApiKeyScopeGuard,
+ *   ApiKeySecurityGuard,
+ *   {
+ *     provide: APP_GUARD,
+ *     useClass: ApiKeySecurityGuard,
+ *   },
+ * ]
+ *
+ *
+ * This makes API-key security global.
+ *
+ * New endpoints are therefore protected automatically.
+ *
+ * Developers must explicitly use:
+ *
+ * @PublicEndpoint()
+ *
+ * for endpoints that genuinely need to be public.
+ *
+ * ============================================================
+ */
+
+// ============================================================
+// SECURITY POLICY
+// ============================================================
+
+export const API_KEY_SECURITY_POLICY = {
+  authenticationScheme:
+    'Bearer',
+
+  requireAuthentication:
+    true,
+
+  requireExplicitScopes:
+    true,
+
+  missingKeyStatusCode:
+    401,
+
+  invalidKeyStatusCode:
+    401,
+
+  inactiveKeyStatusCode:
+    401,
+
+  expiredKeyStatusCode:
+    401,
+
+  missingScopeStatusCode:
+    403,
+
+  scopeCombination:
+    'ALL',
+
+  allowClientDefinedScopes:
+    false,
+
+  allowQueryParameterScopes:
+    false,
+
+  allowBodyScopes:
+    false,
+
+  allowHeaderScopes:
+    false,
+
+  allowImplicitAdmin:
+    false,
+};
+
+// ============================================================
+// SECURITY TESTS
+// ============================================================
+
+describe(
+  'ApiKeyScopeGuard',
+  () => {
+    let service:
+      ApiKeyService;
+
+    let reflector:
+      Reflector;
+
+    let guard:
+      ApiKeyScopeGuard;
+
+    beforeEach(() => {
+      service =
+        new ApiKeyService();
+
+      reflector =
+        new Reflector();
+
+      guard =
+        new ApiKeyScopeGuard(
+          reflector,
+          service,
+        );
+    });
+
+    // ========================================================
+    // TEST HELPERS
+    // ========================================================
+
+    function context(
+      requiredScopes:
+        | ApiScope[]
+        | undefined,
+      principal?:
+        | ApiKeyPrincipal,
+    ): ExecutionContext {
+      return {
+        getHandler: () =>
+          function handler() {},
+
+        getClass: () =>
+          class Controller {},
+
+        switchToHttp: () => ({
+          getRequest: () => ({
+            apiKeyPrincipal:
+              principal,
+          }),
+        }),
+
+        getArgs: () => [],
+
+        getArgByIndex: () => undefined,
+
+        switchToRpc: () =>
+          ({} as any),
+
+        switchToWs: () =>
+          ({} as any),
+
+        getType: () =>
+          'http',
+
+        getContext: () =>
+          undefined,
+      } as unknown as ExecutionContext;
+    }
+
+    // ========================================================
+    // PRINCIPAL FACTORY
+    // ========================================================
+
+    function principal(
+      scopes: ApiScope[],
+    ): ApiKeyPrincipal {
+      return {
+        id: 'key-1',
+
+        name:
+          'Test API Key',
+
+        scopes,
+
+        active: true,
+
+        createdAt:
+          new Date(),
+      };
+    }
+
+    // ========================================================
+    // REQUIRED SCOPE
+    // ========================================================
+
+    it(
+      'should allow a key with the required scope',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue([
+            'users:read',
+          ]);
+
+        const result =
+          guard.canActivate(
+            context(
+              ['users:read'],
+              principal([
+                'users:read',
+              ]),
+            ),
+          );
+
+        expect(
+          result,
+        ).toBe(true);
+      },
+    );
+
+    // ========================================================
+    // MISSING SCOPE
+    // ========================================================
+
+    it(
+      'should reject a key without the required scope',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue([
+            'users:read',
+          ]);
+
+        expect(() =>
+          guard.canActivate(
+            context(
+              ['users:read'],
+              principal([
+                'projects:read',
+              ]),
+            ),
+          ),
+        ).toThrow(
+          ForbiddenException,
+        );
+      },
+    );
+
+    // ========================================================
+    // MULTIPLE SCOPES
+    // ========================================================
+
+    it(
+      'should require all declared scopes',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue([
+            'users:read',
+            'users:write',
+          ]);
+
+        expect(() =>
+          guard.canActivate(
+            context(
+              [
+                'users:read',
+                'users:write',
+              ],
+              principal([
+                'users:read',
+              ]),
+            ),
+          ),
+        ).toThrow(
+          ForbiddenException,
+        );
+      },
+    );
+
+    // ========================================================
+    // NO PRINCIPAL
+    // ========================================================
+
+    it(
+      'should reject requests without authentication',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue([
+            'users:read',
+          ]);
+
+        expect(() =>
+          guard.canActivate(
+            context(
+              ['users:read'],
+              undefined,
+            ),
+          ),
+        ).toThrow(
+          UnauthorizedException,
+        );
+      },
+    );
+
+    // ========================================================
+    // UNDECLARED SCOPES
+    // ========================================================
+
+    it(
+      'should reject protected endpoints without scope metadata',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue(
+            undefined,
+          );
+
+        expect(() =>
+          guard.canActivate(
+            context(
+              undefined,
+              principal([
+                'users:read',
+              ]),
+            ),
+          ),
+        ).toThrow(
+          ForbiddenException,
+        );
+      },
+    );
+
+    // ========================================================
+    // ADMIN IS NOT AUTOMATICALLY ALLOWED
+    // ========================================================
+
+    it(
+      'should not treat admin access as an implicit wildcard',
+      () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue([
+            'users:delete',
+          ]);
+
+        expect(() =>
+          guard.canActivate(
+            context(
+              ['users:delete'],
+              principal([
+                'admin:read',
+              ]),
+            ),
+          ),
+        ).toThrow(
+          ForbiddenException,
+        );
+      },
+    );
+  },
+);
+
+// ============================================================
+// AUTHENTICATION TESTS
+// ============================================================
+
+describe(
+  'ApiKeyAuthenticationGuard',
+  () => {
+    let service:
+      ApiKeyService;
+
+    let hashService:
+      ApiKeyHashService;
+
+    let reflector:
+      Reflector;
+
+    let guard:
+      ApiKeyAuthenticationGuard;
+
+    beforeEach(() => {
+      service =
+        new ApiKeyService();
+
+      hashService =
+        new ApiKeyHashService();
+
+      reflector =
+        new Reflector();
+
+      guard =
+        new ApiKeyAuthenticationGuard(
+          reflector,
+          service,
+          hashService,
+        );
+    });
+
+    function httpContext(
+      authorization?: string,
+    ): ExecutionContext {
+      return {
+        getHandler: () =>
+          function handler() {},
+
+        getClass: () =>
+          class Controller {},
+
+        switchToHttp: () => ({
+          getRequest: () => ({
+            headers: {
+              authorization,
+            },
+          }),
+        }),
+
+        getArgs: () => [],
+
+        getArgByIndex: () =>
+          undefined,
+
+        getType: () =>
+          'http',
+      } as unknown as ExecutionContext;
+    }
+
+    it(
+      'should reject missing API keys',
+      async () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue(
+            false,
+          );
+
+        await expect(
+          guard.canActivate(
+            httpContext(),
+          ),
+        ).rejects.toThrow(
+          UnauthorizedException,
+        );
+      },
+    );
+
+    it(
+      'should reject malformed authorization headers',
+      async () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue(
+            false,
+          );
+
+        await expect(
+          guard.canActivate(
+            httpContext(
+              'Basic abc123',
+            ),
+          ),
+        ).rejects.toThrow(
+          UnauthorizedException,
+        );
+      },
+    );
+
+    it(
+      'should reject unknown API keys',
+      async () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue(
+            false,
+          );
+
+        await expect(
+          guard.canActivate(
+            httpContext(
+              'Bearer unknown-key',
+            ),
+          ),
+        ).rejects.toThrow(
+          UnauthorizedException,
+        );
+      },
+    );
+
+    it(
+      'should authenticate valid API keys',
+      async () => {
+        jest
+          .spyOn(
+            reflector,
+            'getAllAndOverride',
+          )
+          .mockReturnValue(
+            false,
+          );
+
+        const key =
+          'valid-api-key';
+
+        const principal:
+          ApiKeyPrincipal = {
+          id:
+            'key-123',
+
+          name:
+            'Integration Key',
+
+          scopes: [
+            'users:read',
+          ],
+
+          active:
+            true,
+
+          createdAt:
+            new Date(),
+        };
+
+        service.registerKey(
+          hashService.hash(key),
+          principal,
+        );
+
+        const result =
+          await guard.canActivate(
+            httpContext(
+              `Bearer ${key}`,
+            ),
+          );
+
+        expect(
+          result,
+        ).toBe(true);
+      },
+    );
+  },
+);
+
+// ============================================================
+// END-TO-END SECURITY EXPECTATIONS
+// ============================================================
+
+/**
+ * ============================================================
+ * EXPECTED HTTP BEHAVIOUR
+ * ============================================================
+ *
+ * GET /users
+ * Scope: users:read
+ *
+ * No API key:
+ *     401 Unauthorized
+ *
+ * Invalid API key:
+ *     401 Unauthorized
+ *
+ * Valid key without users:read:
+ *     403 Forbidden
+ *
+ * Valid key with users:read:
+ *     200 OK
+ *
+ *
+ * POST /users
+ * Scope: users:write
+ *
+ * Valid read-only key:
+ *     403 Forbidden
+ *
+ * Valid write key:
+ *     200 OK
+ *
+ *
+ * DELETE /users/:id
+ * Scope: users:delete
+ *
+ * Read-only key:
+ *     403 Forbidden
+ *
+ * Write-only key:
+ *     403 Forbidden
+ *
+ * Delete key:
+ *     200 OK
+ *
+ *
+ * ============================================================
+ */
+
+// ============================================================
+// DEVELOPMENT CHECKLIST
+// ============================================================
+
+/**
+ * Before merging this feature:
+ *
+ * [ ] Register ApiKeySecurityGuard globally.
+ *
+ * [ ] Verify authentication happens before authorization.
+ *
+ * [ ] Add @RequireScopes() to every protected controller
+ *     method.
+ *
+ * [ ] Explicitly mark only genuinely public routes with
+ *     @PublicEndpoint().
+ *
+ * [ ] Never accept scopes from:
+ *
+ *     - request body
+ *     - query parameters
+ *     - arbitrary headers
+ *     - JWT/API-key payload supplied by the client
+ *
+ * [ ] Store API key hashes rather than plaintext keys.
+ *
+ * [ ] Return 401 for authentication failures.
+ *
+ * [ ] Return 403 for insufficient privileges.
+ *
+ * [ ] Test every protected endpoint.
+ *
+ * [ ] Test read/write/delete privilege separation.
+ *
+ * [ ] Test inactive API keys.
+ *
+ * [ ] Test expired API keys.
+ *
+ * [ ] Test multiple scopes.
+ *
+ * [ ] Test missing scope metadata.
+ *
+ * [ ] Test public endpoints.
+ *
+ * [ ] Test that admin scopes do not accidentally become
+ *     unrestricted wildcards.
+ *
+ * [ ] Review all existing controllers for missing scope
+ *     declarations.
+ *
+ * [ ] Add regression tests whenever a new protected endpoint
+ *     is introduced.
+ *
+ * ============================================================
+ */

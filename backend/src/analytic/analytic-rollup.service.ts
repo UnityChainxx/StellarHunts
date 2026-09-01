@@ -19,27 +19,66 @@ import { PG_POOL } from './database/postgres.provider';
 @Injectable()
 export class AnalyticsRollupService implements OnModuleInit {
   private readonly logger = new Logger(AnalyticsRollupService.name);
+  private readonly maxRetries = 3;
+  private readonly retryDelayMs = 500;
+  private running = false;
 
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 
   async onModuleInit(): Promise<void> {
-    try {
-      await this.pool.query('REFRESH MATERIALIZED VIEW puzzle_stats_mv');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Initial puzzle_stats_mv refresh failed: ${message}`);
-    }
+    await this.refresh('startup', false);
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
   async refreshLeaderboard(): Promise<void> {
+    await this.refresh('scheduled', true);
+  }
+
+  async refreshForTesting(
+    trigger: string,
+    concurrent: boolean,
+  ): Promise<void> {
+    await this.refresh(trigger, concurrent);
+  }
+
+  private async refresh(trigger: string, concurrent: boolean): Promise<void> {
+    if (this.running) {
+      this.logger.warn(`Skipping ${trigger} rollup: refresh already running`);
+      return;
+    }
+
+    this.running = true;
+    const startedAt = Date.now();
+    const statement = concurrent
+      ? 'REFRESH MATERIALIZED VIEW CONCURRENTLY puzzle_stats_mv'
+      : 'REFRESH MATERIALIZED VIEW puzzle_stats_mv';
+
     try {
-      await this.pool.query(
-        'REFRESH MATERIALIZED VIEW CONCURRENTLY puzzle_stats_mv',
-      );
+      for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+        try {
+          await this.pool.query(statement);
+          this.logger.log(
+            `Analytics rollup succeeded trigger=${trigger} attempt=${attempt} durationMs=${Date.now() - startedAt}`,
+          );
+          return;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Analytics rollup failed trigger=${trigger} attempt=${attempt}/${this.maxRetries} error=${message}`,
+          );
+          if (attempt === this.maxRetries) throw err;
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.retryDelayMs * 2 ** (attempt - 1)),
+          );
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`puzzle_stats_mv refresh failed: ${message}`);
+      this.logger.error(
+        `Analytics rollup exhausted retries trigger=${trigger} durationMs=${Date.now() - startedAt} error=${message}`,
+      );
+    } finally {
+      this.running = false;
     }
   }
 }

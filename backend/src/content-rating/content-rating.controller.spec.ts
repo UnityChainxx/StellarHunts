@@ -17,7 +17,7 @@ describe('ContentRatingController', () => {
       providers: [{ provide: ContentRatingService, useValue: serviceMock }],
     }).compile();
 
-    controller = module.get<ContentRatingController>(ContentController);
+    controller = module.get<ContentRatingController>(ContentRatingController);
   });
 
   it('should be defined', () => {

@@ -8,7 +8,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { OwnershipGuard } from '../common/guards/ownership.guard';
+import { Ownership } from '../common/decorators/ownership.decorator';
 import {
   ApiTags,
   ApiOperation,
@@ -56,6 +60,8 @@ export class UserReactionController {
   }
 
   @Get('user/:userId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get all reactions by specific user' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({
@@ -70,6 +76,8 @@ export class UserReactionController {
   }
 
   @Get('user/:userId/content/:contentId')
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Get specific reaction by user and content' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiParam({ name: 'contentId', description: 'Content ID' })
@@ -166,6 +174,8 @@ export class UserReactionController {
 
   @Delete('user/:userId/content/:contentId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthGuard('jwt'), OwnershipGuard)
+  @Ownership({ param: 'userId' })
   @ApiOperation({ summary: 'Remove reaction by user and content' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiParam({ name: 'contentId', description: 'Content ID' })

@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { utils as ethersUtils } from 'ethers';
 import { VerificationService } from './verification.service';
-import type { JwtPayload, WalletTokenPayload, TokenValidationResult } from '../interfaces/token.interface';
+import type { JwtPayload, WalletTokenPayload } from '../interfaces/token.interface';
 
 describe('VerificationService', () => {
   let service: VerificationService;
@@ -30,7 +31,7 @@ describe('VerificationService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        VerificationService,
+        { provide: VerificationService, useFactory: () => new VerificationService(jwtService, configService) },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
       ],
@@ -129,6 +130,9 @@ describe('VerificationService', () => {
     };
 
     it('validates a correct wallet signature', async () => {
+      jest
+        .spyOn(ethersUtils, 'verifyMessage')
+        .mockReturnValue('0xRecoveredAddress');
       const result = await service.validateWalletToken({
         ...validPayload,
         address: '0xRecoveredAddress',
@@ -157,8 +161,7 @@ describe('VerificationService', () => {
     });
 
     it('returns invalid if signature recovery fails', async () => {
-      const ethers = require('ethers');
-      jest.spyOn(ethers.utils, 'verifyMessage').mockImplementationOnce(() => {
+      jest.spyOn(ethersUtils, 'verifyMessage').mockImplementationOnce(() => {
         throw new Error('signature error');
       });
 
@@ -170,6 +173,9 @@ describe('VerificationService', () => {
 
     it('computes expiresAt when maxAge is set', async () => {
       const timestamp = Date.now();
+      jest
+        .spyOn(ethersUtils, 'verifyMessage')
+        .mockReturnValue('0xRecoveredAddress');
       const result = await service.validateWalletToken(
         {
           ...validPayload,

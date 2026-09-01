@@ -169,6 +169,11 @@ const PuzzleComponent = ({
     lastHint,
     walletConnected,
     walletAddress,
+    isExtensionInstalled,
+    unsupportedNetwork,
+    walletError,
+    connectWallet,
+    disconnectWallet,
     submitAnswer,
     requestHint,
     clearFeedback,
@@ -269,7 +274,7 @@ const PuzzleComponent = ({
                 walletConnected ? "bg-emerald-400 shadow-sm shadow-emerald-400/50" : "bg-gray-500"
               } transition-colors duration-300`}
             />
-            <span className="text-[10px] text-gray-500">
+            <span className="text-[10px] mt-0.5 text-gray-400">
               {walletConnected
                 ? `${walletAddress?.slice(0, 4)}…${walletAddress?.slice(-4)}`
                 : "Wallet disconnected"}
@@ -328,10 +333,10 @@ const PuzzleComponent = ({
               value={answer}
               onChange={handleAnswerChange}
               disabled={submitting || isCorrect}
-              className="h-12 border-white/10 bg-white/[0.04] pr-12 text-white placeholder:text-gray-500 focus:border-purple-400/50 focus:ring-2 focus:ring-purple-400/20"
+              className="h-12 border-white/10 bg-white/[0.04] pr-12 text-white placeholder:text-gray-400 focus:border-purple-400/50 focus:ring-2 focus:ring-purple-400/30"
             />
             {/* Character count indicator */}
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-600">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">
               {answer.length}
             </span>
           </div>
@@ -424,10 +429,59 @@ const PuzzleComponent = ({
         {!walletConnected && (
           <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-center">
             <Wallet className="mx-auto mb-2 h-6 w-6 text-gray-500" />
-            <p className="text-sm text-gray-400">
-              Connect your Freighter wallet to submit answers and earn on-chain rewards.
-            </p>
+            {isExtensionInstalled === false ? (
+              <p className="text-sm text-gray-400">
+                Freighter extension not detected. Install{" "}
+                <a
+                  className="text-amber-300 underline"
+                  href="https://freighter.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Freighter
+                </a>{" "}
+                to connect your wallet and earn on-chain rewards.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-400">
+                Connect your Freighter wallet to submit answers and earn on-chain rewards.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => connectWallet()}
+              disabled={isExtensionInstalled === false}
+              className="mt-3 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-300 disabled:opacity-50"
+            >
+              Connect Wallet
+            </button>
           </div>
+        )}
+
+        {walletConnected && unsupportedNetwork && (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200"
+          >
+            Unsupported network detected. Switch your Freighter network to match
+            the app, then disconnect and reconnect below.
+            <button
+              type="button"
+              onClick={() => disconnectWallet()}
+              className="mt-2 block text-left text-xs underline"
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+
+        {walletError && !unsupportedNetwork && (
+          <p
+            role="alert"
+            className="mt-3 rounded-lg bg-red-500/10 p-2 text-center text-sm text-red-300"
+          >
+            {walletError}
+          </p>
         )}
       </CardContent>
     </Card>
