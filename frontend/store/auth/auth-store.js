@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { devtools } from "zustand/middleware";
-import { apiUrl } from "@/lib/api";
+import { apiClient } from "@/lib/api";
 
 const ENCRYPTION_KEY_NAME = "stellar-hunts-ek";
 
@@ -84,15 +84,8 @@ const useAuthStore = create(
 
 				register: async (userData) => {
 					try {
-						const response = await fetch(apiUrl("/auth/register"), {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify(userData),
-						});
-
-						if (!response.ok) throw new Error("Registration failed");
-
-						const data = await response.json();
+						const response = await apiClient.post("/auth/register", userData);
+						const data = response.data;
 						const { user, token } = data;
 						const encrypted = await encryptToken(token);
 						set({ user, token: encrypted, isAuthenticated: true });
@@ -103,15 +96,8 @@ const useAuthStore = create(
 
 				login: async (credentials) => {
 					try {
-						const response = await fetch(apiUrl("/auth/login"), {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify(credentials),
-						});
-
-						if (!response.ok) throw new Error("Login failed");
-
-						const data = await response.json();
+						const response = await apiClient.post("/auth/login", credentials);
+						const data = response.data;
 						const { user, token } = data;
 						const encrypted = await encryptToken(token);
 						set({ user, token: encrypted, isAuthenticated: true });
@@ -135,19 +121,13 @@ const useAuthStore = create(
 						// GET /auth/profile is the backend route for the authenticated
 						// user; it returns { message, user }. Older code called a
 						// non-existent /auth/user path — see docs/api-conventions.md.
-						const response = await fetch(apiUrl("/auth/profile"), {
-							method: "GET",
-							headers: {
-								"Content-Type": "application/json",
-								...(decryptedToken
-									? { Authorization: `Bearer ${decryptedToken}` }
-									: {}),
-							},
+						const response = await apiClient.get("/auth/profile", {
+							headers: decryptedToken
+								? { Authorization: `Bearer ${decryptedToken}` }
+								: {},
 						});
 
-						if (!response.ok) throw new Error("Fetching user failed");
-
-						const data = await response.json();
+						const data = response.data;
 						set({ user: data.user ?? data, isAuthenticated: true });
 					} catch (error) {
 						console.error("Fetching user error:", error);

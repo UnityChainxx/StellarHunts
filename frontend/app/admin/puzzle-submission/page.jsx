@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { apiClient } from "../../../lib/api";
 
 const difficulties = ["Easy", "Medium", "Hard", "Expert"];
 
@@ -26,22 +27,14 @@ export default function AdminPuzzleSubmission() {
     setStatus(null);
 
     try {
-      const response = await fetch("/api/admin/puzzles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await apiClient.post("/admin/puzzles", {
           title: form.title.trim(),
           description: form.description.trim(),
           difficulty: form.difficulty.toLowerCase(),
           hint: form.nftMetadata.trim() || undefined,
           solution: form.answer.trim(),
           isActive: true,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to submit puzzle");
-      }
+        });
 
       setForm({
         title: "",

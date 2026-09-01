@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import axios from "axios";
+import { apiClient } from "../lib/api";
 import { useApiQuery } from "./useApiQuery";
 import { useApiMutation } from "./useApiMutation";
 
@@ -18,8 +18,7 @@ export const useReferral = (userId) => {
     key: ["referral", userId],
     fn: async ({ signal }) => {
       if (!userId) return null;
-      const response = await axios.get(`/api/referrals/${userId}`, {
-        withCredentials: true,
+      const response = await apiClient.get(`/referrals/${userId}`, {
         signal,
       });
       return response.data;
@@ -32,10 +31,9 @@ export const useReferral = (userId) => {
 
   const trackMutation = useApiMutation({
     fn: async ({ referrerId, newUserId }) => {
-      await axios.post(
-        "/api/referrals/track",
+      await apiClient.post(
+        "/referrals/track",
         { referrerId, newUserId },
-        { withCredentials: true },
       );
     },
     invalidate: ["referral"],
