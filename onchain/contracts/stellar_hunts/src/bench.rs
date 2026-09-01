@@ -29,8 +29,8 @@ fn b(env: &Env, s: &str) -> Bytes {
 fn bench_submit_answer_cpu_budget() {
     let env = Env::default();
     env.mock_all_auths();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
+    // Non-zero ledger so the initialised `last_attempt_ledger == 0` does
+    // not collide with the current ledger (AttemptTooSoon).
     env.ledger().set_sequence_number(100_000);
 
     let admin = Address::generate(&env);
@@ -84,8 +84,6 @@ fn bench_submit_answer_cpu_budget() {
 fn bench_ten_submit_answers_amortised() {
     let env = Env::default();
     env.mock_all_auths();
-    // Start on a non-zero ledger; each submission advances the ledger so
-    // the `AttemptTooSoon` check in `submit_answer` does not fire.
     env.ledger().set_sequence_number(100_000);
 
     let admin = Address::generate(&env);
@@ -113,6 +111,10 @@ fn bench_ten_submit_answers_amortised() {
         let answer = b(&env, &format!("A{}", i));
         let ok = client.submit_answer(&player, &((i as u64) + 1), &answer);
         assert!(ok);
+        // The contract allows one attempt per ledger (AttemptTooSoon), so
+        // advance the simulated ledger between submissions.
+        env.ledger()
+            .set_sequence_number(env.ledger().sequence() + 1);
     }
 
     let total_cpu = budget.cpu_instruction_cost();
@@ -122,7 +124,6 @@ fn bench_ten_submit_answers_amortised() {
         "10x submit_answer  total_cpu={}  avg_cpu={}",
         total_cpu, avg_cpu
     );
-
     assert!(
         avg_cpu < 5_000_000,
         "amortised submit_answer CPU budget exceeded: {} avg instructions",

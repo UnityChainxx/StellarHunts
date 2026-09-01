@@ -23,6 +23,8 @@ import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { LogoutDto } from '../dto/logout.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { RateLimit } from '../../rate-limiter/rate-limit.decorator';
+import { RateLimitGuard } from '../../rate-limiter/rate-limit.guard';
 import { User } from '../entities/user.entity';
 
 @ApiTags('Authentication')
@@ -32,6 +34,8 @@ export class AuthController {
 
   @Post('register')
   @Auth(AuthType.None)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ ttl: 900, limit: 10 })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register a new user',
@@ -59,6 +63,14 @@ export class AuthController {
 
   @Post('login')
   @Auth(AuthType.None) // Public route
+  @UseGuards(RateLimitGuard)
+  // Account-aware throttle: keyed by email so brute-forcing one account
+  // is limited even when the attacker rotates IPs. Falls back to IP.
+  @RateLimit({
+    ttl: 900,
+    limit: 10,
+    keyGenerator: (req) => req.body?.email,
+  })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'User login',
@@ -108,7 +120,8 @@ export class AuthController {
   }
 
   @Post('validate-token')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ ttl: 60, limit: 30 })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

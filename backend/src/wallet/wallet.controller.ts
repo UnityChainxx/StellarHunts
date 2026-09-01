@@ -6,6 +6,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,8 +15,8 @@ import {
 } from '@nestjs/swagger';
 import { WalletService, WalletChallenge } from './wallet.service';
 import { Wallet } from './entities/wallet.entity';
-import { WalletChallengeDto } from './dto/wallet-challenge.dto';
-import { VerifyWalletSignatureDto } from './dto/verify-wallet-signature.dto';
+import { RateLimit } from '../rate-limiter/rate-limit.decorator';
+import { RateLimitGuard } from '../rate-limiter/rate-limit.guard';
 
 @ApiTags('Wallet')
 @Controller('wallet')
@@ -23,6 +24,8 @@ export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
   @Post('link')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ ttl: 900, limit: 10 })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Link or upsert a wallet address' })
   async linkWallet(@Body() body: { address: string }): Promise<Wallet> {
@@ -49,13 +52,15 @@ export class WalletController {
   }
 
   @Post('verify-signature')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Verify a wallet signature with replay protection',
-    description:
-      'Verifies an ed25519 signature over a signed challenge. The nonce is consumed on success so the signature cannot be replayed.',
+  @UseGuards(RateLimitGuard)
+  // Keyed by wallet address too: limits signature brute-forcing on a
+  // specific address across IPs, while still throttling anonymous traffic
+  // by IP.
+  @RateLimit({
+    ttl: 60,
+    limit: 10,
+    keyGenerator: (req) => req.body?.address,
   })
-  @ApiResponse({ status: 200, description: 'Verification result' })
   async verifySignature(
     @Body() body: VerifyWalletSignatureDto,
   ): Promise<{ valid: boolean; error?: string }> {
@@ -67,7 +72,15 @@ export class WalletController {
   }
 
   @Get('verify-signature')
-  @ApiOperation({ summary: 'Verify a wallet signature (query params)' })
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    ttl: 60,
+    limit: 10,
+    keyGenerator: (req) => {
+      const address = req.query?.address;
+      return typeof address === 'string' ? address : undefined;
+    },
+  })
   async verifySignatureGet(
     @Query('address') address: string,
     @Query('signature') signature: string,

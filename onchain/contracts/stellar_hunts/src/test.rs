@@ -76,15 +76,32 @@ fn b(env: &Env, s: &str) -> Bytes {
 // Helper: init contract with selective auth for the `init` call
 // ---------------------------------------------------------------------
 
-/// Register the contract, grant admin auth specifically for `init`, then
-/// call `init`.  Returns `(admin, contract_address, client)` so callers
-/// can set up further `mock_auths` for subsequent admin/player calls.
+/// Register the contract and authorize the admin's `init` call via
+/// `mock_all_auths`. Returns `(admin, contract_address, client)` so
+/// callers can run subsequent admin/player flows.
 fn init_with_admin(env: &Env) -> (Address, Address, StellarHuntsClient) {
+    let admin = new_admin(env);
+    // soroban-sdk 22's `register_contract` returns the contract `Address`
+    // directly (the old `BytesN<32>` + `Address::from_contract_id` pair is
+    // gone).
+    let contract_address = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(env, &contract_address);
+
+    env.mock_all_auths();
+    client.init(&admin);
+    (admin, contract_address, client)
+}
+
+/// Register the contract and authorize ONLY the admin's `init` call.
+/// Use this in tests that verify admin-gated functions are *not*
+/// authorized afterwards (negative auth coverage). The mock entry must
+/// carry the exact invocation args of `init` (soroban-sdk 22 matches on
+/// them), and each entry authorizes a single call.
+fn init_admin_auth_only(env: &Env) -> (Address, Address, StellarHuntsClient) {
     let admin = new_admin(env);
     let contract_address = env.register_contract(None, StellarHunts);
     let client = StellarHuntsClient::new(env, &contract_address);
 
-    // Grant admin auth **only** for the `init` call.
     env.mock_auths(&[MockAuth {
         address: &admin,
         invoke: &MockAuthInvoke {
@@ -106,18 +123,7 @@ fn init_with_admin(env: &Env) -> (Address, Address, StellarHuntsClient) {
 #[test]
 fn test_set_question_per_level_admin_only() {
     let env = Env::default();
-    env.mock_all_auths();
-    let (admin, contract_address, client) = init_with_admin(&env);
-
-    env.mock_auths(&[MockAuth {
-        address: &admin,
-        invoke: &MockAuthInvoke {
-            contract: &contract_address,
-            fn_name: "set_question_per_level",
-            args: (&5u32,).into_val(&env),
-            sub_invokes: &[],
-        },
-    }]);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
 
     client.set_question_per_level(&5u32);
     assert_eq!(client.get_question_per_level(), 5);
@@ -130,7 +136,7 @@ fn test_set_question_per_level_admin_only() {
 #[test]
 fn test_set_question_per_level_unauthorized() {
     let env = Env::default();
-    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_admin_auth_only(&env);
 
     // No mock auth for admin + "set_question_per_level" → require_auth fails.
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -149,35 +155,12 @@ fn test_set_question_per_level_unauthorized() {
 #[test]
 fn test_add_and_get_question() {
     let env = Env::default();
-    env.mock_all_auths();
-    let (admin, contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
 
     let level = crate::Levels::Easy;
     let question = b(&env, "What is the capital of France?");
     let answer = b(&env, "Paris");
     let hint = b(&env, "It starts with P");
-
-    // Set up admin auth for both admin-only calls.
-    env.mock_auths(&[
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "set_question_per_level",
-                args: (&5u32,).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "add_question",
-                args: (level.clone(), &question, &answer, &hint).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-    ]);
 
     client.set_question_per_level(&5u32);
     client.add_question(&level, &question, &answer, &hint);
@@ -193,7 +176,7 @@ fn test_add_and_get_question() {
 #[test]
 fn test_add_question_unauthorized() {
     let env = Env::default();
-    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_admin_auth_only(&env);
 
     let level = crate::Levels::Easy;
     let question = b(&env, "Should I be here?");
@@ -216,47 +199,16 @@ fn test_add_question_unauthorized() {
 #[test]
 fn test_submit_answer_correct_progresses() {
     let env = Env::default();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
+    // Non-zero ledger so the initialised `last_attempt_ledger == 0` does
+    // not collide with the current ledger (AttemptTooSoon).
     env.ledger().set_sequence_number(100_000);
-    let (admin, contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
     let level = crate::Levels::Easy;
     let question = b(&env, "What is 2+2?");
     let answer = b(&env, "4");
     let hint = b(&env, "basic math");
-
-    // Set up auths for admin (setup) and player (submit_answer).
-    env.mock_auths(&[
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "set_question_per_level",
-                args: (&1u32,).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "add_question",
-                args: (level.clone(), &question, &answer, &hint).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &player,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "submit_answer",
-                args: (&player, &1u64, &answer).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-    ]);
 
     client.set_question_per_level(&1u32);
     client.add_question(&level, &question, &answer, &hint);
@@ -275,10 +227,8 @@ fn test_submit_answer_correct_progresses() {
 #[test]
 fn test_submit_answer_incorrect_does_not_progress() {
     let env = Env::default();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
     env.ledger().set_sequence_number(100_000);
-    let (admin, contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
     let level = crate::Levels::Easy;
@@ -286,36 +236,6 @@ fn test_submit_answer_incorrect_does_not_progress() {
     let answer = b(&env, "4");
     let wrong = b(&env, "5");
     let hint = b(&env, "basic math");
-
-    env.mock_auths(&[
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "set_question_per_level",
-                args: (&1u32,).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "add_question",
-                args: (level.clone(), &question, &answer, &hint).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &player,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "submit_answer",
-                args: (&player, &1u64, &wrong).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-    ]);
 
     client.set_question_per_level(&1u32);
     client.add_question(&level, &question, &answer, &hint);
@@ -334,10 +254,8 @@ fn test_submit_answer_incorrect_does_not_progress() {
 #[test]
 fn test_request_hint_after_initialize() {
     let env = Env::default();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
     env.ledger().set_sequence_number(100_000);
-    let (admin, contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
     let player = user(&env);
 
     let level = crate::Levels::Easy;
@@ -347,54 +265,6 @@ fn test_request_hint_after_initialize() {
     let q2 = b(&env, "Q2");
     let a2 = b(&env, "A2");
     let h2 = b(&env, "HINT-Y");
-
-    env.mock_auths(&[
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "set_question_per_level",
-                args: (&2u32,).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "add_question",
-                args: (level.clone(), &q1, &a1, &h1).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &admin,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "add_question",
-                args: (level.clone(), &q2, &a2, &h2).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &player,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "submit_answer",
-                args: (&player, &1u64, &a1).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
-            address: &player,
-            invoke: &MockAuthInvoke {
-                contract: &contract_address,
-                fn_name: "request_hint",
-                args: (&player, &1u64).into_val(&env),
-                sub_invokes: &[],
-            },
-        },
-    ]);
 
     // Two questions per level — answering the first keeps the player on
     // Easy, so a hint request for question 1 remains valid.
@@ -414,19 +284,9 @@ fn test_request_hint_after_initialize() {
 #[test]
 fn test_set_nft_contract_address_admin_only() {
     let env = Env::default();
-    let (admin, contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
 
     let new_addr = Address::generate(&env);
-
-    env.mock_auths(&[MockAuth {
-        address: &admin,
-        invoke: &MockAuthInvoke {
-            contract: &contract_address,
-            fn_name: "set_nft_contract_address",
-            args: (&new_addr,).into_val(&env),
-            sub_invokes: &[],
-        },
-    }]);
 
     client.set_nft_contract_address(&new_addr);
     assert_eq!(client.get_nft_contract_address(), new_addr);
@@ -439,7 +299,7 @@ fn test_set_nft_contract_address_admin_only() {
 #[test]
 fn test_set_nft_contract_address_unauthorized() {
     let env = Env::default();
-    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let (_admin, _contract_address, client) = init_admin_auth_only(&env);
 
     let new_addr = Address::generate(&env);
 
@@ -595,8 +455,6 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
 fn test_cross_contract_full_happy_path_nft_registered_first() {
     let env = Env::default();
     env.mock_all_auths();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
     env.ledger().set_sequence_number(100_000);
 
     // Register the NFT contract first, then the game contract — exercises
@@ -656,8 +514,6 @@ fn test_cross_contract_full_happy_path_nft_registered_first() {
 fn test_cross_contract_full_happy_path_game_registered_first() {
     let env = Env::default();
     env.mock_all_auths();
-    // Non-zero ledger so the `last_attempt_ledger == current_ledger`
-    // check in `submit_answer` does not panic on first submission.
     env.ledger().set_sequence_number(100_000);
 
     // Reverse order: game contract registered before the NFT contract.
@@ -712,12 +568,7 @@ fn test_cross_contract_full_happy_path_game_registered_first() {
 #[test]
 fn test_schema_version() {
     let e = Env::default();
-    e.mock_all_auths();
-    let contract_id = e.register_contract(None, StellarHunts);
-    let client = StellarHuntsClient::new(&e, &contract_id);
-
-    let admin = new_admin(&e);
-    client.init(&admin);
+    let (_admin, _contract_address, client) = init_with_admin(&e);
 
     assert_eq!(client.get_schema_version(), crate::CURRENT_SCHEMA_VERSION);
 }
@@ -837,4 +688,162 @@ fn test_unauthorized_add_question_fails() {
         client.add_question(&Levels::Easy, &Bytes::from_slice(&env, b"q"), &Bytes::from_slice(&env, b"a"), &Bytes::from_slice(&env, b"h"));
     }));
     assert!(should_panic.is_err());
+}
+
+// ---------------------------------------------------------------------
+// Overflow and boundary behavior (issue #265)
+//
+// The contract uses checked arithmetic for every counter increment
+// (question ids, per-level indices, attempts, last_question_index) and
+// panics with `Error::ArithmeticOverflow` (#12) rather than silently
+// wrapping. These tests drive each counter to its boundary and assert
+// the defined panic behaviour.
+// ---------------------------------------------------------------------
+
+fn panic_text(result: &std::result::Result<(), Box<dyn std::any::Any + Send>>) -> String {
+    result
+        .as_ref()
+        .err()
+        .and_then(|e| {
+            e.downcast_ref::<String>()
+                .cloned()
+                .or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string()))
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn test_add_question_overflows_at_max_question_count() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    // Push QuestionCount to u64::MAX so the next question id cannot be
+    // represented.
+    env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .set(&crate::DataKey::QuestionCount, &u64::MAX);
+    });
+
+    let level = crate::Levels::Easy;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.add_question(&level, &b(&env, "Q"), &b(&env, "A"), &b(&env, "H"));
+    }));
+
+    assert!(result.is_err(), "add_question must panic on id overflow");
+    assert!(
+        panic_text(&result).contains("Error(Contract, #12)"),
+        "expected ArithmeticOverflow panic, got: {}",
+        panic_text(&result)
+    );
+}
+
+#[test]
+fn test_question_per_level_boundary_respected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&1u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+
+    // A second question exceeds the per-level budget and must be rejected
+    // with QuestionPerLevelLimit rather than overflowing the index.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+    }));
+
+    assert!(result.is_err(), "adding beyond per-level limit must panic");
+    assert!(
+        panic_text(&result).contains("Error(Contract, #8)"),
+        "expected QuestionPerLevelLimit panic, got: {}",
+        panic_text(&result)
+    );
+}
+
+#[test]
+fn test_submit_answer_attempts_overflow_panics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    // Non-zero ledger so the initialisation-time `last_attempt_ledger == 0`
+    // does not collide with the current ledger.
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&5u32);
+    client.add_question(&level, &b(&env, "Q?"), &b(&env, "A"), &b(&env, "H"));
+
+    // Initialise the player with one (wrong) attempt.
+    let ok = client.submit_answer(&player, &1u64, &b(&env, "wrong"));
+    assert!(!ok);
+
+    // Push attempts to u32::MAX directly.
+    env.as_contract(&contract_id, || {
+        let key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
+        let mut lp: crate::LevelProgress = env.storage().persistent().get(&key).unwrap();
+        lp.attempts = u32::MAX;
+        env.storage().persistent().set(&key, &lp);
+    });
+
+    // Advance the ledger so `AttemptTooSoon` does not fire first.
+    env.ledger()
+        .set_sequence_number(env.ledger().sequence() + 1);
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "wrong"));
+    }));
+
+    assert!(result.is_err(), "attempts increment must panic at u32::MAX");
+    assert!(
+        panic_text(&result).contains("Error(Contract, #12)"),
+        "expected ArithmeticOverflow panic, got: {}",
+        panic_text(&result)
+    );
+}
+
+#[test]
+fn test_submit_answer_last_question_index_overflow_panics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&5u32);
+    client.add_question(&level, &b(&env, "Q?"), &b(&env, "A"), &b(&env, "H"));
+
+    // Initialise the player.
+    let ok = client.submit_answer(&player, &1u64, &b(&env, "wrong"));
+    assert!(!ok);
+
+    // Push last_question_index to u32::MAX directly.
+    env.as_contract(&contract_id, || {
+        let key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
+        let mut lp: crate::LevelProgress = env.storage().persistent().get(&key).unwrap();
+        lp.last_question_index = u32::MAX;
+        env.storage().persistent().set(&key, &lp);
+    });
+
+    env.ledger()
+        .set_sequence_number(env.ledger().sequence() + 1);
+
+    // A correct answer increments last_question_index -> overflow.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A"));
+    }));
+
+    assert!(
+        result.is_err(),
+        "correct answer must panic when last_question_index is at max"
+    );
+    assert!(
+        panic_text(&result).contains("Error(Contract, #12)"),
+        "expected ArithmeticOverflow panic, got: {}",
+        panic_text(&result)
+    );
 }

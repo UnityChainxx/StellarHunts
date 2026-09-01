@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -31,6 +32,12 @@ import type {
   PuzzleReviewSummary,
   ReviewStats,
 } from '../interfaces/review.interface';
+
+// Runtime allowlists (issue #277). TS union types are compile-time only —
+// query strings reach the controller as arbitrary values, so they are
+// validated here before they can reach the query builder.
+const REVIEW_SORT_FIELDS = new Set(['createdAt', 'rating', 'helpfulCount']);
+const SORT_ORDERS = new Set(['ASC', 'DESC']);
 
 @ApiTags('Puzzle Reviews')
 @Controller('puzzle-reviews')
@@ -313,8 +320,23 @@ export class PuzzleReviewController {
     if (minRating && minRating > 0) filters.minRating = minRating;
     if (maxRating && maxRating > 0) filters.maxRating = maxRating;
     if (reviewType) filters.reviewType = reviewType;
-    if (sortBy) filters.sortBy = sortBy;
-    if (sortOrder) filters.sortOrder = sortOrder;
+    if (sortBy !== undefined) {
+      if (!REVIEW_SORT_FIELDS.has(sortBy)) {
+        throw new BadRequestException(
+          `Invalid sortBy field: "${sortBy}"`,
+        );
+      }
+      filters.sortBy = sortBy;
+    }
+    if (sortOrder !== undefined) {
+      const normalized = sortOrder.toUpperCase();
+      if (!SORT_ORDERS.has(normalized)) {
+        throw new BadRequestException(
+          `Invalid sortOrder: "${sortOrder}" (expected ASC or DESC)`,
+        );
+      }
+      filters.sortOrder = normalized as 'ASC' | 'DESC';
+    }
 
     const result = await this.reviewService.getReviews(filters, page, limit);
 

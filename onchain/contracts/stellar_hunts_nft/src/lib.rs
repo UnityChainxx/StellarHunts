@@ -5,11 +5,11 @@
 
 extern crate alloc;
 
+use alloc::string::ToString;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env, String,
     Symbol,
 };
-use alloc::string::ToString;
 
 // Use the shared `Levels` enum from the types crate so we can compile
 // standalone without depending on the game contract (which would create
@@ -89,8 +89,7 @@ impl StellarHuntsNft {
         let symbol_text = symbol.to_string();
 
         if base_uri_text.len() > MAX_BASE_URI_LEN
-            || (!base_uri_text.starts_with("ipfs://")
-                && !base_uri_text.starts_with("https://"))
+            || (!base_uri_text.starts_with("ipfs://") && !base_uri_text.starts_with("https://"))
         {
             panic_with_error!(&env, Error::InvalidBaseUri);
         }

@@ -61,6 +61,7 @@ import { PuzzleForkModule } from './puzzle-fork/puzzle-fork.module';
 import { PuzzleModule } from './puzzle/puzzle.module';
 import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
+import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
 import { PuzzleVersioningModule } from './puzzle-versioning/puzzle-versioning.module';
 import { QuizModule } from './quiz/quiz.module';
@@ -165,9 +166,7 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     AuditLogModule,
     PuzzleSubmissionModule,
     PuzzleTranslationModule,
-    PuzzleVersioningModule,
-    QuizModule,
-    RateLimiterModule.forRoot(),
+    RateLimiterModule,
     ReferralModule,
     ReportsModule,
     RewardShopModule,
