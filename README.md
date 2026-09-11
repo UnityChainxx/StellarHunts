@@ -94,6 +94,9 @@ cd frontend && npm run dev
 
 # Build & test onchain contracts
 cd onchain && cargo test --workspace
+
+# View contract error codes reference
+cat onchain/docs/error-codes.md
 ```
 
 ## Project Structure
@@ -124,6 +127,9 @@ StellarHunts/
     │   ├── stellar_hunts/         # Game contract (Rust)
     │   ├── stellar_hunts_nft/     # NFT badge contract (Rust)
     │   └── stellar_hunts_receiver/# Test helper
+    ├── docs/                     # Contract documentation
+    │   ├── error-codes.md         # Error code reference for off-chain clients
+    │   └── storage-versioning.md  # Storage migration strategy
     └── Cargo.toml            # Workspace manifest
 ```
 

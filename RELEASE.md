@@ -16,6 +16,11 @@ StellarHunts uses [Semantic Versioning](https://semver.org/) and tags to trigger
    - Generate a release changelog from conventional-commit messages
    - Attach the compiled `.wasm` contract files to a GitHub Release
 
+4. Before cutting a release, ensure the error codes documentation is up to date:
+   - Check `onchain/docs/error-codes.md` against the current error enums
+   - Verify all error codes and entry points are documented
+   - Update the table if any error codes were added or modified
+
 ## Conventional commits
 
 Commit messages prefixed with `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `ci:`,
