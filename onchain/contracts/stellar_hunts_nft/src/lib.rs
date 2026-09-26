@@ -175,12 +175,20 @@ impl StellarHuntsNft {
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&NftDataKey::Paused)
+            .unwrap_or(false)
     }
 
     pub fn mint_level_badge(env: Env, minter: Address, recipient: Address, level: Levels) {
         minter.require_auth();
-        if env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
 

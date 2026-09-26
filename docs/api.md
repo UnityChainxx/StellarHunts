@@ -312,6 +312,15 @@ On-chain Soroban NFT badge minting.
 | GET | `/referrals/history` | JWT | Get referral history |
 | POST | `/referrals/invites/:id/complete` | JWT | Mark a referral invite as completed (referrer only) |
 | POST | `/referrals/register` | JWT | Register the authenticated user against a pending referral invite |
+| POST | `/referrals/track` | JWT | Track referral attribution for the authenticated caller following a referral link (idempotent) |
+
+### Referral Attribution Flow
+
+1. **Link Navigation**: A prospective user follows a referral link containing a referral code or referrer ID (e.g. `/ref/:referralId`).
+2. **Authenticated Proxy**: The frontend route (`/api/referrals/track`) forwards the attribution request to `POST /api/v1/referrals/track` with the user's verified credentials.
+3. **Identity Binding**: The backend resolves the invited user ID exclusively from the verified caller (`@CurrentUser('id')`), preventing malicious or arbitrary attribution.
+4. **Idempotency**: Repeated calls for the same referrer and invited user pair return the existing attribution record without creating duplicate entries or raising errors.
+5. **Persistence**: On first attribution, an invite record is created with `status: registered`, associated with the referrer's active code, and statistics are updated.
 
 ---
 

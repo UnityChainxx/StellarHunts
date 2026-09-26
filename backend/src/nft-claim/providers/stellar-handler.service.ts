@@ -54,24 +54,39 @@ export class StellarHandlerService {
    * development allowance). Misconfiguration fails fast in live mode and is
    * logged as a warning in mock mode.
    */
-  private validateRpcUrl(): void {
+  private validateRpcUrl(): string {
     const rpcUrl = process.env.SOROBAN_RPC_URL;
     if (!rpcUrl) {
-      return;
+      if (!this.isMockMode) {
+        throw new Error('Invalid SOROBAN_RPC_URL: SOROBAN_RPC_URL is required in live mode');
+      }
+      return '';
     }
 
+    const nodeEnv = process.env.NODE_ENV?.trim().toLowerCase() || 'development';
+    const isProduction = nodeEnv === 'production';
+
     try {
-      assertSafeHttpUrl(rpcUrl, 'SOROBAN_RPC_URL');
-      const hostname = new URL(rpcUrl).hostname.toLowerCase();
-      const approved = APPROVED_RPC_HOST_SUFFIXES.some((suffix) =>
-        hostname.endsWith(suffix),
-      );
-      const isDevAllowance = DEV_RPC_HOSTS.includes(hostname);
-      if (!approved && !isDevAllowance) {
-        throw new Error(
-          `host "${hostname}" is not an approved Stellar RPC endpoint`,
-        );
+      const parsed = new URL(rpcUrl);
+      const hostname = parsed.hostname.toLowerCase();
+      const isDevAllowance = !isProduction && DEV_RPC_HOSTS.includes(hostname);
+
+      if (parsed.protocol !== 'https:' && !isDevAllowance) {
+        throw new Error(`protocol "${parsed.protocol}" is not allowed, must be https:`);
       }
+
+      if (!isDevAllowance) {
+        assertSafeHttpUrl(rpcUrl, 'SOROBAN_RPC_URL');
+        const approved = APPROVED_RPC_HOST_SUFFIXES.some((suffix) =>
+          hostname.endsWith(suffix) || hostname === suffix.slice(1),
+        );
+        if (!approved) {
+          throw new Error(
+            `host "${hostname}" is not an approved Stellar RPC endpoint`,
+          );
+        }
+      }
+      return rpcUrl;
     } catch (error) {
       if (!this.isMockMode) {
         throw new Error(`Invalid SOROBAN_RPC_URL: ${error.message}`);
@@ -79,6 +94,7 @@ export class StellarHandlerService {
       this.logger.warn(
         `Invalid SOROBAN_RPC_URL ignored in mock mode: ${error.message}`,
       );
+      return rpcUrl;
     }
   }
 
@@ -103,9 +119,10 @@ export class StellarHandlerService {
   }
 
   private async realClaimNFT(claimNFTDto: ClaimNFTDto): Promise<any> {
-    this.logger.log('Processing live Stellar NFT claim');
+    const rpcUrl = this.validateRpcUrl();
+    this.logger.log(`Processing live Stellar NFT claim using RPC at ${rpcUrl}`);
     // TODO: Wire up `@stellar/stellar-sdk` here. Sketch:
-    //   const server = new StellarSdk.SorobanRpc.Server(process.env.SOROBAN_RPC_URL);
+    //   const server = new StellarSdk.SorobanRpc.Server(rpcUrl);
     //   const contract = new StellarSdk.Contract(process.env.SOROBAN_NFT_CONTRACT_ID);
     //   const tx = new StellarSdk.TransactionBuilder(...)
     //     .addOperation(contract.call('mint_level_badge', ...))

@@ -215,25 +215,13 @@ impl StellarHunts {
             .instance()
             .get(&DataKey::QuestionPerLevel)
             .unwrap_or(5u32);
-        let idx: u32 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::QuestionPerLevelIndex(level.clone()))
-            .unwrap_or(0u32);
+        let idx = index_count(&env, &level);
 
         if idx >= per_level {
             panic_with_error!(&env, Error::QuestionPerLevelLimit);
         }
 
-        let next_index = idx
-            .checked_add(1)
-            .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-        env.storage()
-            .persistent()
-            .set(&DataKey::QuestionsByLevel(level.clone(), idx), &question_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::QuestionPerLevelIndex(level.clone()), &next_index);
+        index_append(&env, &level, question_id).unwrap_or_else(|e| panic_with_error!(&env, e));
 
         env.events()
             .publish((Symbol::new(&env, "question_added"),), (question_id, level));
@@ -276,67 +264,19 @@ impl StellarHunts {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
 
-            let old_idx = env
-                .storage()
-                .persistent()
-                .get::<DataKey, u32>(&DataKey::QuestionPerLevelIndex(old_level.clone()))
-                .unwrap_or(0u32);
-
-            let new_idx: u32 = env
-                .storage()
-                .persistent()
-                .get(&DataKey::QuestionPerLevelIndex(level.clone()))
-                .unwrap_or(0u32);
+            let new_idx = index_count(&env, &level);
 
             if new_idx >= per_level {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
 
-            let new_next_index = new_idx
-                .checked_add(1)
-                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-            env.storage().persistent().set(
-                &DataKey::QuestionsByLevel(level.clone(), new_idx),
-                &question_id,
-            );
-            env.storage().persistent().set(
-                &DataKey::QuestionPerLevelIndex(level.clone()),
-                &new_next_index,
-            );
+            index_append(&env, &level, question_id).unwrap_or_else(|e| panic_with_error!(&env, e));
 
-            // `old_idx` counts the questions in the old level, so it is
-            // >= 1 whenever the question being moved exists there; a
-            // checked_sub keeps the underflow behavior explicit anyway.
-            let last_old_idx = old_idx
-                .checked_sub(1)
-                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-            for i in 0..old_idx {
-                let qid: u64 = env
-                    .storage()
-                    .persistent()
-                    .get(&DataKey::QuestionsByLevel(old_level.clone(), i))
-                    .unwrap_or(0u64);
-                if qid == question_id {
-                    for j in i..last_old_idx {
-                        let next_qid: u64 = env
-                            .storage()
-                            .persistent()
-                            .get(&DataKey::QuestionsByLevel(old_level.clone(), j + 1))
-                            .unwrap_or(0u64);
-                        env.storage()
-                            .persistent()
-                            .set(&DataKey::QuestionsByLevel(old_level.clone(), j), &next_qid);
-                    }
-                    env.storage()
-                        .persistent()
-                        .remove(&DataKey::QuestionsByLevel(old_level.clone(), last_old_idx));
-                    break;
-                }
+            let removed = index_remove_by_id(&env, &old_level, question_id)
+                .unwrap_or_else(|e| panic_with_error!(&env, e));
+            if !removed {
+                panic_with_error!(&env, Error::QuestionNotFound);
             }
-            env.storage().persistent().set(
-                &DataKey::QuestionPerLevelIndex(old_level.clone()),
-                &last_old_idx,
-            );
         }
 
         let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
@@ -396,7 +336,12 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn submit_answer(env: Env, caller: Address, question_id: u64, answer: Bytes) -> bool {
-        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
         caller.require_auth();
@@ -539,7 +484,12 @@ impl StellarHunts {
     }
 
     pub fn claim_level_completion_nft(env: Env, caller: Address, level: Levels) {
-        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
         caller.require_auth();
@@ -606,9 +556,11 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn get_question(env: Env, question_id: u64) -> Question {
-        match env.storage()
+        match env
+            .storage()
             .persistent()
-            .get(&DataKey::Question(question_id)) {
+            .get(&DataKey::Question(question_id))
+        {
             Some(q) => q,
             None => panic_with_error!(&env, Error::QuestionNotFound),
         }
@@ -630,7 +582,8 @@ impl StellarHunts {
         let q: Question = match env
             .storage()
             .persistent()
-            .get(&DataKey::Question(question_id)) {
+            .get(&DataKey::Question(question_id))
+        {
             Some(q) => q,
             None => panic_with_error!(&env, Error::QuestionNotFound),
         };
@@ -687,7 +640,10 @@ impl StellarHunts {
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 
     pub fn get_schema_version(e: Env) -> u32 {
@@ -740,6 +696,85 @@ fn require_admin(env: &Env) {
         .get(&DataKey::Admin)
         .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
     admin.require_auth();
+}
+
+// ---------------------------------------------------------------------
+// Level question index helpers and invariant (issue #464)
+// ---------------------------------------------------------------------
+//
+// Index Invariant:
+// 1. `QuestionPerLevelIndex(level)` stores the total count `N` of active questions at `level`.
+// 2. For every `i` in `0..N`, `QuestionsByLevel(level, i)` contains the `i`-th live question ID.
+// 3. The entries at indices `0..N` contain each live question ID for that level exactly once.
+// 4. Slots at index `>= N` are cleared/unmapped (no trailing stale entries).
+// 5. Appending increments `N` and writes at index `N_old`.
+// 6. Removing by ID shifts all subsequent entries down by 1 to maintain contiguous indices `0..N-1`,
+//    removes slot `N-1`, and decrements `N`.
+
+fn index_count(env: &Env, level: &Levels) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::QuestionPerLevelIndex(level.clone()))
+        .unwrap_or(0u32)
+}
+
+fn index_append(env: &Env, level: &Levels, question_id: u64) -> Result<u32, Error> {
+    let idx = index_count(env, level);
+    let next_index = idx.checked_add(1).ok_or(Error::ArithmeticOverflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::QuestionsByLevel(level.clone(), idx), &question_id);
+    env.storage()
+        .persistent()
+        .set(&DataKey::QuestionPerLevelIndex(level.clone()), &next_index);
+    Ok(idx)
+}
+
+fn index_remove_by_id(env: &Env, level: &Levels, question_id: u64) -> Result<bool, Error> {
+    let count = index_count(env, level);
+    if count == 0 {
+        return Ok(false);
+    }
+
+    let mut found_idx: Option<u32> = None;
+    for i in 0..count {
+        let qid: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestionsByLevel(level.clone(), i))
+            .unwrap_or(0u64);
+        if qid == question_id {
+            found_idx = Some(i);
+            break;
+        }
+    }
+
+    let Some(i) = found_idx else {
+        return Ok(false);
+    };
+
+    let last_idx = count.checked_sub(1).ok_or(Error::ArithmeticOverflow)?;
+
+    for j in i..last_idx {
+        let next_qid: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestionsByLevel(level.clone(), j + 1))
+            .unwrap_or(0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::QuestionsByLevel(level.clone(), j), &next_qid);
+    }
+
+    env.storage()
+        .persistent()
+        .remove(&DataKey::QuestionsByLevel(level.clone(), last_idx));
+
+    env.storage()
+        .persistent()
+        .set(&DataKey::QuestionPerLevelIndex(level.clone()), &last_idx);
+
+    Ok(true)
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Repository } from 'typeorm';
 import {
@@ -17,6 +18,96 @@ export class ReferralInviteService {
     private readonly inviteRepository: Repository<ReferralInvite>,
     private readonly referralCodeService: ReferralCodeService,
   ) {}
+
+  async trackReferral(
+    userId: string,
+    email: string,
+    referrerIdentifier: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    isNew: boolean;
+    invite: ReferralInvite;
+    bonuses: any;
+  }> {
+    let referralCode: any;
+    try {
+      referralCode = await this.referralCodeService.findByCode(referrerIdentifier);
+    } catch {
+      const codes = await this.referralCodeService.findByUserId(referrerIdentifier);
+      referralCode = codes.find((c) => c.isActive) || codes[0];
+    }
+
+    if (!referralCode) {
+      throw new NotFoundException('Referral code or referrer not found');
+    }
+
+    if (referralCode.userId === userId) {
+      throw new BadRequestException('Cannot refer yourself');
+    }
+
+    // Check if an invite already exists for this pair (idempotent repeat attribution)
+    const existingInvite = await this.inviteRepository.findOne({
+      where: [
+        { referralCodeId: referralCode.id, invitedUserId: userId },
+        ...(email ? [{ referralCodeId: referralCode.id, email }] : []),
+      ],
+      relations: ['referralCode'],
+    });
+
+    const bonuses = {
+      referrer: {
+        xp: 50,
+        nft: 'Rare NFT',
+        badge: 'Referral Master',
+      },
+      newUser: {
+        xp: 25,
+        nft: 'Welcome NFT',
+        badge: 'Referred User',
+      },
+    };
+
+    if (existingInvite) {
+      if (!existingInvite.invitedUserId) {
+        existingInvite.invitedUserId = userId;
+        if (existingInvite.status === InviteStatus.PENDING) {
+          existingInvite.status = InviteStatus.REGISTERED;
+          existingInvite.registeredAt = new Date();
+        }
+        await this.inviteRepository.save(existingInvite);
+      }
+
+      return {
+        success: true,
+        message: 'Referral already tracked (idempotent)',
+        isNew: false,
+        invite: existingInvite,
+        bonuses,
+      };
+    }
+
+    const invite = this.inviteRepository.create({
+      referralCodeId: referralCode.id,
+      invitedUserId: userId,
+      email: email || `user-${userId}@stellarhunts.local`,
+      status: InviteStatus.REGISTERED,
+      registeredAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      metadata: JSON.stringify({ trackedVia: 'referral_link' }),
+    });
+
+    const savedInvite = await this.inviteRepository.save(invite);
+    await this.referralCodeService.updateStats(referralCode.id, { invites: 1 });
+
+    return {
+      success: true,
+      message: 'Referral tracked successfully',
+      isNew: true,
+      invite: savedInvite,
+      bonuses,
+    };
+  }
 
   async createInvite(createDto: CreateInviteDto): Promise<ReferralInvite> {
     // Validate referral code
