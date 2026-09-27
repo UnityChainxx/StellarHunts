@@ -41,9 +41,36 @@ export class AuditLogController {
   async getAuditLogs(@Query() filter: FilterAuditLogDto) {
     return this.auditLogService.findAll({
       ...filter,
+      actor: filter.actor || filter.userId,
       startDate: filter.startDate ? new Date(filter.startDate) : undefined,
       endDate: filter.endDate ? new Date(filter.endDate) : undefined,
     });
+  }
+
+  @Get('moderation/:reviewId')
+  @ApiOperation({
+    summary: 'Get moderation decision history for a review (admin only)',
+    description: 'Resolves all audit entries for a given review / moderation target',
+  })
+  @ApiParam({
+    name: 'reviewId',
+    description: 'Review ID to retrieve moderation audit entries for',
+  })
+  async getModerationAuditHistory(@Param('reviewId') reviewId: string) {
+    return this.auditLogService.findByTarget('review', reviewId);
+  }
+
+  @Get('target/:targetType/:targetId')
+  @ApiOperation({
+    summary: 'Get audit logs for a specific target entity (admin only)',
+  })
+  @ApiParam({ name: 'targetType', description: 'Target entity type' })
+  @ApiParam({ name: 'targetId', description: 'Target entity ID' })
+  async getTargetAuditHistory(
+    @Param('targetType') targetType: string,
+    @Param('targetId') targetId: string,
+  ) {
+    return this.auditLogService.findByTarget(targetType, targetId);
   }
 
   @Get('export')
@@ -52,11 +79,14 @@ export class AuditLogController {
     @Query() filter: FilterAuditLogDto,
     @Res() res: Response,
   ) {
-    const logs = await this.auditLogService.findAll({
+    const result = await this.auditLogService.findAll({
       ...filter,
+      actor: filter.actor || filter.userId,
       startDate: filter.startDate ? new Date(filter.startDate) : undefined,
       endDate: filter.endDate ? new Date(filter.endDate) : undefined,
+      limit: 1000,
     });
+    const logs = result.data;
 
     const escapeCsv = (value: unknown): string => {
       const str = value == null ? '' : String(value);

@@ -55,6 +55,10 @@ class PurchaseItemDto {
   @IsNotEmpty()
   @IsString()
   itemId: string;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 
 @Controller('reward-shop')
@@ -90,8 +94,15 @@ export class RewardShopController {
     this.logger.log(
       `Received purchase request: ${JSON.stringify(purchaseDto)}`,
     );
-    const { userId, itemId } = purchaseDto;
-    return this.rewardShopService.purchaseItem(userId, itemId);
+    const { userId, itemId, idempotencyKey } = purchaseDto;
+    return this.rewardShopService.purchaseItem(userId, itemId, idempotencyKey);
+  }
+
+  @Get('purchases/:purchaseId')
+  @UseGuards(AuthGuard('jwt'))
+  getPurchaseById(@Param('purchaseId') purchaseId: string): Purchase {
+    this.logger.log(`Received request for purchase by ID: ${purchaseId}`);
+    return this.rewardShopService.getPurchaseById(purchaseId);
   }
 
   @Get('users/:userId/points')
