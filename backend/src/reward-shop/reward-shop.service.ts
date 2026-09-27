@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface ShopItem {
   id: string;
@@ -22,6 +23,8 @@ export interface Purchase {
   itemName: string;
   pointsSpent: number;
   purchaseDate: Date;
+  idempotencyKey?: string;
+  referenceId?: string;
 }
 
 @Injectable()
@@ -31,6 +34,8 @@ export class RewardShopService {
   private shopItems = new Map<string, ShopItem>();
 
   private purchases = new Map<string, Purchase>();
+
+  private idempotencyMap = new Map<string, Purchase>();
 
   private userPoints = new Map<string, number>();
 
@@ -103,6 +108,18 @@ export class RewardShopService {
     this.userPoints.set('userB', 300);
     this.userPoints.set('userC', 50);
 
+    // Retain readability of legacy purchase identifiers
+    const legacyPurchase: Purchase = {
+      id: 'purchase-1700000000000-legacy01',
+      userId: 'userA',
+      itemId: 'item1',
+      itemName: 'Bronze Chest',
+      pointsSpent: 100,
+      purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
+      referenceId: 'purchase-1700000000000-legacy01',
+    };
+    this.purchases.set(legacyPurchase.id, legacyPurchase);
+
     this.logger.log(`Seeded ${this.shopItems.size} shop items.`);
     this.logger.log(`Seeded ${this.userPoints.size} user point balances.`);
   }
@@ -145,8 +162,25 @@ export class RewardShopService {
     return item;
   }
 
-  purchaseItem(userId: string, itemId: string): Purchase {
+  purchaseItem(
+    userId: string,
+    itemId: string,
+    idempotencyKey?: string,
+  ): Purchase {
     this.logger.log(`Attempting purchase: User ${userId}, Item ${itemId}`);
+
+    // Idempotent retry protection: a retried purchase with the same idempotencyKey returns
+    // the existing purchase without creating a second record or charging points/stock twice.
+    if (idempotencyKey) {
+      const idempotencyId = `${userId}:${idempotencyKey}`;
+      const existingPurchase = this.idempotencyMap.get(idempotencyId);
+      if (existingPurchase) {
+        this.logger.log(
+          `Idempotent purchase request for user ${userId} and key "${idempotencyKey}". Returning existing purchase ${existingPurchase.id}.`,
+        );
+        return existingPurchase;
+      }
+    }
 
     const item = this.shopItems.get(itemId);
     if (!item) {
@@ -173,7 +207,9 @@ export class RewardShopService {
     this.userPoints.set(userId, userCurrentPoints - item.price);
     this.shopItems.set(item.id, item);
 
-    const purchaseId = `purchase-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // Purchase identifiers are generated deterministically by uuid rather than Date.now and nondeterministic suffixes
+    const purchaseId = uuidv4();
+    const referenceId = `purchase-${purchaseId.replace(/-/g, '').substring(0, 12)}`;
     const newPurchase: Purchase = {
       id: purchaseId,
       userId,
@@ -181,11 +217,17 @@ export class RewardShopService {
       itemName: item.name,
       pointsSpent: item.price,
       purchaseDate: new Date(),
+      idempotencyKey,
+      referenceId,
     };
     this.purchases.set(purchaseId, newPurchase);
 
+    if (idempotencyKey) {
+      this.idempotencyMap.set(`${userId}:${idempotencyKey}`, newPurchase);
+    }
+
     this.logger.log(
-      `Purchase successful: User ${userId} bought ${item.name} for ${item.price} points.`,
+      `Purchase successful: User ${userId} bought ${item.name} for ${item.price} points. ID: ${purchaseId}`,
     );
     this.logger.log(`Remaining stock for ${item.name}: ${item.stock}`);
     this.logger.log(
@@ -193,6 +235,20 @@ export class RewardShopService {
     );
 
     return newPurchase;
+  }
+
+  getPurchaseById(purchaseId: string): Purchase {
+    const purchase = this.purchases.get(purchaseId);
+    if (!purchase) {
+      throw new NotFoundException(`Purchase with ID "${purchaseId}" not found.`);
+    }
+    return purchase;
+  }
+
+  getUserPurchases(userId: string): Purchase[] {
+    return Array.from(this.purchases.values()).filter(
+      (purchase) => purchase.userId === userId,
+    );
   }
 
   getUserPoints(userId: string): number {

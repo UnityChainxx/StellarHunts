@@ -1,67 +1,52 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Trophy,
-  TrendingUp,
-  Share2
-} from "lucide-react";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateDisplay";
+import { Trophy, TrendingUp, Share2, Users } from "lucide-react";
 import ReferralStats from "@/components/ReferralStats";
 import ReferralLink from "@/components/ReferralLink";
 import ReferralCard from "@/components/ReferralCard";
+import { useReferral } from "@/hooks/useReferral";
+import useAuthStore from "@/store/auth/auth-store";
 
 export default function InviteFriendsPage() {
-  const [referralLink] = useState("https://nft-hunt.com/ref/user123");
+  const userId = useAuthStore((state) => state.user?.id);
+  const {
+    referralStats,
+    invitedUsers,
+    loading,
+    error,
+    generateReferralLink,
+    fetchReferralData,
+    shareReferral,
+  } = useReferral(userId);
 
-  const shareReferral = async () => {
-    if (navigator.share) {
-      await navigator.share({ title: "Join StellarHunts", url: referralLink });
-      return;
-    }
-    await navigator.clipboard?.writeText(referralLink);
-  };
+  const referralLink = userId ? generateReferralLink(userId) : "";
 
-  // Mock data for invited users
-  const invitedUsers = [
-    {
-      id: 1,
-      username: "crypto_explorer",
-      avatar: "/placeholder.svg",
-      joinedDate: "2024-01-15",
-      status: "active",
-      rewardEarned: "Rare NFT",
-      xpBonus: 50
-    },
-    {
-      id: 2,
-      username: "blockchain_master",
-      avatar: "/placeholder.svg",
-      joinedDate: "2024-01-20",
-      status: "active",
-      rewardEarned: "Epic NFT",
-      xpBonus: 100
-    },
-    {
-      id: 3,
-      username: "puzzle_solver",
-      avatar: "/placeholder.svg",
-      joinedDate: "2024-01-25",
-      status: "pending",
-      rewardEarned: null,
-      xpBonus: 0
-    }
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-purple-900 to-black">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <LoadingState message="Loading your referrals..." />
+        </div>
+      </div>
+    );
+  }
 
-  // Mock referral stats
-  const referralStats = {
-    totalInvites: 8,
-    activeUsers: 5,
-    totalRewards: 3,
-    totalXPEarned: 250,
-    nextMilestone: "10 invites for Legendary NFT"
-  };
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-purple-900 to-black">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <ErrorState error={error} onRetry={() => fetchReferralData(userId)} />
+        </div>
+      </div>
+    );
+  }
+
+  const nextMilestone = 10;
+  const remaining = Math.max(nextMilestone - referralStats.totalInvites, 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-purple-900 to-black">
@@ -80,7 +65,7 @@ export default function InviteFriendsPage() {
         <ReferralStats stats={referralStats} />
 
         {/* Referral Link Section */}
-        <ReferralLink referralLink={referralLink} />
+        {referralLink && <ReferralLink referralLink={referralLink} />}
 
         {/* Invited Users Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -93,11 +78,19 @@ export default function InviteFriendsPage() {
                 </Badge>
               </div>
 
-              <div className="space-y-4">
-                {invitedUsers.map((user) => (
-                  <ReferralCard key={user.id} user={user} />
-                ))}
-              </div>
+              {invitedUsers.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title="No friends invited yet"
+                  description="Share your referral link to start earning rewards together."
+                />
+              ) : (
+                <div className="space-y-4">
+                  {invitedUsers.map((user) => (
+                    <ReferralCard key={user.id} user={user} />
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
 
@@ -111,18 +104,20 @@ export default function InviteFriendsPage() {
                     <Trophy className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-white font-medium">Legendary NFT</p>
+                    <p className="text-white font-medium">{referralStats.nextMilestone || "Legendary NFT"}</p>
                     <p className="text-gray-400 text-sm">10 invites needed</p>
                   </div>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full"
-                    style={{ width: `${(referralStats.totalInvites / 10) * 100}%` }}
+                    style={{
+                      width: `${Math.min((referralStats.totalInvites / nextMilestone) * 100, 100)}%`,
+                    }}
                   ></div>
                 </div>
                 <p className="text-gray-300 text-sm">
-                  {10 - referralStats.totalInvites} more invites to go!
+                  {remaining} more invites to go!
                 </p>
               </div>
             </Card>
@@ -163,7 +158,7 @@ export default function InviteFriendsPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
-                onClick={shareReferral}
+                onClick={() => shareReferral(referralLink)}
                 className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
               >
                 <Share2 className="w-4 h-4 mr-2" />

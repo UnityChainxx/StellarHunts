@@ -272,6 +272,76 @@ fn test_submit_answer_incorrect_does_not_progress() {
     assert_eq!(new_level, crate::Levels::Easy);
 }
 
+#[test]
+fn test_submit_answer_requires_next_indexed_question() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&2u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+
+    let out_of_order = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &2u64, &b(&env, "A2"));
+    }));
+    assert!(out_of_order.is_err());
+    assert!(panic_text(&out_of_order).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 0);
+
+    assert!(client.submit_answer(&player, &1u64, &b(&env, "A1")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(duplicate.is_err());
+    assert!(panic_text(&duplicate).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 1);
+    assert_eq!(client.get_player_level(&player), level);
+
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
+}
+
+#[test]
+fn test_retire_question_compacts_level_index_and_answer_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&3u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+    client.add_question(&level, &b(&env, "Q3"), &b(&env, "A3"), &b(&env, "H3"));
+
+    client.retire_question(&1u64);
+    assert_eq!(client.get_question_in_level(&level, &0u32), b(&env, "Q2"));
+    assert_eq!(client.get_question_in_level(&level, &1u32), b(&env, "Q3"));
+    let count: u32 = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(level.clone()))
+            .unwrap()
+    });
+    assert_eq!(count, 2);
+
+    // Compaction can invalidate stored player cursors; fresh progress starts
+    // at the new first question and retired question IDs can no longer pass.
+    let retired_answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(retired_answer.is_err());
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &3u64, &b(&env, "A3")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
+}
+
 // ---------------------------------------------------------------------
 // Hint request after answering a question
 // ---------------------------------------------------------------------
@@ -607,6 +677,130 @@ fn test_schema_version_zero_before_init() {
     let client = StellarHuntsClient::new(&env, &contract_id);
 
     assert_eq!(client.get_schema_version(), 0);
+}
+
+// ---------------------------------------------------------------------
+// Question retirement is enforced (#447)
+// ---------------------------------------------------------------------
+
+#[test]
+fn test_retire_question_sets_flag() {
+    let env = Env::default();
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&5u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Retired question"),
+        &b(&env, "answer"),
+        &b(&env, "hint"),
+    );
+
+    assert!(!client.is_question_retired(&1u64));
+    client.retire_question(&1u64);
+    assert!(client.is_question_retired(&1u64));
+}
+
+/// Submitting to a retired question must fail with the dedicated
+/// `QuestionRetired` (#14) error rather than grading the answer.
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")]
+fn test_retired_question_cannot_be_answered() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+
+    client.set_question_per_level(&1u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Q"),
+        &b(&env, "A"),
+        &b(&env, "H"),
+    );
+    client.retire_question(&1u64);
+
+    client.submit_answer(&player, &1u64, &b(&env, "A"));
+}
+
+/// Retiring a question must not change stored progress and must not
+/// complete the level (the core regression from #447).
+#[test]
+fn test_retired_answer_does_not_change_progress_or_complete_level() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+
+    client.set_question_per_level(&1u32);
+    client.add_question(&level, &b(&env, "Q"), &b(&env, "A"), &b(&env, "H"));
+    client.retire_question(&1u64);
+
+    let before = client.get_player_level_progress(&player, &level);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A"));
+    }));
+    assert!(
+        result.is_err(),
+        "retired question must not be gradeable (#447)"
+    );
+
+    let after = client.get_player_level_progress(&player, &level);
+    assert_eq!(after.last_question_index, before.last_question_index);
+    assert_eq!(after.attempts, before.attempts);
+    assert!(
+        !after.is_completed,
+        "a retired question must not complete a level"
+    );
+    assert_eq!(client.get_player_level(&player), level);
+}
+
+/// `request_hint` must refuse retired questions instead of returning the hint.
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")]
+fn test_retired_question_hint_denied() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+
+    // Keep the level open (5 questions) and give the player one attempt so
+    // the retired check is the reason the call fails, not `NotInitialized`.
+    client.set_question_per_level(&5u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Q"),
+        &b(&env, "A"),
+        &b(&env, "H"),
+    );
+    assert!(client.submit_answer(&player, &1u64, &b(&env, "A")));
+    client.retire_question(&1u64);
+
+    client.request_hint(&player, &1u64);
+}
+
+/// Re-adding the same content creates a new, un-retired question id.
+#[test]
+fn test_readding_same_content_is_not_retired() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+
+    client.set_question_per_level(&5u32);
+    let question = b(&env, "Same question");
+    let answer = b(&env, "Same answer");
+    let hint = b(&env, "Same hint");
+
+    client.add_question(&level, &question, &answer, &hint); // id 1
+    client.retire_question(&1u64);
+    client.add_question(&level, &question, &answer, &hint); // id 2, fresh
+
+    assert!(client.is_question_retired(&1u64));
+    assert!(!client.is_question_retired(&2u64));
+    assert!(client.submit_answer(&player, &2u64, &answer));
 }
 
 // ---------------------------------------------------------------------

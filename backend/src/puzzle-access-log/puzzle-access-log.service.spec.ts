@@ -90,4 +90,31 @@ describe('PuzzleAccessLogService', () => {
     expect(repo.createQueryBuilder().where).toHaveBeenCalled();
     expect(result).toEqual(expectedData);
   });
+
+  it('cleanupExpiredLogs should delete expired logs in bounded batches', async () => {
+    const selectQb = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValueOnce([{ id: 'acc-1' }, { id: 'acc-2' }])
+        .mockResolvedValueOnce([]),
+    };
+    const deleteQb = {
+      delete: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 2 }),
+    };
+
+    mockAccessLogRepository.createQueryBuilder
+      .mockReturnValueOnce(selectQb)
+      .mockReturnValueOnce(deleteQb)
+      .mockReturnValueOnce(selectQb);
+
+    const result = await service.cleanupExpiredLogs(14, 500, 2);
+    expect(result.deletedRows).toBe(2);
+    expect(result.batches).toBe(1);
+    expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
 });

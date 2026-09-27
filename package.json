@@ -10,9 +10,20 @@
   "scripts": {
     "dev:frontend": "npm run --workspace frontend dev",
     "dev:backend": "npm run --workspace backend start:dev",
+    "build:frontend": "npm run --workspace frontend build",
+    "build:backend": "npm run --workspace backend build",
     "build:onchain": "cargo build --manifest-path onchain/Cargo.toml --workspace --release",
+    "lint:frontend": "npm run --workspace frontend lint",
+    "lint:backend": "npm run --workspace backend lint",
+    "test:frontend": "npm run --workspace frontend test",
+    "test:backend": "npm run --workspace backend test",
+    "test:backend:e2e": "npm run --workspace backend test:e2e",
     "test:onchain": "cargo test --manifest-path onchain/Cargo.toml --workspace",
-    "fmt:onchain": "cargo fmt --manifest-path onchain/Cargo.toml --all -- --check"
+    "fmt:onchain": "cargo fmt --manifest-path onchain/Cargo.toml --all -- --check",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "test": "npm run test:backend && npm run test:frontend && npm run test:onchain",
+    "build": "npm run build:backend && npm run build:frontend",
+    "ci": "npm run fmt:onchain && npm run lint && npm run test && npm run test:backend:e2e && npm run build"
   },
   "keywords": [
     "stellar",

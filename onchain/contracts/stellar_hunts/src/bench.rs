@@ -84,7 +84,6 @@ fn bench_submit_answer_cpu_budget() {
 fn bench_ten_submit_answers_amortised() {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().set_sequence_number(100_000);
 
     let admin = Address::generate(&env);
     let contract_id = env.register_contract(None, StellarHunts);
@@ -107,14 +106,15 @@ fn bench_ten_submit_answers_amortised() {
     budget.reset_default();
 
     for i in 0..per_level {
+        // Exactly one ledger advance per iteration: consecutive submissions
+        // land on adjacent ledgers (100_000, 100_001, ...), which is the same
+        // one-attempt-per-ledger pattern a player produces on-chain. A second
+        // advance here would make the loop measure a sequence that cannot
+        // occur on-chain (#458).
         env.ledger().set_sequence_number(100_000 + i as u32);
         let answer = b(&env, &format!("A{}", i));
         let ok = client.submit_answer(&player, &((i as u64) + 1), &answer);
         assert!(ok);
-        // The contract allows one attempt per ledger (AttemptTooSoon), so
-        // advance the simulated ledger between submissions.
-        env.ledger()
-            .set_sequence_number(env.ledger().sequence() + 1);
     }
 
     let total_cpu = budget.cpu_instruction_cost();

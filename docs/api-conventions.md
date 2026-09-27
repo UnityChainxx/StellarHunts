@@ -42,13 +42,40 @@ Every browser-to-backend request uses the same URL shape:
 
 ## How the contract is enforced
 
+- `backend/src/api-prefix.ts` — the single source of truth for the global
+  prefix. `backend/src/main.ts` and `backend/test/api-prefix.e2e-spec.ts`
+  both import it, so the runtime and the test cannot disagree.
 - `frontend/tests/apiRoutes.test.js` — asserts every frontend call site
   (stores, services) builds `/api/v1` routes through `apiUrl()`.
 - `backend/test/api-prefix.e2e-spec.ts` — boots a minimal Nest app with the
-  same prefix config and asserts the prefix and `/docs` exclusion behave
+  shared prefix config and asserts the prefix and `/docs` exclusion behave
   as documented.
-- `docs/api.md` — the endpoint reference (paths are listed without the
-  prefix; mentally prefix each with `/api/v1`).
+- `.github/workflows/build.yml` (`backend-openapi` job) — regenerates the
+  OpenAPI document and the reference and fails when the committed files are
+  stale.
 
-If a backend route changes, update the frontend call site, `docs/api.md`,
-and the two tests in the same PR.
+If a backend route changes, update the frontend call site and let the
+OpenAPI pipeline regenerate `docs/api.md` in the same PR.
+
+## Generated API reference
+
+`docs/api.md` is **generated** and must not be edited by hand:
+
+```bash
+npm --prefix backend run openapi:generate   # emit docs/openapi.json + docs/api.md
+npm --prefix backend run openapi:check      # regenerate and fail if docs are stale
+```
+
+The pipeline is:
+
+1. `backend/scripts/generate-openapi.ts` boots the Nest application without
+   serving it and writes `docs/openapi.json` (`npm run openapi:emit`).
+   Authentication requirements are derived from route guards and recorded as
+   `x-auth` extensions.
+2. `backend/scripts/generate-api-reference.ts` renders `docs/api.md` from that
+   document (`npm run openapi:docs`).
+
+Do not edit `docs/api.md` directly — change the controllers (or their
+`@ApiBearerAuth()` / `@UseGuards()` decorators) and regenerate. The reference
+advertises the `/api/v1` prefix via the document's `servers` entry, so the
+paths inside it are listed without the prefix.

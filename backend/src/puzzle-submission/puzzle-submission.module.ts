@@ -7,7 +7,7 @@ import { PuzzleSubmissionController } from './puzzle-submission.controller';
 import { Puzzle } from '../puzzle/puzzle.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PuzzleSubmission]), RateLimiterModule.forRoot()],
+  imports: [TypeOrmModule.forFeature([PuzzleSubmission]), RateLimiterModule],
   providers: [PuzzleSubmissionService],
   controllers: [PuzzleSubmissionController],
   providers: [PuzzleSubmissionService],

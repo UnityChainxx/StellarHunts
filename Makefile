@@ -77,8 +77,8 @@ test: test-backend test-frontend contracts.test ## Run backend + frontend + onch
 test-frontend: ## Run frontend tests (Vitest)
 	cd $(FRONTEND_DIR) && npm test
 
-test-backend: ## Run NestJS unit tests
-	cd $(BACKEND_DIR) && npm test
+test-backend: ## Run NestJS unit tests with coverage (mirrors CI)
+	cd $(BACKEND_DIR) && npm run test:cov
 
 test-backend-e2e: ## Run NestJS E2E tests
 	cd $(BACKEND_DIR) && npm run test:e2e
@@ -135,5 +135,5 @@ clean-onchain: ## Remove Scarb build artefacts
 	rm -rf $(ONCHAIN_DIR)/target
 
 # ---------- CI ----------
-ci: contracts.fmt-check contracts.test lint-backend test-backend lint-frontend test-frontend build-frontend build-backend ## Targets used by CI pipeline
+ci: contracts.fmt-check contracts.test lint-backend test-backend test-backend-e2e lint-frontend test-frontend build-frontend build-backend ## Targets used by CI pipeline
 	@echo "✓ CI checks passed locally."
