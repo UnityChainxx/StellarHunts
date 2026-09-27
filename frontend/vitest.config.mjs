@@ -11,6 +11,7 @@ export default defineConfig({
     include: ['tests/**/*.{test,spec}.{js,jsx,ts,tsx}'],
   },
   resolve: {
+    // Vitest test runner alias resolution: resolves '@/*' imports during test runs.
     alias: {
       '@': path.resolve(__dirname),
     },

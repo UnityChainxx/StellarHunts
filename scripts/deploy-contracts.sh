@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Bootstrap & deployment script for Soroban smart contracts
+# Toolchain compatibility: stellar-cli 28.0.0 (pinned in .tool-versions) matches soroban-sdk 28.0.0 (Protocol 28).
 NETWORK="${1:-testnet}"
 ADMIN_SECRET="${2:-SA...}"
 

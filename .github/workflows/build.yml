@@ -18,6 +18,45 @@ concurrency:
 # Onchain jobs (contracts)
 # ─────────────────────────────────────────────────────────────────────
 jobs:
+  workflow-lint:
+    name: Lint workflow YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Verify workflow YAML files have no duplicate keys
+        run: |
+          python3 -c "
+          import glob, sys, yaml
+
+          class UniqueKeyLoader(yaml.SafeLoader):
+              def construct_mapping(self, node, deep=False):
+                  mapping = set()
+                  for key_node, value_node in node.value:
+                      key = self.construct_object(key_node, deep=deep)
+                      if key in mapping:
+                          raise yaml.constructor.ConstructorError(
+                              'while constructing a mapping',
+                              node.start_mark,
+                              f'found duplicate key: {key}',
+                              key_node.start_mark
+                          )
+                      mapping.add(key)
+                  return super().construct_mapping(node, deep=deep)
+
+          failed = False
+          for fpath in sorted(glob.glob('.github/workflows/*.yml') + glob.glob('.github/workflows/*.yaml')):
+              try:
+                  with open(fpath, 'r', encoding='utf-8') as f:
+                      yaml.load(f, Loader=UniqueKeyLoader)
+                  print(f'OK: {fpath}')
+              except Exception as e:
+                  print(f'Error in {fpath}: {e}', file=sys.stderr)
+                  failed = True
+
+          if failed:
+              sys.exit(1)
+          "
+
   # Changed-path matrix: only run the jobs relevant to the files touched
   # in a PR/push, while preserving a full run whenever shared configuration
   # (lockfile, workflows, release config, root manifests) changes. This
@@ -224,10 +263,14 @@ jobs:
         continue-on-error: true
         run: npm run lint
 
-      - name: npm audit
+      - name: npm audit (critical)
         working-directory: backend
         run: npm audit --audit-level=critical
+
+      - name: npm audit (high)
+        working-directory: backend
         continue-on-error: true
+        run: npm audit --audit-level=high
 
 
   backend-test:
@@ -385,9 +428,13 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
-      - name: npm audit
+      - name: npm audit (critical)
         working-directory: frontend
-        # Advisories are reported but do not block the build.
+        run: npm audit --audit-level=critical
+
+      - name: npm audit (high)
+        working-directory: frontend
+        # Advisories are reported but do not block the build until Next.js is upgraded.
         continue-on-error: true
         run: npm audit --audit-level=high
 
