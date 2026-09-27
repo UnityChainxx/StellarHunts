@@ -27,6 +27,7 @@ describe('ReferralController', () => {
       getReferralHistory: jest.fn().mockResolvedValue([]),
       processCompletedInvite: jest.fn().mockResolvedValue({ id: 'invite-1' }),
       handleUserRegistration: jest.fn().mockResolvedValue({ id: 'invite-1' }),
+      trackReferral: jest.fn().mockResolvedValue({ success: true, isNew: true }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -94,6 +95,18 @@ describe('ReferralController', () => {
       expect(serviceMock.processCompletedInvite).toHaveBeenCalledWith(
         '22222222-2222-4222-8222-222222222222',
         USER_ID,
+      );
+    });
+  });
+
+  describe('trackReferral', () => {
+    it('resolves invited user identity from the authenticated user, ignoring client-supplied id', async () => {
+      const dto = { referrerId: 'REF12345', newUserId: 'spoofed-id' };
+      await controller.trackReferral(USER_ID, 'user@example.com', dto);
+      expect(serviceMock.trackReferral).toHaveBeenCalledWith(
+        USER_ID,
+        'user@example.com',
+        dto,
       );
     });
   });

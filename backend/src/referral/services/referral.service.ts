@@ -18,6 +18,14 @@ export class ReferralService {
     return this.referralCodeService.createReferralCode(userId, createDto);
   }
 
+  async trackReferral(
+    userId: string,
+    email: string,
+    trackDto: { referrerId: string },
+  ) {
+    return this.inviteService.trackReferral(userId, email, trackDto.referrerId);
+  }
+
   /**
    * An invite is sent on behalf of a referral code, so the caller must own
    * the code referenced by `createDto.referralCode`. Prevents any

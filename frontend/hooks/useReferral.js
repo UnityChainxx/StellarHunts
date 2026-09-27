@@ -1,65 +1,76 @@
 "use client";
 
-import { useCallback } from "react";
-import { apiClient } from "../lib/api";
-import { useApiQuery } from "./useApiQuery";
-import { useApiMutation } from "./useApiMutation";
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 
 /**
  * Hook for managing referral data with consistent loading / error / empty states.
- *
- * Built on the shared useApiQuery / useApiMutation wrappers so all requests get
- * automatic retry, cancellation, stale-data handling, and user-visible errors.
  */
-export const useReferral = (userId) => {
-  // ── Queries ──────────────────────────────────────────────────────────────
+export const useReferral = (userId = null) => {
+  const [referralStats, setReferralStats] = useState({
+    totalInvites: 0,
+    activeUsers: 0,
+    totalRewards: 0,
+    totalXPEarned: 0,
+    nextMilestone: "",
+  });
 
-  const referralQuery = useApiQuery({
-    key: ["referral", userId],
-    fn: async ({ signal }) => {
-      if (!userId) return null;
-      const response = await apiClient.get(`/referrals/${userId}`, {
-        signal,
+  const [invitedUsers, setInvitedUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchReferralData = useCallback(async (id) => {
+    if (!id) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get(`/api/referrals/${id}`, {
+        withCredentials: true,
       });
-      return response.data;
-    },
-    enabled: !!userId,
-    staleTime: 60_000,
-  });
 
-  // ── Mutations ────────────────────────────────────────────────────────────
+      const stats = response.data?.stats ?? response.data;
+      const users = response.data?.invitedUsers ?? [];
+      setReferralStats(stats);
+      setInvitedUsers(users);
+    } catch (err) {
+      console.error("Failed to fetch referral data:", err);
+      setError("Failed to load referral data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const trackMutation = useApiMutation({
-    fn: async ({ referrerId, newUserId }) => {
-      await apiClient.post(
-        "/referrals/track",
-        { referrerId, newUserId },
-      );
-    },
-    invalidate: ["referral"],
-  });
-
-  // ── Actions ──────────────────────────────────────────────────────────────
-
-  const fetchReferralData = useCallback(
-    (id) => {
-      if (id) referralQuery.refetch();
-    },
-    [referralQuery],
-  );
-
-  const trackReferral = useCallback(
-    (referrerId, newUserId) =>
-      trackMutation.mutateAsync({ referrerId, newUserId }),
-    [trackMutation],
-  );
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (userId) {
+      fetchReferralData(userId);
+    }
+  }, [userId, fetchReferralData]);
 
   const generateReferralLink = useCallback((id) => {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nft-hunt.com";
     return `${baseUrl}/ref/${id}`;
   }, []);
+
+  const trackReferral = useCallback(
+    async (referrerId, newUserId) => {
+      try {
+        const response = await axios.post(
+          "/api/referrals/track",
+          { referrerId, newUserId },
+          { withCredentials: true },
+        );
+
+        await fetchReferralData(referrerId);
+        return response?.data;
+      } catch (err) {
+        console.error("Failed to track referral:", err);
+        throw err;
+      }
+    },
+    [fetchReferralData],
+  );
 
   const getRewardTier = useCallback((totalInvites) => {
     if (totalInvites >= 50) return { tier: "Mythic", reward: "Mythic NFT", color: "pink" };
@@ -106,23 +117,11 @@ export const useReferral = (userId) => {
     }
   }, []);
 
-  // ── Derived state ────────────────────────────────────────────────────────
-
-  const data = referralQuery.data;
-  const referralStats = data?.stats ?? {
-    totalInvites: 0,
-    activeUsers: 0,
-    totalRewards: 0,
-    totalXPEarned: 0,
-    nextMilestone: "",
-  };
-  const invitedUsers = data?.invitedUsers ?? [];
-
   return {
     referralStats,
     invitedUsers,
-    loading: referralQuery.isLoading,
-    error: referralQuery.error,
+    loading,
+    error,
     generateReferralLink,
     fetchReferralData,
     trackReferral,

@@ -1,36 +1,68 @@
 import { NextResponse } from 'next/server';
+import axios from 'axios';
+import { apiUrl } from '@/lib/api';
 
+/**
+ * Authenticated proxy for referral tracking.
+ *
+ * Forwards referral attribution to the backend single-writer service
+ * (`POST /api/v1/referrals/track`), binding the attribution to the caller's
+ * verified identity (JWT Bearer token or session cookie).
+ *
+ * Unauthenticated requests are rejected with 401 to prevent arbitrary attribution.
+ */
 export async function POST(request) {
   try {
-    const { referrerId, newUserId } = await request.json();
+    const authHeader = request.headers.get('authorization');
+    const cookieHeader = request.headers.get('cookie');
+    const cookieToken =
+      request.cookies.get('token')?.value ||
+      request.cookies.get('jwt')?.value ||
+      request.cookies.get('access_token')?.value;
 
-    // In a real implementation, this would:
-    // 1. Validate the referral
-    // 2. Update the referrer's stats
-    // 3. Award bonuses to both users
-    // 4. Store the referral relationship
+    if (!authHeader && !cookieToken && !cookieHeader) {
+      return NextResponse.json(
+        { error: 'Authentication required to attribute a referral' },
+        { status: 401 }
+      );
+    }
 
-    console.log(`Tracking referral: ${referrerId} -> ${newUserId}`);
+    const body = await request.json();
+    const { referrerId, newUserId } = body;
 
-    // Mock successful response
-    const response = {
-      success: true,
-      message: 'Referral tracked successfully',
-      bonuses: {
-        referrer: {
-          xp: 50,
-          nft: 'Rare NFT',
-          badge: 'Referral Master'
-        },
-        newUser: {
-          xp: 25,
-          nft: 'Welcome NFT',
-          badge: 'Referred User'
-        }
-      }
-    };
+    if (!referrerId) {
+      return NextResponse.json(
+        { error: 'referrerId is required' },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json(response);
+    const backendUrl = apiUrl('/referrals/track');
+    const headers = {};
+
+    if (authHeader) {
+      headers['authorization'] = authHeader;
+    } else if (cookieToken) {
+      headers['authorization'] = `Bearer ${cookieToken}`;
+    }
+
+    if (cookieHeader) {
+      headers['cookie'] = cookieHeader;
+    }
+
+    try {
+      const response = await axios.post(
+        backendUrl,
+        { referrerId, newUserId },
+        { headers, withCredentials: true }
+      );
+
+      return NextResponse.json(response.data, { status: response.status });
+    } catch (backendError) {
+      const status = backendError.response?.status || 500;
+      const data = backendError.response?.data || { error: 'Failed to track referral' };
+      return NextResponse.json(data, { status });
+    }
   } catch (error) {
     console.error('Error tracking referral:', error);
     return NextResponse.json(
@@ -38,4 +70,4 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-} 
+}

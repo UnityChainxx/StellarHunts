@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{StellarHunts, StellarHuntsClient};
+use crate::{Levels, StellarHunts, StellarHuntsClient};
 // Brings `Address::generate` into scope as an extension trait method.
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger;
@@ -812,11 +812,7 @@ fn test_readding_same_content_is_not_retired() {
 #[test]
 fn test_legacy_question_readable() {
     let env = Env::default();
-    let admin = new_admin(&env);
-    let contract_id = env.register_contract(None, StellarHunts);
-    let client = StellarHuntsClient::new(&env, &contract_id);
-    env.mock_all_auths();
-    client.init(&admin);
+    let (_admin, contract_id, client) = init_with_admin(&env);
 
     // Write a Question exactly as an old (unversioned) contract would have:
     // version field = 0, question stored under DataKey::Question(7).
@@ -848,11 +844,7 @@ fn test_legacy_question_readable() {
 #[test]
 fn test_level_progress_roundtrip_compat() {
     let env = Env::default();
-    let admin = new_admin(&env);
-    let contract_id = env.register_contract(None, StellarHunts);
-    let client = StellarHuntsClient::new(&env, &contract_id);
-    env.mock_all_auths();
-    client.init(&admin);
+    let (_admin, contract_id, client) = init_with_admin(&env);
 
     let player = user(&env);
     let level = crate::Levels::Medium;
@@ -897,15 +889,12 @@ fn test_levels_discriminants_stable() {
 #[test]
 fn test_unauthorized_add_question_fails() {
     let env = Env::default();
-    // Only `init` is authorized, so the subsequent `add_question` has no
-    // admin auth and must panic. (Previously this test enabled
-    // `mock_all_auths`, which authorized the call and defeated its own
-    // assertion.)
-    let (_admin, _contract_address, client) = init_admin_auth_only(&env);
+    let (_admin, _contract_id, client) = init_admin_auth_only(&env);
 
+    // Call as normal user (no admin auth)
     let should_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         client.add_question(
-            &crate::Levels::Easy,
+            &Levels::Easy,
             &Bytes::from_slice(&env, b"q"),
             &Bytes::from_slice(&env, b"a"),
             &Bytes::from_slice(&env, b"h"),
@@ -1070,4 +1059,275 @@ fn test_submit_answer_last_question_index_overflow_panics() {
         "expected ArithmeticOverflow panic, got: {}",
         panic_text(&result)
     );
+}
+
+// ---------------------------------------------------------------------
+// Level index integrity tests (issue #464)
+// ---------------------------------------------------------------------
+
+#[test]
+fn test_update_question_move_level_updates_indices() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&10u32);
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &b(&env, "H3"),
+    );
+
+    // Move Q2 from Easy to Medium
+    client.update_question(
+        &2u64,
+        &b(&env, "Q2-updated"),
+        &b(&env, "A2"),
+        &Levels::Medium,
+        &b(&env, "H2"),
+    );
+
+    env.as_contract(&contract_id, || {
+        let easy_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(Levels::Easy))
+            .unwrap();
+        assert_eq!(easy_count, 2);
+
+        let q_e0: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Easy, 0))
+            .unwrap();
+        let q_e1: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Easy, 1))
+            .unwrap();
+        assert_eq!(q_e0, 1);
+        assert_eq!(q_e1, 3);
+        assert!(!env
+            .storage()
+            .persistent()
+            .has(&crate::DataKey::QuestionsByLevel(Levels::Easy, 2)));
+
+        let med_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(Levels::Medium))
+            .unwrap();
+        assert_eq!(med_count, 1);
+
+        let q_m0: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Medium, 0))
+            .unwrap();
+        assert_eq!(q_m0, 2);
+    });
+}
+
+#[test]
+fn test_property_index_contains_each_question_exactly_once_after_interleaved_ops() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&20u32);
+
+    let levels = [Levels::Easy, Levels::Medium, Levels::Hard];
+
+    let assert_index_invariants = |expected_questions: &[(u64, Levels)]| {
+        env.as_contract(&contract_id, || {
+            let mut all_found_qids: std::vec::Vec<u64> = std::vec::Vec::new();
+
+            for lvl in levels.iter() {
+                let count: u32 = env
+                    .storage()
+                    .persistent()
+                    .get(&crate::DataKey::QuestionPerLevelIndex(lvl.clone()))
+                    .unwrap_or(0u32);
+
+                let expected_for_lvl: std::vec::Vec<u64> = expected_questions
+                    .iter()
+                    .filter(|(_, l)| l == lvl)
+                    .map(|(q, _)| *q)
+                    .collect();
+
+                assert_eq!(
+                    count as usize,
+                    expected_for_lvl.len(),
+                    "Count mismatch for level {:?}",
+                    lvl
+                );
+
+                let mut lvl_qids: std::vec::Vec<u64> = std::vec::Vec::new();
+                for i in 0..count {
+                    let qid: u64 = env
+                        .storage()
+                        .persistent()
+                        .get(&crate::DataKey::QuestionsByLevel(lvl.clone(), i))
+                        .expect("Missing question entry at valid index");
+                    assert!(
+                        !lvl_qids.contains(&qid),
+                        "Duplicate question {} found at index {} in level {:?}",
+                        qid,
+                        i,
+                        lvl
+                    );
+                    lvl_qids.push(qid);
+                    all_found_qids.push(qid);
+                }
+
+                // Check that slot `count` is cleared
+                assert!(
+                    !env.storage()
+                        .persistent()
+                        .has(&crate::DataKey::QuestionsByLevel(lvl.clone(), count)),
+                    "Trailing slot at index {} must be vacant for level {:?}",
+                    count,
+                    lvl
+                );
+            }
+
+            // Assert each stored question id appears exactly once across all levels
+            assert_eq!(all_found_qids.len(), expected_questions.len());
+            for (q, _) in expected_questions.iter() {
+                assert!(
+                    all_found_qids.contains(q),
+                    "Question {} missing from all level indices",
+                    q
+                );
+            }
+        });
+    };
+
+    // 1. Interleaved adds
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    ); // 1 -> Easy
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    ); // 2 -> Easy
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &b(&env, "H3"),
+    ); // 3 -> Medium
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q4"),
+        &b(&env, "A4"),
+        &b(&env, "H4"),
+    ); // 4 -> Easy
+    client.add_question(
+        &Levels::Hard,
+        &b(&env, "Q5"),
+        &b(&env, "A5"),
+        &b(&env, "H5"),
+    ); // 5 -> Hard
+
+    let mut state = std::vec![
+        (1u64, Levels::Easy),
+        (2u64, Levels::Easy),
+        (3u64, Levels::Medium),
+        (4u64, Levels::Easy),
+        (5u64, Levels::Hard),
+    ];
+    assert_index_invariants(&state);
+
+    // 2. Interleaved moves
+    // Move Q2 from Easy to Medium
+    client.update_question(
+        &2u64,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &Levels::Medium,
+        &b(&env, "H2"),
+    );
+    state[1].1 = Levels::Medium;
+    assert_index_invariants(&state);
+
+    // Move Q3 from Medium to Hard
+    client.update_question(
+        &3u64,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &Levels::Hard,
+        &b(&env, "H3"),
+    );
+    state[2].1 = Levels::Hard;
+    assert_index_invariants(&state);
+
+    // Add Q6 to Easy
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q6"),
+        &b(&env, "A6"),
+        &b(&env, "H6"),
+    ); // 6 -> Easy
+    state.push((6u64, Levels::Easy));
+    assert_index_invariants(&state);
+
+    // Move Q1 from Easy to Hard
+    client.update_question(
+        &1u64,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &Levels::Hard,
+        &b(&env, "H1"),
+    );
+    state[0].1 = Levels::Hard;
+    assert_index_invariants(&state);
+
+    // Move Q4 from Easy to Medium
+    client.update_question(
+        &4u64,
+        &b(&env, "Q4"),
+        &b(&env, "A4"),
+        &Levels::Medium,
+        &b(&env, "H4"),
+    );
+    state[3].1 = Levels::Medium;
+    assert_index_invariants(&state);
+
+    // Add Q7 to Medium
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Q7"),
+        &b(&env, "A7"),
+        &b(&env, "H7"),
+    ); // 7 -> Medium
+    state.push((7u64, Levels::Medium));
+    assert_index_invariants(&state);
+
+    // Move Q5 from Hard to Easy
+    client.update_question(
+        &5u64,
+        &b(&env, "Q5"),
+        &b(&env, "A5"),
+        &Levels::Easy,
+        &b(&env, "H5"),
+    );
+    state[4].1 = Levels::Easy;
+    assert_index_invariants(&state);
 }
