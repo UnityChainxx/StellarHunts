@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{StellarHunts, StellarHuntsClient};
+use crate::{Levels, StellarHunts, StellarHuntsClient};
 // Brings `Address::generate` into scope as an extension trait method.
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Ledger;
@@ -270,6 +270,76 @@ fn test_submit_answer_incorrect_does_not_progress() {
     // Still on Easy.
     let new_level = client.get_player_level(&player);
     assert_eq!(new_level, crate::Levels::Easy);
+}
+
+#[test]
+fn test_submit_answer_requires_next_indexed_question() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&2u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+
+    let out_of_order = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &2u64, &b(&env, "A2"));
+    }));
+    assert!(out_of_order.is_err());
+    assert!(panic_text(&out_of_order).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 0);
+
+    assert!(client.submit_answer(&player, &1u64, &b(&env, "A1")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(duplicate.is_err());
+    assert!(panic_text(&duplicate).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 1);
+    assert_eq!(client.get_player_level(&player), level);
+
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
+}
+
+#[test]
+fn test_retire_question_compacts_level_index_and_answer_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&3u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+    client.add_question(&level, &b(&env, "Q3"), &b(&env, "A3"), &b(&env, "H3"));
+
+    client.retire_question(&1u64);
+    assert_eq!(client.get_question_in_level(&level, &0u32), b(&env, "Q2"));
+    assert_eq!(client.get_question_in_level(&level, &1u32), b(&env, "Q3"));
+    let count: u32 = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(level.clone()))
+            .unwrap()
+    });
+    assert_eq!(count, 2);
+
+    // Compaction can invalidate stored player cursors; fresh progress starts
+    // at the new first question and retired question IDs can no longer pass.
+    let retired_answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(retired_answer.is_err());
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &3u64, &b(&env, "A3")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
 }
 
 // ---------------------------------------------------------------------
@@ -610,6 +680,130 @@ fn test_schema_version_zero_before_init() {
 }
 
 // ---------------------------------------------------------------------
+// Question retirement is enforced (#447)
+// ---------------------------------------------------------------------
+
+#[test]
+fn test_retire_question_sets_flag() {
+    let env = Env::default();
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&5u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Retired question"),
+        &b(&env, "answer"),
+        &b(&env, "hint"),
+    );
+
+    assert!(!client.is_question_retired(&1u64));
+    client.retire_question(&1u64);
+    assert!(client.is_question_retired(&1u64));
+}
+
+/// Submitting to a retired question must fail with the dedicated
+/// `QuestionRetired` (#14) error rather than grading the answer.
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")]
+fn test_retired_question_cannot_be_answered() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+
+    client.set_question_per_level(&1u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Q"),
+        &b(&env, "A"),
+        &b(&env, "H"),
+    );
+    client.retire_question(&1u64);
+
+    client.submit_answer(&player, &1u64, &b(&env, "A"));
+}
+
+/// Retiring a question must not change stored progress and must not
+/// complete the level (the core regression from #447).
+#[test]
+fn test_retired_answer_does_not_change_progress_or_complete_level() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+
+    client.set_question_per_level(&1u32);
+    client.add_question(&level, &b(&env, "Q"), &b(&env, "A"), &b(&env, "H"));
+    client.retire_question(&1u64);
+
+    let before = client.get_player_level_progress(&player, &level);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A"));
+    }));
+    assert!(
+        result.is_err(),
+        "retired question must not be gradeable (#447)"
+    );
+
+    let after = client.get_player_level_progress(&player, &level);
+    assert_eq!(after.last_question_index, before.last_question_index);
+    assert_eq!(after.attempts, before.attempts);
+    assert!(
+        !after.is_completed,
+        "a retired question must not complete a level"
+    );
+    assert_eq!(client.get_player_level(&player), level);
+}
+
+/// `request_hint` must refuse retired questions instead of returning the hint.
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")]
+fn test_retired_question_hint_denied() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+
+    // Keep the level open (5 questions) and give the player one attempt so
+    // the retired check is the reason the call fails, not `NotInitialized`.
+    client.set_question_per_level(&5u32);
+    client.add_question(
+        &crate::Levels::Easy,
+        &b(&env, "Q"),
+        &b(&env, "A"),
+        &b(&env, "H"),
+    );
+    assert!(client.submit_answer(&player, &1u64, &b(&env, "A")));
+    client.retire_question(&1u64);
+
+    client.request_hint(&player, &1u64);
+}
+
+/// Re-adding the same content creates a new, un-retired question id.
+#[test]
+fn test_readding_same_content_is_not_retired() {
+    let env = Env::default();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_address, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+
+    client.set_question_per_level(&5u32);
+    let question = b(&env, "Same question");
+    let answer = b(&env, "Same answer");
+    let hint = b(&env, "Same hint");
+
+    client.add_question(&level, &question, &answer, &hint); // id 1
+    client.retire_question(&1u64);
+    client.add_question(&level, &question, &answer, &hint); // id 2, fresh
+
+    assert!(client.is_question_retired(&1u64));
+    assert!(!client.is_question_retired(&2u64));
+    assert!(client.submit_answer(&player, &2u64, &answer));
+}
+
+// ---------------------------------------------------------------------
 // Storage compatibility (see onchain/docs/storage-versioning.md)
 // ---------------------------------------------------------------------
 
@@ -908,4 +1102,275 @@ fn test_submit_answer_last_question_index_overflow_panics() {
         "expected ArithmeticOverflow panic, got: {}",
         panic_text(&result)
     );
+}
+
+// ---------------------------------------------------------------------
+// Level index integrity tests (issue #464)
+// ---------------------------------------------------------------------
+
+#[test]
+fn test_update_question_move_level_updates_indices() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&10u32);
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &b(&env, "H3"),
+    );
+
+    // Move Q2 from Easy to Medium
+    client.update_question(
+        &2u64,
+        &b(&env, "Q2-updated"),
+        &b(&env, "A2"),
+        &Levels::Medium,
+        &b(&env, "H2"),
+    );
+
+    env.as_contract(&contract_id, || {
+        let easy_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(Levels::Easy))
+            .unwrap();
+        assert_eq!(easy_count, 2);
+
+        let q_e0: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Easy, 0))
+            .unwrap();
+        let q_e1: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Easy, 1))
+            .unwrap();
+        assert_eq!(q_e0, 1);
+        assert_eq!(q_e1, 3);
+        assert!(!env
+            .storage()
+            .persistent()
+            .has(&crate::DataKey::QuestionsByLevel(Levels::Easy, 2)));
+
+        let med_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(Levels::Medium))
+            .unwrap();
+        assert_eq!(med_count, 1);
+
+        let q_m0: u64 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionsByLevel(Levels::Medium, 0))
+            .unwrap();
+        assert_eq!(q_m0, 2);
+    });
+}
+
+#[test]
+fn test_property_index_contains_each_question_exactly_once_after_interleaved_ops() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    client.set_question_per_level(&20u32);
+
+    let levels = [Levels::Easy, Levels::Medium, Levels::Hard];
+
+    let assert_index_invariants = |expected_questions: &[(u64, Levels)]| {
+        env.as_contract(&contract_id, || {
+            let mut all_found_qids: std::vec::Vec<u64> = std::vec::Vec::new();
+
+            for lvl in levels.iter() {
+                let count: u32 = env
+                    .storage()
+                    .persistent()
+                    .get(&crate::DataKey::QuestionPerLevelIndex(lvl.clone()))
+                    .unwrap_or(0u32);
+
+                let expected_for_lvl: std::vec::Vec<u64> = expected_questions
+                    .iter()
+                    .filter(|(_, l)| l == lvl)
+                    .map(|(q, _)| *q)
+                    .collect();
+
+                assert_eq!(
+                    count as usize,
+                    expected_for_lvl.len(),
+                    "Count mismatch for level {:?}",
+                    lvl
+                );
+
+                let mut lvl_qids: std::vec::Vec<u64> = std::vec::Vec::new();
+                for i in 0..count {
+                    let qid: u64 = env
+                        .storage()
+                        .persistent()
+                        .get(&crate::DataKey::QuestionsByLevel(lvl.clone(), i))
+                        .expect("Missing question entry at valid index");
+                    assert!(
+                        !lvl_qids.contains(&qid),
+                        "Duplicate question {} found at index {} in level {:?}",
+                        qid,
+                        i,
+                        lvl
+                    );
+                    lvl_qids.push(qid);
+                    all_found_qids.push(qid);
+                }
+
+                // Check that slot `count` is cleared
+                assert!(
+                    !env.storage()
+                        .persistent()
+                        .has(&crate::DataKey::QuestionsByLevel(lvl.clone(), count)),
+                    "Trailing slot at index {} must be vacant for level {:?}",
+                    count,
+                    lvl
+                );
+            }
+
+            // Assert each stored question id appears exactly once across all levels
+            assert_eq!(all_found_qids.len(), expected_questions.len());
+            for (q, _) in expected_questions.iter() {
+                assert!(
+                    all_found_qids.contains(q),
+                    "Question {} missing from all level indices",
+                    q
+                );
+            }
+        });
+    };
+
+    // 1. Interleaved adds
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    ); // 1 -> Easy
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    ); // 2 -> Easy
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &b(&env, "H3"),
+    ); // 3 -> Medium
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q4"),
+        &b(&env, "A4"),
+        &b(&env, "H4"),
+    ); // 4 -> Easy
+    client.add_question(
+        &Levels::Hard,
+        &b(&env, "Q5"),
+        &b(&env, "A5"),
+        &b(&env, "H5"),
+    ); // 5 -> Hard
+
+    let mut state = std::vec![
+        (1u64, Levels::Easy),
+        (2u64, Levels::Easy),
+        (3u64, Levels::Medium),
+        (4u64, Levels::Easy),
+        (5u64, Levels::Hard),
+    ];
+    assert_index_invariants(&state);
+
+    // 2. Interleaved moves
+    // Move Q2 from Easy to Medium
+    client.update_question(
+        &2u64,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &Levels::Medium,
+        &b(&env, "H2"),
+    );
+    state[1].1 = Levels::Medium;
+    assert_index_invariants(&state);
+
+    // Move Q3 from Medium to Hard
+    client.update_question(
+        &3u64,
+        &b(&env, "Q3"),
+        &b(&env, "A3"),
+        &Levels::Hard,
+        &b(&env, "H3"),
+    );
+    state[2].1 = Levels::Hard;
+    assert_index_invariants(&state);
+
+    // Add Q6 to Easy
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q6"),
+        &b(&env, "A6"),
+        &b(&env, "H6"),
+    ); // 6 -> Easy
+    state.push((6u64, Levels::Easy));
+    assert_index_invariants(&state);
+
+    // Move Q1 from Easy to Hard
+    client.update_question(
+        &1u64,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &Levels::Hard,
+        &b(&env, "H1"),
+    );
+    state[0].1 = Levels::Hard;
+    assert_index_invariants(&state);
+
+    // Move Q4 from Easy to Medium
+    client.update_question(
+        &4u64,
+        &b(&env, "Q4"),
+        &b(&env, "A4"),
+        &Levels::Medium,
+        &b(&env, "H4"),
+    );
+    state[3].1 = Levels::Medium;
+    assert_index_invariants(&state);
+
+    // Add Q7 to Medium
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Q7"),
+        &b(&env, "A7"),
+        &b(&env, "H7"),
+    ); // 7 -> Medium
+    state.push((7u64, Levels::Medium));
+    assert_index_invariants(&state);
+
+    // Move Q5 from Hard to Easy
+    client.update_question(
+        &5u64,
+        &b(&env, "Q5"),
+        &b(&env, "A5"),
+        &Levels::Easy,
+        &b(&env, "H5"),
+    );
+    state[4].1 = Levels::Easy;
+    assert_index_invariants(&state);
 }

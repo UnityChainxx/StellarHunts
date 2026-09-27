@@ -1,6 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Pool } from 'pg';
 import { PG_POOL } from './database/postgres.provider';
+
+export const ANALYTICS_RETENTION_DAYS = 90;
 
 export interface UserPuzzleEngagement {
   solveCount: number;
@@ -291,5 +294,75 @@ export class AnalyticService {
       await this.recordPuzzleSolveAsync(userId, puzzleId, solveTime);
     }
     this.logger.log('Data seeding complete.');
+  }
+
+  /**
+   * Bounded batch retention cleanup for `analytics_events`.
+   * Purges operational event telemetry older than `retentionDays` in batches of `batchSize`.
+   * Concurrent-safe with `SKIP LOCKED` across multiple replicas.
+   * Records removed count and run duration.
+   */
+  async cleanupExpiredEvents(
+    retentionDays: number = ANALYTICS_RETENTION_DAYS,
+    batchSize: number = 1000,
+    maxBatches: number = 20,
+  ): Promise<{ deletedRows: number; durationMs: number; batches: number }> {
+    const startTime = Date.now();
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    let totalDeleted = 0;
+    let batchCount = 0;
+
+    if (!this.pool) {
+      // In-memory fallback
+      let deleted = 0;
+      const deleteLimit = batchSize * maxBatches;
+      for (let i = this.memoryEvents.length - 1; i >= 0 && deleted < deleteLimit; i--) {
+        if (this.memoryEvents[i].solvedAt < cutoff) {
+          this.memoryEvents.splice(i, 1);
+          deleted++;
+        }
+      }
+      const durationMs = Date.now() - startTime;
+      this.logger.log(
+        `Analytics retention cleanup (memory): purged ${deleted} events older than ${retentionDays} days in ${durationMs}ms`,
+      );
+      return { deletedRows: deleted, durationMs, batches: deleted > 0 ? 1 : 0 };
+    }
+
+    while (batchCount < maxBatches) {
+      // Bounded batch deletion with FOR UPDATE SKIP LOCKED to prevent lock escalation and concurrency conflicts
+      const query = `
+        WITH to_delete AS (
+          SELECT id FROM analytics_events
+          WHERE solved_at < $1
+          ORDER BY id ASC
+          LIMIT $2
+          FOR UPDATE SKIP LOCKED
+        )
+        DELETE FROM analytics_events
+        WHERE id IN (SELECT id FROM to_delete)
+        RETURNING id;
+      `;
+      const result = await this.pool.query(query, [cutoff, batchSize]);
+      const deletedCount = result.rowCount ?? result.rows?.length ?? 0;
+      totalDeleted += deletedCount;
+      batchCount++;
+
+      if (deletedCount < batchSize) {
+        break;
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+    this.logger.log(
+      `Analytics retention cleanup: purged ${totalDeleted} events older than ${retentionDays} days in ${durationMs}ms (${batchCount} batches)`,
+    );
+
+    return { deletedRows: totalDeleted, durationMs, batches: batchCount };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async scheduledRetentionCleanup(): Promise<void> {
+    await this.cleanupExpiredEvents();
   }
 }

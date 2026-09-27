@@ -6,12 +6,6 @@
       "esnext"
     ],
     "baseUrl": ".",
-    "ignoreDeprecations": "5.0",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,

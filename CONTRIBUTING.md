@@ -150,6 +150,22 @@ The CI workflow (`.github/workflows/build.yml`) runs automatically on push to `m
 
 All checks must pass before a pull request can be merged.
 
+### One command before you open a PR
+
+Before opening a pull request, run the full check suite locally with a
+single command from the repository root:
+
+```bash
+make ci
+```
+
+The equivalent npm entry point is `npm run ci`. Both delegate to the same
+per-workspace scripts (backend lint + tests, frontend lint + tests, onchain
+format + tests, and both production builds), so running either one locally
+is equivalent to what CI enforces. The root `npm test`, `npm run lint` and
+`npm run build` scripts map to the corresponding `make test`, `make lint`
+and `make build` targets if you only want part of the suite.
+
 ## Pull Request Process
 
 1. **Create a feature branch** from `main` using the naming convention above

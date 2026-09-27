@@ -31,6 +31,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       onchain: ${{ steps.filter.outputs.onchain }}
+      docs: ${{ steps.filter.outputs.docs }}
       shared: ${{ steps.filter.outputs.shared }}
       run-all: ${{ steps.filter.outputs.run_all }}
     steps:
@@ -47,6 +48,11 @@ jobs:
               - 'frontend/**'
             onchain:
               - 'onchain/**'
+            # The generated API document/reference must be re-validated even
+            # when edited directly, so a hand-edit fails the drift gate.
+            docs:
+              - 'docs/api.md'
+              - 'docs/openapi.json'
             # Shared configuration affects every project: any of these alone
             # is enough to force a full (all jobs) validation run.
             shared:
@@ -243,9 +249,115 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Run unit tests
+      # Collects coverage so the thresholds configured in
+      # backend/package.json's jest block are enforced rather than dead
+      # config. Thresholds are pinned to the current baseline (8%) with a
+      # ratchet plan to raise them back to 60% as the untested modules gain
+      # specs — landing the original 60% gate today would fail on the
+      # pre-existing suite (issue #515). `--passWithNoTests` is intentionally
+      # gone: a `testRegex` that matches nothing must fail, not silently pass.
+      - name: Run unit tests with coverage
         working-directory: backend
-        run: npm test -- --passWithNoTests
+        run: npm run test:cov
+
+  # The e2e suite is a required gate: it locks the API-prefix contract
+  # (backend/test/api-prefix.e2e-spec.ts) and the security-header contract
+  # (backend/test/security-headers.e2e-spec.ts) alongside the gameplay and
+  # rewards flows. Postgres and Redis are provisioned as service containers
+  # because the specs that boot AppModule need both (issue #515).
+  backend-e2e:
+    name: Backend e2e tests
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: stellarshunts
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-test-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5432'
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: stellarshunts
+      DATABASE_SYNC: 'true'
+      DATABASE_LOAD: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      STELLAR_MODE: mock
+      STELLAR_NETWORK: testnet
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run e2e tests
+        working-directory: backend
+        run: npm run test:e2e
+
+  # The OpenAPI document (docs/openapi.json) and the API reference
+  # (docs/api.md) are generated from the application, never edited by hand.
+  # This job regenerates both and fails when the committed files are stale,
+  # so drift becomes a diff instead of a silent divergence (issue #555).
+  backend-openapi:
+    name: OpenAPI reference is up to date
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.shared == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Regenerate the OpenAPI document and the API reference
+        working-directory: backend
+        run: npm run openapi:generate
+
+      - name: Fail when the committed reference is stale
+        run: |
+          if ! git diff --exit-code -- docs/openapi.json docs/api.md; then
+            echo "::error::docs/openapi.json or docs/api.md is out of date. Run 'npm --prefix backend run openapi:generate' and commit the result."
+            exit 1
+          fi
 
   # ─────────────────────────────────────────────────────────────────────
   # Frontend CI
@@ -275,7 +387,7 @@ jobs:
 
       - name: npm audit
         working-directory: frontend
-        run: npm audit --audit-level=critical
+        # Advisories are reported but do not block the build.
         continue-on-error: true
         run: npm audit --audit-level=high
 

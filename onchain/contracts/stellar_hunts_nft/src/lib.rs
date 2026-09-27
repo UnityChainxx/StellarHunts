@@ -32,6 +32,10 @@ pub enum NftDataKey {
     BaseUri,
     Name,
     Symbol,
+    /// Schema version written at `init`. A missing key means version `0`
+    /// (a deployment that predates versioning) — see
+    /// `onchain/docs/storage-versioning.md` and issue #453.
+    SchemaVersion,
 }
 
 #[contracttype]
@@ -61,6 +65,13 @@ pub enum Error {
 const MAX_BASE_URI_LEN: usize = 200;
 const MAX_NAME_LEN: usize = 64;
 const MAX_SYMBOL_LEN: usize = 16;
+
+/// Current storage schema version for the NFT contract (#453).
+///
+/// An instance initialized before versioning existed reports `0` from
+/// `get_schema_version()`, so off-chain tooling can detect pre-versioning
+/// state without requiring a re-`init`.
+const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 // ---------------------------------------------------------------------
 // Contract
@@ -102,6 +113,9 @@ impl StellarHuntsNft {
         env.storage().instance().set(&NftDataKey::Admin, &admin);
         env.storage()
             .instance()
+            .set(&NftDataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
+        env.storage()
+            .instance()
             .set(&NftDataKey::Minters(game_contract.clone()), &true);
         env.storage()
             .instance()
@@ -113,6 +127,17 @@ impl StellarHuntsNft {
             (Symbol::new(&env, "nft_initialized"),),
             (admin, game_contract),
         );
+    }
+
+    /// Storage schema version of this deployment (#453).
+    ///
+    /// Returns `CURRENT_SCHEMA_VERSION` after `init`; a legacy instance that
+    /// never wrote the key reports `0`.
+    pub fn get_schema_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&NftDataKey::SchemaVersion)
+            .unwrap_or(0)
     }
 
     pub fn propose_admin(env: Env, new_admin: Address) {
@@ -175,12 +200,20 @@ impl StellarHuntsNft {
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&NftDataKey::Paused)
+            .unwrap_or(false)
     }
 
     pub fn mint_level_badge(env: Env, minter: Address, recipient: Address, level: Levels) {
         minter.require_auth();
-        if env.storage().instance().get(&NftDataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
 
@@ -239,7 +272,7 @@ impl StellarHuntsNft {
             .storage()
             .instance()
             .get(&NftDataKey::Admin)
-            .expect("admin not set");
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()
@@ -252,7 +285,7 @@ impl StellarHuntsNft {
             .storage()
             .instance()
             .get(&NftDataKey::Admin)
-            .expect("admin not set");
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()

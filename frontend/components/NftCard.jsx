@@ -2,6 +2,7 @@ import Image from "next/image";
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Lock, Shield } from "lucide-react";
+import { isOptimisableImageSrc } from "@/lib/images";
 
 // Static rarity → gradient class lookup. Defined at module scope so the
 // object identity is stable across renders and consumer prop identity
@@ -60,13 +61,26 @@ const NFTCard = ({ nft, onClaim = undefined }) => {
               nft.rarity
             )} opacity-80`}
           >
-            <Image
-              src={nft.src}
-              alt={nft.name || "StellarHunts NFT"}
-              fill
-              sizes="(max-width: 768px) 100vw, 33vw"
-              className="object-cover mix-blend-overlay"
-            />
+            {isOptimisableImageSrc(nft.src) ? (
+              <Image
+                src={nft.src}
+                alt={nft.name || "StellarHunts NFT"}
+                fill
+                sizes="(max-width: 768px) 100vw, 33vw"
+                className="object-cover mix-blend-overlay"
+              />
+            ) : (
+              // Host not listed in next.config.mjs — fall back to a plain
+              // <img> so an unexpected badge URL still renders instead of
+              // throwing a next/image configuration error.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={nft.src}
+                alt={nft.name || "StellarHunts NFT"}
+                className="absolute inset-0 object-cover w-full h-full mix-blend-overlay"
+                loading="lazy"
+              />
+            )}
           </div>
 
           {nft.locked && (

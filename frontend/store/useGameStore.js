@@ -21,22 +21,24 @@ import { apiClient } from "@/lib/api";
 
 const createThrottledStorage = (storage, delayMs = 150) => {
   let timer = null;
-  let pendingValue = null;
+  let pending = null;
   const flush = () => {
-    if (pendingValue !== null) {
+    if (pending !== null) {
       try {
-        storage.setItem("game-storage", pendingValue);
+        // Write under the key `persist` passes us — never a hardcoded key,
+        // so a rename can't silently strand the payload.
+        storage.setItem(pending.name, pending.value);
       } catch (e) {
         // Quota or serialization errors should not break gameplay.
       }
-      pendingValue = null;
+      pending = null;
     }
     timer = null;
   };
   return {
     getItem: (name) => storage.getItem(name),
     setItem: (name, value) => {
-      pendingValue = value;
+      pending = { name, value };
       if (timer) {
         clearTimeout(timer);
       }
@@ -47,7 +49,7 @@ const createThrottledStorage = (storage, delayMs = 150) => {
         clearTimeout(timer);
         timer = null;
       }
-      pendingValue = null;
+      pending = null;
       storage.removeItem(name);
     },
   };
@@ -67,6 +69,41 @@ const safeLocalStorage = () => {
     };
   }
   return window.localStorage;
+};
+
+// Canonical persist key for this store, following the `<store-name>:v<version>`
+// convention documented in frontend/store/README.md.
+const PERSIST_KEY = "game-store:v1";
+
+// Legacy key this store used before the naming convention was adopted.
+// Reserved for this store's migration only — do not reuse it elsewhere.
+const LEGACY_PERSIST_KEY = "game-storage";
+
+/**
+ * One-time migration for players whose progress was persisted under the
+ * legacy `game-storage` key. Copies the payload to the canonical
+ * `game-store:v1` key and removes the legacy entry so the two can never
+ * drift apart. Runs synchronously (before hydration) so the migrated
+ * value is visible to `persist` on its first read.
+ */
+const migrateLegacyPersistKey = (storage) => {
+  let legacy;
+  try {
+    legacy = storage.getItem(LEGACY_PERSIST_KEY);
+  } catch (e) {
+    return;
+  }
+  if (legacy === null || legacy === undefined) return;
+
+  try {
+    if (storage.getItem(PERSIST_KEY) === null) {
+      storage.setItem(PERSIST_KEY, legacy);
+    }
+  } catch (e) {
+    // Quota/serialization errors must not block hydration — fall through
+    // and still clear the legacy key so a retry can happen later.
+  }
+  storage.removeItem(LEGACY_PERSIST_KEY);
 };
 
 const DIFFICULTY_LEVELS = ["easy", "medium", "difficult", "advanced"];
@@ -343,25 +380,42 @@ const useGameStore = create(
       },
     }),
     {
-      name: "game-storage",
+      name: PERSIST_KEY,
       // Throttle writes so the localStorage payload is only re-serialised
       // and written once per coalescing window (see `createThrottledStorage`).
-      storage: createJSONStorage(() =>
-        createThrottledStorage(safeLocalStorage()),
-      ),
-      // Only durable progress fields are persisted. Transient state (none
-      // currently, but a narrow allow-list keeps the storage size small and
-      // future-proofs against accidental bloat) is excluded.
+      storage: createJSONStorage(() => {
+        const storage = safeLocalStorage();
+        migrateLegacyPersistKey(storage);
+        return createThrottledStorage(storage);
+      }),
+      // Only durable progress is persisted. `user` (the auth/account object)
+      // and `nfts` (the server-owned NFT gallery) are ephemeral client state
+      // that is re-fetched from the API — persisting them would bloat
+      // localStorage and risk stale data. See frontend/store/README.md.
       partialize: (state) => ({
-        user: state.user,
         completedPuzzles: state.completedPuzzles,
         completedDifficulties: state.completedDifficulties,
         currentDifficulty: state.currentDifficulty,
         currentPuzzleIndex: state.currentPuzzleIndex,
         score: state.score,
-        nfts: state.nfts,
       }),
       version: 1,
+      // Payloads written before the `version` field existed are reported as
+      // version 0. Normalise them to the current shape (defaulting any
+      // missing field) instead of letting a shape change silently reset the
+      // player's progress.
+      migrate: (persistedState, version) => {
+        if (!persistedState || version >= 1) {
+          return persistedState;
+        }
+        return {
+          completedPuzzles: persistedState.completedPuzzles ?? [],
+          completedDifficulties: persistedState.completedDifficulties ?? [],
+          currentDifficulty: persistedState.currentDifficulty ?? "easy",
+          currentPuzzleIndex: persistedState.currentPuzzleIndex ?? 0,
+          score: persistedState.score ?? 0,
+        };
+      },
     },
   ),
 );

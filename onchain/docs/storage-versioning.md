@@ -89,6 +89,11 @@ part of the serialization. Two safe ways to evolve a stored struct:
   from existing state.
 
 ### `stellar_hunts_nft`
+- `CURRENT_SCHEMA_VERSION = 1`, written to `NftDataKey::SchemaVersion` at
+  `init` and readable via `get_schema_version()`. A missing key means `0`
+  (a deployment that predates versioning), so an operator can detect
+  pre-versioning state without re-running `init` (which would otherwise
+  fail with `AlreadyInitialized`) — see issue #453.
 - `Badge(Address, Levels)` is a presence flag; `BadgeData(Address, Levels)`
   stores `minted_at` + `minter`. Both keys are append-only in practice
   (badges are never unminted), so evolving `BadgeData` by adding fields is
@@ -97,6 +102,88 @@ part of the serialization. Two safe ways to evolve a stored struct:
 
 ### `stellar_hunts_receiver`
 - Stateless mock (no storage). Nothing to version.
+
+## Operational procedure
+
+The migration tooling lives in `scripts/contract-schema.sh`. Credentials are
+read **only** from the environment (or the Stellar CLI's configured identity);
+no secret is ever committed to the repository.
+
+| Variable | Purpose |
+| --- | --- |
+| `STELLAR_NETWORK` | `testnet` (default), `futurenet`, or `pubnet`. |
+| `STELLAR_SOURCE` / `STELLAR_ACCOUNT` | Stellar CLI identity name used to sign (`--source`). Leave unset to use the CLI default identity. |
+| `STELLAR_HUNTS_CONTRACT_ID` | Game contract id. |
+| `STELLAR_HUNTS_NFT_CONTRACT_ID` | NFT contract id (inspected once it is versioned). |
+| `MIGRATE_FUNCTION` | Entry point to call (default `migrate_schema`). |
+| `MIGRATE_BATCH_SIZE` | Records per invocation (default `25`). |
+
+### 1. Inspect
+
+```bash
+scripts/contract-schema.sh inspect
+```
+
+This prints the deployed `get_schema_version()` next to `CURRENT_SCHEMA_VERSION`
+parsed from `onchain/contracts/stellar_hunts/src/lib.rs`, for example:
+
+```
+Expected schema version (from source): 1
+
+stellar_hunts          deployed=1 expected=1 OK
+stellar_hunts_nft      not configured (set STELLAR_HUNTS_NFT_CONTRACT_ID)
+```
+
+A `MISMATCH` line means the deployment and the source disagree; do not migrate
+until you understand why.
+
+### 2. Plan
+
+- Confirm the **starting version** (`--from`) is the version currently deployed.
+- Choose a `--batch-size` that comfortably fits the per-ledger resource budget
+  (start small, e.g. `10`–`25`).
+- Confirm the admin identity in `STELLAR_SOURCE` is the contract admin.
+
+### 3. Migrate
+
+```bash
+# from the currently deployed version, in bounded batches
+scripts/contract-schema.sh migrate --from 0 --batch-size 25
+```
+
+The driver **refuses to run** when the deployed version is not the expected
+starting version:
+
+```
+error: refusing to migrate: deployed version 1 != expected starting version 0
+```
+
+Each invocation of the admin entry point is reported per batch:
+
+```
+Migrating C... from 0 to 1 in batches of 25 via migrate_schema
+batch 1: 1
+migration complete: deployed schema version is now 1
+```
+
+The contract-side entry point is
+`migrate_schema(from_version: u32, batch_size: u32) -> u32`. It is
+admin-gated, rejects a `from_version` that does not match the deployed version
+(`SchemaVersionMismatch`), stamps `CURRENT_SCHEMA_VERSION` once the version is
+confirmed, and is idempotent — re-running it after a completed migration is a
+no-op. Struct-level data migrations are tracked separately (see the
+progress-struct versioning issue) and would be added as the work performed
+inside this entry point.
+
+### 4. Verify
+
+```bash
+scripts/contract-schema.sh inspect
+```
+
+Expect `deployed=<CURRENT_SCHEMA_VERSION> expected=<CURRENT_SCHEMA_VERSION> OK`.
+The contract also emits a `schema_migrated` event carrying the old and new
+versions, which can be checked in the transaction result.
 
 ## Test expectations
 
@@ -116,3 +203,8 @@ guarantees:
 - `test_levels_discriminants_stable` — `Levels` numeric discriminants
   (Easy=1, Medium=2, Hard=3, Master=4) never change, protecting both stored
   state and event payloads.
+- `stellar_hunts_nft/src/test.rs`: `test_schema_version`,
+  `test_schema_version_zero_before_init`, and
+  `test_legacy_instance_without_version_key_reports_zero` lock the NFT
+  contract's version surface: `CURRENT_SCHEMA_VERSION` after `init`, `0`
+  before, and `0` for a legacy instance whose key was never written.

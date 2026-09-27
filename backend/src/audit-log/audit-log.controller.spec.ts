@@ -46,7 +46,7 @@ describe('AuditLogController', () => {
   });
 
   describe('getAuditLogs', () => {
-    it('delegates to the service with parsed date filters', async () => {
+    it('delegates to the service with parsed date filters and actor mapping', async () => {
       await controller.getAuditLogs({
         userId: 'user-1',
         action: 'login',
@@ -55,18 +55,48 @@ describe('AuditLogController', () => {
       });
       expect(serviceMock.findAll).toHaveBeenCalledWith({
         userId: 'user-1',
+        actor: 'user-1',
         action: 'login',
         startDate: new Date('2026-01-01T00:00:00.000Z'),
         endDate: new Date('2026-01-31T00:00:00.000Z'),
       });
     });
 
+    it('delegates with target filters and pagination parameters', async () => {
+      await controller.getAuditLogs({
+        actor: 'admin-1',
+        targetType: 'review',
+        targetId: 'rev-123',
+        page: 2,
+        limit: 10,
+      });
+      expect(serviceMock.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: 'admin-1',
+          targetType: 'review',
+          targetId: 'rev-123',
+          page: 2,
+          limit: 10,
+        }),
+      );
+    });
+
     it('leaves dates undefined when not provided', async () => {
       await controller.getAuditLogs({});
       expect(serviceMock.findAll).toHaveBeenCalledWith({
+        actor: undefined,
         startDate: undefined,
         endDate: undefined,
       });
+    });
+  });
+
+  describe('getModerationAuditHistory', () => {
+    it('resolves audit history for a review moderation target', async () => {
+      serviceMock.findByTarget = jest.fn().mockResolvedValue([{ id: 'log-1' }]);
+      const res = await controller.getModerationAuditHistory('review-999');
+      expect(serviceMock.findByTarget).toHaveBeenCalledWith('review', 'review-999');
+      expect(res).toEqual([{ id: 'log-1' }]);
     });
   });
 
