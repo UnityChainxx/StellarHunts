@@ -127,4 +127,24 @@ describe('ReferralService authorization', () => {
       expect(bonusService.allocateReferralBonus).not.toHaveBeenCalled();
     });
   });
+
+  describe('trackReferral', () => {
+    it('delegates to inviteService.trackReferral with authenticated user id and email', async () => {
+      (inviteService as any).trackReferral = jest.fn().mockResolvedValue({
+        success: true,
+        isNew: true,
+        invite: { id: 'inv-1' },
+      });
+
+      const res = await service.trackReferral(OTHER_ID, 'other@example.com', {
+        referrerId: 'ABCD1234',
+      });
+      expect((inviteService as any).trackReferral).toHaveBeenCalledWith(
+        OTHER_ID,
+        'other@example.com',
+        'ABCD1234',
+      );
+      expect(res.success).toBe(true);
+    });
+  });
 });

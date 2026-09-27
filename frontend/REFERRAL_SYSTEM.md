@@ -53,16 +53,17 @@ The referral system encourages users to invite friends to join StellarHunts. Use
   - `shareReferral()`: Native sharing with fallback
   - `copyReferralLink()`: Clipboard functionality
 
-## API Routes
+## API Routes & Attribution Flow
 
 ### `GET /api/referrals/[userId]`
-- Fetches referral statistics and invited users list
-- Returns mock data (to be connected to backend)
+- Fetches referral statistics and invited users list for the given user ID.
 
 ### `POST /api/referrals/track`
-- Tracks new referrals when users sign up
-- Awards bonuses to both referrer and new user
-- Updates referral statistics
+- Thin authenticated proxy route connecting client interactions to the backend single-writer service (`POST /api/v1/referrals/track`).
+- **Authentication**: Gated by caller authentication (JWT Bearer token or session cookie). Unauthenticated attempts are rejected with `401 Unauthorized` so that attribution cannot be forged for arbitrary accounts.
+- **Identity Binding**: The backend identifies the invited user strictly from `@CurrentUser('id')`, ignoring any spoofed user IDs in the request body.
+- **Idempotency**: Repeat visits or calls for the same referral pair (referrer and referred user) are idempotent. They return the existing attribution record rather than creating duplicate invite records or raising errors.
+- **Persistence**: Persists a `ReferralInvite` record with `status: registered`, links it to the referrer's active `ReferralCode`, updates invite counters, and reports bonus entitlements.
 
 ## Reward System
 

@@ -1,11 +1,14 @@
 import { Controller, Get, Module, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { DOCS_ROUTE_EXCLUSIONS, buildApiPrefix } from '../src/api-prefix';
 
 // Minimal controllers so this spec verifies the global prefix contract
 // without needing a database. The frontend route-compatibility tests
 // (frontend/tests/apiRoutes.test.js) lock the same contract on the client
-// side — keep the two in sync (issue #360).
+// side — keep the two in sync (issue #360). The prefix itself is not
+// re-declared here: it is imported from src/api-prefix.ts, the same module
+// `src/main.ts` builds the global prefix from (issue #555).
 @Controller('probe')
 class ProbeController {
   @Get()
@@ -41,11 +44,11 @@ describe('API prefix contract (frontend ↔ backend)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    // Mirrors backend/src/main.ts: the version comes from
-    // `appConfig.apiVersion` (backend/config/app.config.ts), default 'v1';
-    // the docs exclusion uses string route patterns (not RegExps).
-    app.setGlobalPrefix('api/v1', {
-      exclude: ['docs', 'docs-json', 'docs/(.*)'],
+    // Borrowed from backend/src/main.ts (via src/api-prefix.ts) so this spec
+    // asserts the real contract instead of re-declaring it. The version
+    // defaults to 'v1' (backend/config/app.config.ts).
+    app.setGlobalPrefix(buildApiPrefix('v1'), {
+      exclude: DOCS_ROUTE_EXCLUSIONS,
     });
     await app.init();
   });

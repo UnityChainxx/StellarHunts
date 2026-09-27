@@ -49,54 +49,129 @@ describe('AuditLogService', () => {
   });
 
   describe('findAll', () => {
-    it('filters by userId and action', async () => {
-      await service.findAll({ userId: 'user-1', action: 'login' });
-      expect(repo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            userId: 'user-1',
-            action: expect.anything(),
-          }),
-          order: { timestamp: 'DESC' },
-        }),
-      );
+    it('filters by userId and action and returns paginated result with deterministic ordering', async () => {
+      const qb = {
+        andWhere: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[{ id: 'log-1', userId: 'user-1' }], 1]),
+      };
+      repo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll({ userId: 'user-1', action: 'login', page: 1, limit: 10 });
+      expect(repo.createQueryBuilder).toHaveBeenCalledWith('log');
+      expect(qb.andWhere).toHaveBeenCalledWith('log.userId = :actor', { actor: 'user-1' });
+      expect(qb.andWhere).toHaveBeenCalledWith('log.action ILIKE :action', { action: '%login%' });
+      expect(qb.orderBy).toHaveBeenCalledWith('log.timestamp', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('log.id', 'DESC');
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({
+        data: [{ id: 'log-1', userId: 'user-1' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
     });
 
-    it('passes date range bounds to Between', async () => {
+    it('filters by targetType and targetId', async () => {
+      const qb = {
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[{ id: 'log-rev-1' }], 1]),
+      };
+      repo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.findAll({ targetType: 'review', targetId: 'rev-100' });
+      expect(qb.andWhere).toHaveBeenCalledWith("(log.meta->>'targetType' = :targetType)", { targetType: 'review' });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        "(log.meta->>'targetId' = :targetId OR log.meta->>'reviewId' = :targetId)",
+        { targetId: 'rev-100' },
+      );
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('filters by date range', async () => {
+      const qb = {
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      repo.createQueryBuilder.mockReturnValue(qb);
+
       const start = new Date('2026-01-01');
       const end = new Date('2026-01-31');
       await service.findAll({ startDate: start, endDate: end });
-      const arg = repo.find.mock.calls[0][0];
-      expect(arg.where.timestamp).toBeDefined();
-      // Between produces a FindOperator — verify the two bounds
-      expect(arg.where.timestamp._value).toEqual([start, end]);
+      expect(qb.andWhere).toHaveBeenCalledWith('log.timestamp BETWEEN :startDate AND :endDate', {
+        startDate: start,
+        endDate: end,
+      });
     });
   });
 
-  describe('purgeOlderThan', () => {
-    it('deletes logs older than the retention window', async () => {
+  describe('findByTarget', () => {
+    it('resolves audit records for a target', async () => {
       const qb = {
-        delete: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 7 }),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[{ id: 'log-target-1' }], 1]),
       };
       repo.createQueryBuilder.mockReturnValue(qb);
 
-      const purged = await service.purgeOlderThan(DEFAULT_RETENTION_DAYS);
-      expect(purged).toBe(7);
-      expect(qb.where).toHaveBeenCalledWith(
-        'timestamp < :cutoff',
-        expect.objectContaining({ cutoff: expect.any(Date) }),
-      );
+      const logs = await service.findByTarget('review', 'review-123');
+      expect(logs).toEqual([{ id: 'log-target-1' }]);
+    });
+  });
+
+  describe('purgeOlderThan / cleanupExpiredLogs', () => {
+    it('deletes expired logs in bounded batches', async () => {
+      const selectQb = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ id: 'log-1' }, { id: 'log-2' }])
+          .mockResolvedValueOnce([]),
+      };
+      const deleteQb = {
+        delete: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 2 }),
+      };
+
+      repo.createQueryBuilder
+        .mockReturnValueOnce(selectQb)
+        .mockReturnValueOnce(deleteQb)
+        .mockReturnValueOnce(selectQb);
+
+      const result = await service.cleanupExpiredLogs(DEFAULT_RETENTION_DAYS, 500, 2);
+      expect(result.deletedRows).toBe(2);
+      expect(result.batches).toBe(1);
+      expect(result.durationMs).toBeGreaterThanOrEqual(0);
     });
 
     it('returns 0 when nothing was purged', async () => {
-      const qb = {
-        delete: jest.fn().mockReturnThis(),
+      const selectQb = {
+        select: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+        limit: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
       };
-      repo.createQueryBuilder.mockReturnValue(qb);
+      repo.createQueryBuilder.mockReturnValue(selectQb);
 
       await expect(service.purgeOlderThan(30)).resolves.toBe(0);
     });

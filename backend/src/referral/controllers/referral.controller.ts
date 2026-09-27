@@ -15,6 +15,7 @@ import type { User } from '../../auth/entities/user.entity';
 import type { ReferralService } from '../services/referral.service';
 import type { CreateReferralCodeDto } from '../dto/create-referral-code.dto';
 import type { CreateInviteDto } from '../dto/create-invite.dto';
+import type { TrackReferralDto } from '../dto/track-referral.dto';
 
 @Controller('referrals')
 @UseGuards(JwtAuthGuard)
@@ -34,6 +35,16 @@ export class ReferralController {
     @Body() createDto: CreateReferralCodeDto,
   ) {
     return this.referralService.createReferralCode(userId, createDto);
+  }
+
+  @Post('track')
+  @HttpCode(HttpStatus.OK)
+  async trackReferral(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('email') email: string,
+    @Body() trackDto: TrackReferralDto,
+  ) {
+    return this.referralService.trackReferral(userId, email, trackDto);
   }
 
   @Get('codes/my')

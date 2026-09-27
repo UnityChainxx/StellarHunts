@@ -1,5 +1,3 @@
-import { OutboxEvent } from "./outbox/entities/outbox-event.entity";
-import { OutboxModule } from "./outbox/outbox.module";
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -10,38 +8,23 @@ import * as Joi from 'joi';
 import appConfig from 'config/app.config';
 import databaseConfig from 'config/database.config';
 
-import { User } from './auth/entities/user.entity';
-import { TimeTrial } from './time-trial/time-trial.entity';
-import { Puzzle } from './puzzle/puzzle.entity';
-import { Category } from './puzzle-category/entities/category.entity';
-import { Report } from './report/entities/report.entity';
-import { Wallet } from './wallet/entities/wallet.entity';
-import { ConsumedWalletNonce } from './wallet/entities/consumed-nonce.entity';
-import { TokenHistory } from './user-token-history/entities/token-history.entity';
-import { AuditLog } from './audit-log/entities/audit-log.entity';
-import { Admin } from './admin/admin.entity';
-import { PuzzleReview } from './puzzle-review/puzzle-review/entities/puzzle-review.entity';
-import { ReviewModeration } from './puzzle-review/puzzle-review/entities/review-moderation.entity';
-import { DraftPuzzle } from './puzzle-draft/entities/draft-puzzle.entity';
-
-import { CacheModule } from './cache/cache.module';
-
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { GracefulShutdownService } from './graceful-shutdown.service';
 
 import { AchievementModule } from './achievement/achievement.module';
 import { ActivityModule } from './activity/activity.module';
-import { AnalyticsModule } from './analytic/analytic.module';
+import { AnalyticModule } from './analytic/analytic.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuthModule } from './auth/auth.module';
-import { BadgeModule } from './badge/badge.module';
 import { CacheModule } from './cache/cache.module';
 import { ContentModule } from './content/content.module';
 import { ContentRatingModule } from './content-rating/content-rating.module';
 import { DailyRewardModule } from './daily-reward/daily-reward.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { GeoStatsModule } from './geostat/geostat.module';
+import { HealthModule } from './health/health.module';
 import { HintModule } from './hint/hint.module';
 import { InAppNotificationsModule } from './in-app-notifications/in-app-notifications.module';
 import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
@@ -50,6 +33,7 @@ import { MilestoneModule } from './milestone/milestone.module';
 import { MultiplayerQueueModule } from './multiplayer-queue/multiplayer-queue.module';
 import { NFTClaimModule } from './nft-claim/nft-claim.module';
 import { NftMarketplaceStubModule } from './nft-marketplace-stub/nft-marketplace-stub.module';
+import { OutboxModule } from './outbox/outbox.module';
 import { ProgressModule } from './progress/progress.module';
 import { PromoCodeModule } from './promo-code/entities/promo-code.module';
 import { PuzzleAccessLogModule } from './puzzle-access-log/puzzle-access-log.module';
@@ -57,14 +41,10 @@ import { PuzzleCategoryModule } from './puzzle-category/puzzle-category.module';
 import { PuzzleCommentModule } from './puzzle-comment/puzzle-comment.module';
 import { PuzzleDependencyModule } from './puzzle-dependency/puzzle-dependency.module';
 import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
-import { PuzzleForkModule } from './puzzle-fork/puzzle-fork.module';
 import { PuzzleModule } from './puzzle/puzzle.module';
 import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { PuzzleSubmissionModule } from './puzzle-submission/puzzle-submission.module';
-import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { PuzzleTranslationModule } from './puzzle-translation/puzzle-translation.module';
-import { PuzzleVersioningModule } from './puzzle-versioning/puzzle-versioning.module';
-import { QuizModule } from './quiz/quiz.module';
 import { RateLimiterModule } from './rate-limiter/rate-limiter.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReportsModule } from './report/report.module';
@@ -78,14 +58,7 @@ import { UserInventoryModule } from './user-inventory/user-inventory.module';
 import { UserModule } from './user/user.module';
 import { UserRankingModule } from './user-ranking/user-ranking.module';
 import { UserReactionModule } from './user-reaction/user-reaction.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { PuzzleDraftModule } from './puzzle-draft/puzzle-draft.module';
-import { PuzzleReviewModule } from './puzzle-review/puzzle-review/puzzle-review.module';
 import { UserReportCardModule } from './user-report-card/user-report-card.module';
-import { HealthModule } from './health/health.module';
-import { MaintenanceModeModule } from './maintenance-mode/maintenance-mode.module';
-import { WalletModule } from './wallet/wallet.module';
-import { GracefulShutdownService } from './graceful-shutdown.service';
 
 @Module({
   imports: [
@@ -110,13 +83,11 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         DATABASE_PASSWORD: Joi.string().required(),
         DATABASE_NAME: Joi.string().required(),
         STELLAR_MODE: Joi.string().valid('mock', 'live').default('live'),
-        NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
         STELLAR_NETWORK: Joi.string().valid('testnet', 'pubnet').default('testnet'),
       }),
     }),
     TypeOrmModule.forRootAsync({
-      imports: [
-    ScheduleModule.forRoot(),ConfigModule],
+      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
@@ -125,16 +96,22 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
         username: configService.get('database.user'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
-        entities: [User, TimeTrial, Puzzle, Category, Report, OutboxEvent],
+        // Entity metadata is discovered from the `TypeOrmModule.forFeature`
+        // registration in each feature module. Keeping a hand-maintained
+        // `entities: [...]` list here silently omitted most modules and made
+        // every repository for a non-listed entity fail at runtime with an
+        // EntityMetadataNotFoundError. `autoLoadEntities` is the single
+        // source of truth; `scripts/audit-modules.ts` fails if any entity is
+        // missing a `forFeature` registration.
+        autoLoadEntities: true,
         migrations: [join(__dirname, '**', 'migrations', '*.{ts,js}')],
         synchronize: configService.get('database.synchronize') === true,
-        autoLoadEntities: configService.get('database.autoload') === true,
         migrationsRun: configService.get('database.migrationsRun') === true,
       }),
     }),
     AchievementModule,
     ActivityModule,
-    AnalyticsModule,
+    AnalyticModule,
     ApiKeyModule,
     HealthModule,
     AuthModule,
@@ -180,14 +157,9 @@ import { GracefulShutdownService } from './graceful-shutdown.service';
     UserRankingModule,
     UserReactionModule,
     UserReportCardModule,
-    MaintenanceModeModule,
     OutboxModule,
   ],
   controllers: [AppController],
   providers: [AppService, GracefulShutdownService],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CsrfMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

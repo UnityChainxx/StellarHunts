@@ -18,8 +18,12 @@ import {
   ApiQuery,
   ApiParam,
   ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
-import { AdminGuard } from '../guards/admin.guard';
+import { JwtAuthGuard } from '../../../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../admin/guards/roles.guard';
+import { Roles } from '../../../admin/roles.decorator';
+import { AdminRole } from '../../../admin/admin-role.enum';
 import { ModerationService } from '../services/moderation.service';
 import type {
   ModerationRequest,
@@ -29,8 +33,10 @@ import type { PuzzleReview } from '../entities/puzzle-review.entity';
 import { ModerationAction, ModerationReason } from '../entities/review-moderation.entity';
 
 @ApiTags('Review Moderation')
+@ApiBearerAuth()
 @Controller('moderation')
-@UseGuards(AdminGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(AdminRole.ADMIN, AdminRole.SUPERADMIN)
 export class ModerationController {
   private readonly logger = new Logger(ModerationController.name);
 
@@ -196,5 +202,21 @@ export class ModerationController {
     @Param('reviewId', ParseUUIDPipe) reviewId: string,
   ) {
     return this.moderationService.getModerationHistory(reviewId);
+  }
+
+  @Get(':reviewId/decision-history')
+  @ApiOperation({
+    summary: 'Get moderation decision history and audit trail',
+    description: 'Retrieves moderation records alongside resolved immutable audit log entries',
+  })
+  @ApiParam({ name: 'reviewId', description: 'Review ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Decision history and audit entries retrieved',
+  })
+  async getDecisionHistory(
+    @Param('reviewId', ParseUUIDPipe) reviewId: string,
+  ) {
+    return this.moderationService.getDecisionHistory(reviewId);
   }
 }

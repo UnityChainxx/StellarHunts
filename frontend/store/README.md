@@ -23,6 +23,35 @@ When you bump a store's `version` (e.g. because you changed the shape of
 persisted state and need a migration), bump the `:vN` suffix in `name` too,
 so old and new shapes never collide under the same key.
 
+### Legacy keys and migrations
+
+When a store's key changes, ship a migration in the same PR that copies the
+old payload to the new key before hydration and removes the old entry, so
+existing players do not lose progress. Migration must be synchronous (run
+before `persist` performs its first read) for synchronous storage backends
+such as `localStorage`.
+
+This store previously persisted under the undocumented `game-storage` key.
+`useGameStore` now writes to `game-store:v1` and performs a one-time
+migration in `migrateLegacyPersistKey()` that re-keys any existing
+`game-storage` payload. The old key is reserved for that migration only —
+never reuse `game-storage` for a new store.
+
+### What to persist
+
+Persist only durable *progress* — state the player expects to survive a
+reload. For `useGameStore` the allow-list is:
+
+- `completedPuzzles`
+- `completedDifficulties`
+- `currentDifficulty`
+- `currentPuzzleIndex`
+- `score`
+
+Do **not** persist account/session objects (`user`) or server-owned
+collections (`nfts`): those are re-fetched from the API and persisting them
+would go stale and bloat `localStorage`.
+
 ### Adding a new persisted store
 
 1. Pick a `name` following the table format above.

@@ -94,6 +94,8 @@ export class ModerationService {
       moderationRequest.moderatorId,
       `moderation.${moderationRequest.action}`,
       {
+        targetType: 'review',
+        targetId: moderationRequest.reviewId,
         reviewId: moderationRequest.reviewId,
         previousStatus,
         newStatus,
@@ -191,6 +193,30 @@ export class ModerationService {
       where: { reviewId },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Resolve decision history and correlated audit trail for a review
+   */
+  async getDecisionHistory(reviewId: string): Promise<{
+    reviewId: string;
+    moderationHistory: ReviewModeration[];
+    auditLogs: any[];
+  }> {
+    this.logger.log(
+      `Resolving decision history and audit trail for review: ${reviewId}`,
+    );
+
+    const [moderationHistory, auditLogs] = await Promise.all([
+      this.getModerationHistory(reviewId),
+      this.auditLogService.findByTarget('review', reviewId),
+    ]);
+
+    return {
+      reviewId,
+      moderationHistory,
+      auditLogs,
+    };
   }
 
   /**

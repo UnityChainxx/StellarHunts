@@ -118,7 +118,7 @@ API_VERSION=v1
 | `DATABASE_PASSWORD`| Yes (DB) | _unset_                  | `config/database.config.ts`  | PostgreSQL password.                                           |
 | `DATABASE_NAME`    | Yes (DB) | _unset_                  | `config/database.config.ts`  | PostgreSQL database name (default: `stellarshunt`).            |
 | `DATABASE_SYNC`    | No       | `false`                  | `config/database.config.ts`  | Set `true` in dev to auto-sync TypeORM entities (never in prod).|
-| `DATABASE_LOAD`    | No       | `false`                  | `config/database.config.ts`  | Set `true` to auto-load entities on boot.                      |
+| `DATABASE_LOAD`    | No       | `false`                  | `config/database.config.ts`  | Legacy flag; entity auto-loading is now always on (see "Database entity registration" below). |
 | `JWT_SECRET`       | Yes (prod)| _unset_                 | `src/auth/*`                 | HMAC secret for signing JWT access tokens.                     |
 | `STELLAR_MODE`     | No       | `live`                   | `src/app.module.ts` and `src/nft-claim/providers/stellar-handler.service.ts` | `live` or `mock`; mock is rejected in production. |
 | `STELLAR_NETWORK`  | No       | `testnet`               | `src/app.module.ts`         | Stellar network identifier (`testnet` or `pubnet`).            |
@@ -126,11 +126,46 @@ API_VERSION=v1
 
 > The `.env` file is `.gitignore`d — never commit secrets to git.
 
+### Database entity registration
+
+The TypeORM connection uses `autoLoadEntities: true` (see
+`src/app.module.ts`). This means **an entity is only added to the connection
+when a feature module registers it with `TypeOrmModule.forFeature([...])`** —
+there is no hand-maintained `entities: [...]` list to keep in sync. If an
+entity is never registered, the first request that touches its repository
+fails at runtime with an `EntityMetadataNotFoundError`.
+
+Convention for every entity-owning module:
+
+```ts
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { MyEntity } from './entities/my.entity';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([MyEntity])],
+  providers: [MyService],
+  controllers: [MyController],
+})
+export class MyModule {}
+```
+
+Run the audit before opening a PR:
+
+```bash
+npm run audit:entities   # fails if any entity lacks a forFeature registration
+```
+
+Because `autoLoadEntities` only loads registered entities, always use this
+script (or the `entity-registration.spec.ts` unit test) rather than adding
+entity classes to `AppModule` by hand.
+
 ### Scripts
 
 | Script               | Command                    | Purpose                                              |
 |----------------------|----------------------------|------------------------------------------------------|
 | `npm run start`      | `nest start`               | Start the backend once.                              |
+| `npm run audit:entities` | `ts-node scripts/audit-entities.ts` | Fail if any entity is not registered via `forFeature`. |
+| `npm run audit:modules`  | `ts-node scripts/audit-modules.ts`  | Report feature modules not imported by `AppModule`. |
 | `npm run start:dev`  | `nest start --watch`       | Start with hot-reload on file changes. (default dev) |
 | `npm run start:debug`| `nest start --debug --watch` | Start with `--inspect` for the Node debugger.       |
 | `npm run start:prod` | `node dist/main`           | Run the compiled output (after `npm run build`).     |
@@ -183,9 +218,26 @@ override it).
 
 ## API Documentation
 
-Swagger documentation is available at `http://localhost:3001/api/docs`
-when the server is running. It provides interactive exploration of all
-endpoints, request schemas, and authentication requirements.
+When enabled, Swagger UI is served at `http://localhost:3001/docs` (the
+`/docs` route family is excluded from the `/api` global prefix). It
+provides interactive exploration of all endpoints, request schemas, and
+authentication requirements.
+
+The UI is governed by the `swagger.enabled` flag in
+`backend/config/app.config.ts` (see `backend/src/swagger.ts`):
+
+- **Development** (and any non-production environment) serves `/docs` by
+  default.
+- **Production / staging / test** keeps `/docs` disabled by default,
+  because the document exposes the full route inventory and DTO shapes.
+  Opt back in explicitly with `SWAGGER_ENABLED=true` when you need to
+  introspect a running instance:
+
+  ```env
+  SWAGGER_ENABLED=true
+  ```
+
+`npm run test:e2e -- swagger` covers both the enabled and disabled paths.
 
 ## Testing
 

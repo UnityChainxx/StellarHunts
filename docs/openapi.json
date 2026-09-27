@@ -1,0 +1,1151 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "StellarHunts API",
+    "description": "StellarHunts backend REST API. Generated from the NestJS controllers; route conventions are documented in docs/api-conventions.md.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Versioned API prefix"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register a new user account",
+        "x-auth": "Public"
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in and receive a JWT",
+        "x-auth": "Public"
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get the authenticated user's profile",
+        "x-auth": "JWT"
+      }
+    },
+    "/auth/validate-token": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Validate a JWT token",
+        "x-auth": "JWT"
+      }
+    },
+    "/users": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create a new user",
+        "x-auth": "Public"
+      }
+    },
+    "/users/profile": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update the authenticated user's profile",
+        "x-auth": "JWT"
+      }
+    },
+    "/users/link-wallet": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Link a Stellar wallet address to the account",
+        "x-auth": "JWT"
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get a user by ID",
+        "x-auth": "JWT"
+      }
+    },
+    "/users/{id}/rank": {
+      "get": {
+        "tags": [
+          "Users",
+          "User Ranking"
+        ],
+        "summary": "Get a user's ranking information",
+        "x-auth": "JWT"
+      }
+    },
+    "/users/{id}/progress": {
+      "get": {
+        "tags": [
+          "Users",
+          "Progress"
+        ],
+        "summary": "Get a user's overall progress",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzles/submit": {
+      "post": {
+        "tags": [
+          "Puzzles (Game)"
+        ],
+        "summary": "Submit an answer for a puzzle",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzles/hint": {
+      "post": {
+        "tags": [
+          "Puzzles (Game)"
+        ],
+        "summary": "Request a hint for the current puzzle",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzles/progress": {
+      "get": {
+        "tags": [
+          "Puzzles (Game)"
+        ],
+        "summary": "Get the authenticated user's puzzle progress",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzles/rate-limit-status": {
+      "get": {
+        "tags": [
+          "Puzzles (Game)"
+        ],
+        "summary": "Check current rate-limit status for submissions",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzles/active": {
+      "get": {
+        "tags": [
+          "Puzzles (Game)"
+        ],
+        "summary": "List all active puzzles",
+        "x-auth": "Public"
+      }
+    },
+    "/admin/puzzles": {
+      "post": {
+        "tags": [
+          "Puzzles (Admin CRUD)"
+        ],
+        "summary": "Create a new puzzle",
+        "x-auth": "JWT + Admin"
+      },
+      "get": {
+        "tags": [
+          "Puzzles (Admin CRUD)",
+          "Admin"
+        ],
+        "summary": "List all puzzles (admin view)",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/admin/puzzles/{id}": {
+      "get": {
+        "tags": [
+          "Puzzles (Admin CRUD)"
+        ],
+        "summary": "Get a puzzle by ID (admin view)",
+        "x-auth": "JWT + Admin"
+      },
+      "patch": {
+        "tags": [
+          "Puzzles (Admin CRUD)"
+        ],
+        "summary": "Update a puzzle",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Puzzles (Admin CRUD)"
+        ],
+        "summary": "Delete a puzzle",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-submission": {
+      "post": {
+        "tags": [
+          "Puzzle Submission"
+        ],
+        "summary": "Submit a puzzle answer",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-categories/puzzles-by-category": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Get puzzles grouped by category",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-categories/categories": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "List all categories",
+        "x-auth": "Public"
+      },
+      "post": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Create a category",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-categories/categories/{id}": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Get a category by ID",
+        "x-auth": "Public"
+      },
+      "put": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Update a category",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Delete a category",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-categories/categories/slug/{slug}": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Get a category by slug",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-categories/puzzles": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "List all categorised puzzles",
+        "x-auth": "Public"
+      },
+      "post": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Add a puzzle to a category",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-categories/puzzles/{id}": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Get a categorised puzzle by ID",
+        "x-auth": "Public"
+      },
+      "put": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Update a puzzle's category assignment",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Remove a puzzle from a category",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-categories/categories/{id}/puzzles": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Get all puzzles in a category",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-categories/puzzles/difficulty/{difficulty}": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Filter puzzles by difficulty",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-categories/puzzles/search": {
+      "get": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Search puzzles",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-categories/seed-categories": {
+      "post": {
+        "tags": [
+          "Puzzle Categories"
+        ],
+        "summary": "Seed default categories",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-dependencies": {
+      "post": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Create a dependency",
+        "x-auth": "JWT + Admin"
+      },
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "List all dependencies",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/puzzle/{puzzleId}": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Get dependencies for a puzzle",
+        "x-auth": "JWT"
+      },
+      "delete": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Remove all dependencies for a puzzle",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-dependencies/{id}": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Get a dependency by ID",
+        "x-auth": "JWT"
+      },
+      "patch": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Update a dependency",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Delete a dependency",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-dependencies/check-eligibility": {
+      "post": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Check if a user is eligible to attempt a puzzle",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/mark-completed": {
+      "post": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Mark a dependency as completed",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/user/{userId}/completed": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "List completed dependencies for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/user/{userId}/unlocked": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "List unlocked puzzles for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/chain/{puzzleId}": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Get the full prerequisite chain for a puzzle",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-dependencies/stats/{puzzleId}": {
+      "get": {
+        "tags": [
+          "Puzzle Dependencies"
+        ],
+        "summary": "Get dependency stats for a puzzle",
+        "x-auth": "JWT"
+      }
+    },
+    "/puzzle-translations": {
+      "post": {
+        "tags": [
+          "Puzzle Translations"
+        ],
+        "summary": "Create a translation",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-translations/{id}": {
+      "put": {
+        "tags": [
+          "Puzzle Translations"
+        ],
+        "summary": "Update a translation",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/puzzle-translations/{puzzleId}": {
+      "get": {
+        "tags": [
+          "Puzzle Translations"
+        ],
+        "summary": "Get all translations for a puzzle",
+        "x-auth": "Public"
+      }
+    },
+    "/puzzle-translations/{puzzleId}/lang": {
+      "get": {
+        "tags": [
+          "Puzzle Translations"
+        ],
+        "summary": "Get a translation for a puzzle in a specific language",
+        "x-auth": "Public"
+      }
+    },
+    "/content": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "List published content",
+        "x-auth": "Public"
+      }
+    },
+    "/content/{id}": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Get a content item by ID",
+        "x-auth": "Public"
+      }
+    },
+    "/admin/content": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Create a content item",
+        "x-auth": "JWT + Admin"
+      },
+      "get": {
+        "tags": [
+          "Content",
+          "Admin"
+        ],
+        "summary": "List all content (admin view)",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/admin/content/{id}": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Get a content item (admin view)",
+        "x-auth": "JWT + Admin"
+      },
+      "patch": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Update a content item",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Delete a content item",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/rewards": {
+      "post": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Create a reward",
+        "x-auth": "JWT + Admin"
+      },
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "List all rewards",
+        "x-auth": "JWT"
+      }
+    },
+    "/rewards/{id}": {
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Get a reward by ID",
+        "x-auth": "JWT"
+      },
+      "delete": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Delete a reward",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/rewards/challenge/{challengeId}": {
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Get rewards for a challenge",
+        "x-auth": "JWT"
+      }
+    },
+    "/rewards/claim": {
+      "post": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Claim a reward",
+        "x-auth": "JWT"
+      }
+    },
+    "/rewards/user/{userId}/claims": {
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "List all reward claims for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/rewards/claims/{id}": {
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Get a specific claim",
+        "x-auth": "JWT"
+      }
+    },
+    "/rewards/{id}/stats": {
+      "get": {
+        "tags": [
+          "Rewards"
+        ],
+        "summary": "Get claim stats for a reward",
+        "x-auth": "JWT"
+      }
+    },
+    "/nft-claim/claim": {
+      "post": {
+        "tags": [
+          "NFT Claim"
+        ],
+        "summary": "Trigger an NFT badge mint for a completed level",
+        "x-auth": "JWT"
+      }
+    },
+    "/reward-shop": {
+      "get": {
+        "tags": [
+          "Reward Shop"
+        ],
+        "summary": "List reward shop items (see Swagger for full schema)",
+        "x-auth": "JWT"
+      }
+    },
+    "/achievements/{playerId}": {
+      "get": {
+        "tags": [
+          "Achievements"
+        ],
+        "summary": "Get all achievements for a player",
+        "x-auth": "JWT"
+      }
+    },
+    "/badges/assign": {
+      "post": {
+        "tags": [
+          "Badges"
+        ],
+        "summary": "Assign a badge to a user",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/badges/user/{id}": {
+      "get": {
+        "tags": [
+          "Badges"
+        ],
+        "summary": "Get all badges for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/activity": {
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Record a streak activity event",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/user/{userId}": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Get streak data for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/my-streak": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Get the authenticated user's streak",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/leaderboard": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Streak leaderboard",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/history": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Authenticated user's streak history",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/user/{userId}/history": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Streak history for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/streaks/recalculate": {
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Recalculate streaks",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/streaks/reset": {
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Reset streaks",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/streaks/active": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "List users with active streaks",
+        "x-auth": "JWT"
+      }
+    },
+    "/public/streaks/user/{userId}": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Get streak data for a user (public)",
+        "x-auth": "Public"
+      }
+    },
+    "/public/streaks/leaderboard": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Public streak leaderboard",
+        "x-auth": "Public"
+      }
+    },
+    "/public/streaks/user/{userId}/history": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Public streak history for a user",
+        "x-auth": "Public"
+      }
+    },
+    "/public/streaks/stats": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Global streak statistics",
+        "x-auth": "Public"
+      }
+    },
+    "/time-trial/start": {
+      "post": {
+        "tags": [
+          "Time Trial"
+        ],
+        "summary": "Start a timed puzzle attempt",
+        "x-auth": "JWT"
+      }
+    },
+    "/time-trial/submit/{id}": {
+      "post": {
+        "tags": [
+          "Time Trial"
+        ],
+        "summary": "Submit an answer for a time trial",
+        "x-auth": "JWT"
+      }
+    },
+    "/time-trial/results/{userId}": {
+      "get": {
+        "tags": [
+          "Time Trial"
+        ],
+        "summary": "Get time trial results for a user",
+        "x-auth": "JWT"
+      }
+    },
+    "/time-trial/leaderboard/{puzzleId}": {
+      "get": {
+        "tags": [
+          "Time Trial"
+        ],
+        "summary": "Time trial leaderboard for a puzzle",
+        "x-auth": "Public"
+      }
+    },
+    "/in-app-notifications": {
+      "get": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "List notifications for the authenticated user",
+        "x-auth": "JWT"
+      },
+      "post": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Create a notification",
+        "x-auth": "JWT"
+      }
+    },
+    "/in-app-notifications/unread-count": {
+      "get": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Get unread notification count",
+        "x-auth": "JWT"
+      }
+    },
+    "/in-app-notifications/system": {
+      "post": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Send a system-wide notification",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/in-app-notifications/read": {
+      "patch": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Mark a notification as read",
+        "x-auth": "JWT"
+      }
+    },
+    "/in-app-notifications/read-all": {
+      "patch": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Mark all notifications as read",
+        "x-auth": "JWT"
+      }
+    },
+    "/in-app-notifications/archive": {
+      "patch": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Archive a notification",
+        "x-auth": "JWT"
+      }
+    },
+    "/in-app-notifications/{id}": {
+      "delete": {
+        "tags": [
+          "In-App Notifications"
+        ],
+        "summary": "Delete a notification",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/codes": {
+      "post": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Generate a referral code",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/codes/my": {
+      "get": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Get the authenticated user's referral code",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/invites": {
+      "post": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Send a referral invite",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/stats": {
+      "get": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Get referral statistics",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/history": {
+      "get": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Get referral history",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/invites/{id}/complete": {
+      "post": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Mark a referral invite as completed (referrer only)",
+        "x-auth": "JWT"
+      }
+    },
+    "/referrals/register": {
+      "post": {
+        "tags": [
+          "Referrals"
+        ],
+        "summary": "Register the authenticated user against a pending referral invite",
+        "x-auth": "JWT"
+      }
+    },
+    "/challenges": {
+      "post": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Create a challenge",
+        "x-auth": "JWT + Admin"
+      },
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "List all challenges",
+        "x-auth": "JWT"
+      }
+    },
+    "/challenges/available": {
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "List challenges available to the user",
+        "x-auth": "JWT"
+      }
+    },
+    "/challenges/daily": {
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Get today's daily challenge",
+        "x-auth": "JWT"
+      }
+    },
+    "/challenges/weekly": {
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Get the current weekly challenge",
+        "x-auth": "JWT"
+      }
+    },
+    "/challenges/{id}": {
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Get a challenge by ID",
+        "x-auth": "JWT"
+      },
+      "patch": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Update a challenge",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Delete a challenge",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/challenges/{id}/stats": {
+      "get": {
+        "tags": [
+          "Challenges"
+        ],
+        "summary": "Get stats for a challenge",
+        "x-auth": "JWT"
+      }
+    },
+    "/feedback": {
+      "post": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Submit feedback",
+        "x-auth": "JWT"
+      }
+    },
+    "/feedback/admin": {
+      "get": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "List all feedback (admin view)",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/feedback/stats": {
+      "get": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Feedback statistics",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/feedback/target/{targetType}": {
+      "get": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Get feedback for a target type",
+        "x-auth": "JWT"
+      }
+    },
+    "/feedback/admin/{id}": {
+      "put": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Update a feedback entry",
+        "x-auth": "JWT + Admin"
+      },
+      "delete": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Delete a feedback entry",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/activity": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "Get the social activity feed (see Swagger for full schema)",
+        "x-auth": "JWT"
+      }
+    },
+    "/wallet/link": {
+      "post": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Link a Stellar wallet address",
+        "x-auth": "JWT"
+      }
+    },
+    "/wallet/verify-signature": {
+      "post": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Verify a wallet signature (POST)",
+        "x-auth": "JWT"
+      },
+      "get": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Verify a wallet signature (GET)",
+        "x-auth": "JWT"
+      }
+    },
+    "/admin/login": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin login",
+        "x-auth": "Public"
+      }
+    },
+    "/admin/profile": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get admin profile",
+        "x-auth": "JWT + Admin"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "Health Probes"
+        ],
+        "summary": "Liveness probe \u2014 returns `200` while the process is accepting requests",
+        "x-auth": "Public"
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "Health Probes"
+        ],
+        "summary": "Readiness probe \u2014 returns `200` only when required dependencies are reachable; `503` otherwise",
+        "x-auth": "Public"
+      }
+    }
+  }
+}
