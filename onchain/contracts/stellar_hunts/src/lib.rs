@@ -664,12 +664,16 @@ impl StellarHunts {
     }
 
     pub fn get_player_level_progress(env: Env, player: Address, level: Levels) -> LevelProgress {
-        let key = DataKey::PlayerLevelProgress(player, level.clone());
+        let key = DataKey::PlayerLevelProgress(player.clone(), level.clone());
         env.storage()
             .persistent()
             .get(&key)
             .unwrap_or(LevelProgress {
-                player: env.current_contract_address(),
+                // Issue #449: the default for a player with no stored record
+                // must carry the queried `player` identity, not the contract
+                // address, so callers can key caches and cross-check the
+                // response against the request.
+                player,
                 level,
                 last_question_index: 0,
                 is_completed: false,
