@@ -76,12 +76,22 @@ DATABASE_SYNC=true
 NODE_ENV=development
 
 # Stellar / Soroban
+# The schema default for `STELLAR_MODE` is **live**, so local development
+# opts in to `mock` explicitly. Omitting it in a deployment without Soroban
+# credentials fails at startup, which is the intended fail-closed behaviour.
 STELLAR_MODE=mock
+# testnet | pubnet (Stellar's public network is `pubnet`; `mainnet` is the
+# older name for the same network and is rejected).
 STELLAR_NETWORK=testnet
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 STELLAR_HUNTS_CONTRACT_ID=...
 STELLAR_HUNTS_NFT_CONTRACT_ID=...
 ```
+
+Every value in the block above is asserted against the real startup validation
+schema by `backend/src/config/config-validation.spec.ts`, including the
+commented-out ones in `backend/.env.example`, so the documented configuration
+cannot drift from what the application accepts.
 
 ### Development
 
