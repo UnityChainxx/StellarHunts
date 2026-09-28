@@ -45,8 +45,9 @@ export class HealthController {
     ];
 
     // Stellar RPC is only a hard dependency outside mock mode. In mock
-    // mode (STELLAR_MODE=mock, the default for local development) the
-    // check reports healthy so local/dev deployments still pass readiness.
+    // mode (STELLAR_MODE=mock, which local development sets explicitly —
+    // the schema default is `live`) the check reports healthy so
+    // local/dev deployments still pass readiness.
     if (this.stellar.isConfigured) {
       checks.push(() => this.stellar.pingCheck('stellar-rpc'));
     }
