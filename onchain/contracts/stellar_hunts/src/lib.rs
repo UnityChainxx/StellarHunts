@@ -65,6 +65,9 @@ pub enum DataKey {
     NftContract,
     QuestionCount,
     QuestionPerLevel,
+    /// Per-level question cap. When set for a level, overrides `QuestionPerLevel`
+    /// for that level only. Falls back to `QuestionPerLevel` when unset.
+    QuestionCapByLevel(Levels),
     Question(u64),
     RetiredQuestion(u64),
     QuestionsByLevel(Levels, u32),
@@ -116,6 +119,12 @@ pub enum Error {
     ArithmeticOverflow = 12,
     ContractPaused = 13,
     SchemaVersionMismatch = 14,
+    /// Returned when an admin tries to set a per-level cap below the number
+    /// of questions already indexed for that level.
+    CapBelowExistingIndex = 15,
+    /// Returned when an admin tries to set a per-level cap of zero (which
+    /// would make the level permanently unreachable).
+    CapWouldMakeLevelUnreachable = 16,
 }
 
 // ---------------------------------------------------------------------
@@ -215,11 +224,7 @@ impl StellarHunts {
             .persistent()
             .set(&DataKey::Question(question_id), &q);
 
-        let per_level: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::QuestionPerLevel)
-            .unwrap_or(5u32);
+        let per_level: u32 = get_cap_for_level(&env, &level);
         let idx = index_count(&env, &level);
 
         if idx >= per_level {
@@ -264,11 +269,7 @@ impl StellarHunts {
             .persistent()
             .has(&DataKey::RetiredQuestion(question_id));
         if old_level != level && !is_retired {
-            let per_level: u32 = env
-                .storage()
-                .instance()
-                .get(&DataKey::QuestionPerLevel)
-                .unwrap_or(0u32);
+            let per_level: u32 = get_cap_for_level(&env, &level);
             if per_level == 0 {
                 panic_with_error!(&env, Error::QuestionPerLevelLimit);
             }
@@ -313,6 +314,39 @@ impl StellarHunts {
         env.storage()
             .instance()
             .set(&DataKey::QuestionPerLevel, &amount);
+    }
+
+    /// Set a question cap for a specific level (issue #467).
+    ///
+    /// The cap must be ≥ the current `QuestionPerLevelIndex` for that level
+    /// (i.e. it cannot be set below the number of questions already indexed).
+    /// A cap of zero would make the level permanently unreachable and is rejected.
+    ///
+    /// After setting, completion for players in this level is measured against
+    /// this cap, not the global `QuestionPerLevel`. Levels with no per-level cap
+    /// fall back to the global value (default 5).
+    pub fn set_question_cap_for_level(env: Env, level: Levels, cap: u32) {
+        require_admin(&env);
+        if cap == 0 {
+            panic_with_error!(&env, Error::CapWouldMakeLevelUnreachable);
+        }
+        // Reject caps below the existing question index so the level remains
+        // completable for players already in progress.
+        let existing_index = index_count(&env, &level);
+        if cap < existing_index {
+            panic_with_error!(&env, Error::CapBelowExistingIndex);
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::QuestionCapByLevel(level), &cap);
+    }
+
+    /// Returns the effective question cap for `level`.
+    ///
+    /// Returns the per-level cap if one has been set, otherwise the global
+    /// `QuestionPerLevel` value (default 5 when neither is configured).
+    pub fn get_question_cap_for_level(env: Env, level: Levels) -> u32 {
+        get_cap_for_level(&env, &level)
     }
 
     pub fn retire_question(env: Env, question_id: u64) {
@@ -430,12 +464,11 @@ impl StellarHunts {
                 .last_question_index
                 .checked_add(1)
                 .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-            let active_questions: u32 = env
-                .storage()
-                .persistent()
-                .get(&DataKey::QuestionPerLevelIndex(question.level.clone()))
-                .unwrap_or(0u32);
-            if lp.last_question_index >= active_questions {
+            // Completion is determined by the level-specific cap so that each
+            // level can require a different number of correct answers. Falls back
+            // to the global cap (issue #467).
+            let level_cap: u32 = get_cap_for_level(&env, &question.level);
+            if lp.last_question_index >= level_cap {
                 lp.is_completed = true;
                 let next = question.level.next();
                 let pp = PlayerProgress {
@@ -841,6 +874,28 @@ fn require_admin(env: &Env) {
 // 5. Appending increments `N` and writes at index `N_old`.
 // 6. Removing by ID shifts all subsequent entries down by 1 to maintain contiguous indices `0..N-1`,
 //    removes slot `N-1`, and decrements `N`.
+
+/// Returns the effective question cap for `level`.
+///
+/// If a per-level cap has been set via `set_question_cap_for_level` it is
+/// returned. Otherwise the global `QuestionPerLevel` value is used, defaulting
+/// to 5 when neither has been configured. This matches the existing
+/// `unwrap_or(5u32)` behaviour in `add_question`.
+pub fn get_cap_for_level(env: &Env, level: &Levels) -> u32 {
+    // Per-level cap takes precedence.
+    if let Some(cap) = env
+        .storage()
+        .instance()
+        .get::<DataKey, u32>(&DataKey::QuestionCapByLevel(level.clone()))
+    {
+        return cap;
+    }
+    // Fall back to the global cap (default 5 if unset).
+    env.storage()
+        .instance()
+        .get(&DataKey::QuestionPerLevel)
+        .unwrap_or(5u32)
+}
 
 fn index_count(env: &Env, level: &Levels) -> u32 {
     env.storage()

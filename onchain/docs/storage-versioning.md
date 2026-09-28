@@ -87,6 +87,11 @@ part of the serialization. Two safe ways to evolve a stored struct:
   adding one (or switching to `PlayerProgressV2`/`LevelProgressV2` keys)
   requires a schema-version bump and a migration that seeds the new field
   from existing state.
+- `QuestionCapByLevel(Levels)` (added in issue #467) — stores the per-level
+  question cap for a `Levels` variant. Absence means the global
+  `QuestionPerLevel` value (default 5) governs that level. Setting this key
+  overrides the global cap for that level only. The key is stored in instance
+  storage alongside `QuestionPerLevel`.
 
 ### `stellar_hunts_nft`
 - `CURRENT_SCHEMA_VERSION = 1`, written to `NftDataKey::SchemaVersion` at

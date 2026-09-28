@@ -1374,3 +1374,195 @@ fn test_property_index_contains_each_question_exactly_once_after_interleaved_ops
     state[4].1 = Levels::Easy;
     assert_index_invariants(&state);
 }
+
+// ── Per-level question cap tests (issue #467) ─────────────────────────────
+
+/// A level with no per-level cap behaves exactly as before: it uses the global
+/// `QuestionPerLevel` value (or the default of 5 when neither is set).
+#[test]
+fn test_level_without_cap_falls_back_to_global() {
+    let env = Env::default();
+    let (admin, _, client) = init_with_admin(&env);
+
+    // Set a global cap of 2.
+    env.mock_all_auths();
+    client.set_question_per_level(&2u32);
+
+    // Easy has no per-level cap, so it should use the global cap of 2.
+    assert_eq!(client.get_question_cap_for_level(&Levels::Easy), 2u32);
+    // Master also has no per-level cap.
+    assert_eq!(client.get_question_cap_for_level(&Levels::Master), 2u32);
+
+    let _ = admin;
+}
+
+/// Each of the four levels can have a distinct cap.
+#[test]
+fn test_per_level_caps_are_independent() {
+    let env = Env::default();
+    let (admin, _, client) = init_with_admin(&env);
+
+    env.mock_all_auths();
+    client.set_question_cap_for_level(&Levels::Easy, &3u32);
+    client.set_question_cap_for_level(&Levels::Medium, &5u32);
+    client.set_question_cap_for_level(&Levels::Hard, &7u32);
+    client.set_question_cap_for_level(&Levels::Master, &10u32);
+
+    assert_eq!(client.get_question_cap_for_level(&Levels::Easy), 3u32);
+    assert_eq!(client.get_question_cap_for_level(&Levels::Medium), 5u32);
+    assert_eq!(client.get_question_cap_for_level(&Levels::Hard), 7u32);
+    assert_eq!(client.get_question_cap_for_level(&Levels::Master), 10u32);
+
+    let _ = admin;
+}
+
+/// Setting a cap of zero is rejected with `CapWouldMakeLevelUnreachable`.
+#[test]
+#[should_panic]
+fn test_zero_cap_is_rejected() {
+    let env = Env::default();
+    let (_, _, client) = init_with_admin(&env);
+    env.mock_all_auths();
+    client.set_question_cap_for_level(&Levels::Easy, &0u32);
+}
+
+/// Setting a cap below the existing question index is rejected with
+/// `CapBelowExistingIndex`.
+#[test]
+#[should_panic]
+fn test_cap_below_existing_index_is_rejected() {
+    let env = Env::default();
+    let (_, _, client) = init_with_admin(&env);
+    env.mock_all_auths();
+
+    // Add 2 questions to Easy (cap is 5 by default).
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    );
+
+    // 2 questions indexed; trying to set cap to 1 should be rejected.
+    client.set_question_cap_for_level(&Levels::Easy, &1u32);
+}
+
+/// Setting a cap exactly equal to the existing question index is accepted.
+#[test]
+fn test_cap_equal_to_existing_index_is_accepted() {
+    let env = Env::default();
+    let (_, _, client) = init_with_admin(&env);
+    env.mock_all_auths();
+
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q1"),
+        &b(&env, "A1"),
+        &b(&env, "H1"),
+    );
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Q2"),
+        &b(&env, "A2"),
+        &b(&env, "H2"),
+    );
+
+    // Setting cap = 2 (same as existing index) is valid.
+    client.set_question_cap_for_level(&Levels::Easy, &2u32);
+    assert_eq!(client.get_question_cap_for_level(&Levels::Easy), 2u32);
+}
+
+/// Completion uses the per-level cap. Two players: one in a level with cap 1,
+/// one in a level with cap 2. Completion happens at the correct threshold for
+/// each level.
+#[test]
+fn test_completion_uses_per_level_cap() {
+    let env = Env::default();
+    let (_, _, client) = init_with_admin(&env);
+    env.mock_all_auths();
+
+    // Set Easy cap to 1, Medium cap to 2.
+    client.set_question_cap_for_level(&Levels::Easy, &1u32);
+    client.set_question_cap_for_level(&Levels::Medium, &2u32);
+
+    // Add 1 question to Easy, 2 to Medium.
+    let answer_easy = b(&env, "easy_answer");
+    client.add_question(
+        &Levels::Easy,
+        &b(&env, "Easy Q1"),
+        &answer_easy,
+        &b(&env, "H1"),
+    );
+
+    let answer_med1 = b(&env, "med_answer_1");
+    let answer_med2 = b(&env, "med_answer_2");
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Med Q1"),
+        &answer_med1,
+        &b(&env, "H2"),
+    );
+    client.add_question(
+        &Levels::Medium,
+        &b(&env, "Med Q2"),
+        &answer_med2,
+        &b(&env, "H3"),
+    );
+
+    // Player A answers Easy Q1 — should complete Easy (cap = 1).
+    let player_a = Address::generate(&env);
+    env.ledger().set_sequence_number(1);
+    let correct = client.submit_answer(&player_a, &1u64, &answer_easy);
+    assert!(correct, "Easy Q1 should be correct");
+
+    // Player A should now be at Medium.
+    let level_a = client.get_player_level(&player_a);
+    assert_eq!(level_a, Levels::Medium, "player A should advance to Medium after cap-1 Easy");
+
+    // Player B answers Medium Q1 — should NOT complete (cap = 2, only 1 answered).
+    let player_b = Address::generate(&env);
+    env.ledger().set_sequence_number(2);
+    let correct_b1 = client.submit_answer(&player_b, &2u64, &answer_med1);
+    assert!(correct_b1);
+    // Player B is still in Medium.
+    let level_b_after_1 = client.get_player_level(&player_b);
+    assert_eq!(
+        level_b_after_1,
+        Levels::Medium,
+        "player B should still be in Medium after 1/2 questions"
+    );
+
+    // Player B answers Medium Q2 — should complete Medium (cap = 2).
+    env.ledger().set_sequence_number(3);
+    let correct_b2 = client.submit_answer(&player_b, &3u64, &answer_med2);
+    assert!(correct_b2);
+    let level_b_after_2 = client.get_player_level(&player_b);
+    assert_eq!(
+        level_b_after_2,
+        Levels::Hard,
+        "player B should advance to Hard after cap-2 Medium"
+    );
+}
+
+/// A per-level cap overrides the global cap for that level only.
+#[test]
+fn test_per_level_cap_overrides_global_for_that_level() {
+    let env = Env::default();
+    let (_, _, client) = init_with_admin(&env);
+    env.mock_all_auths();
+
+    // Global cap = 3.
+    client.set_question_per_level(&3u32);
+    // Easy cap = 1 (overrides global for Easy only).
+    client.set_question_cap_for_level(&Levels::Easy, &1u32);
+
+    assert_eq!(client.get_question_cap_for_level(&Levels::Easy), 1u32);
+    // Medium has no per-level cap, falls back to global.
+    assert_eq!(client.get_question_cap_for_level(&Levels::Medium), 3u32);
+}
