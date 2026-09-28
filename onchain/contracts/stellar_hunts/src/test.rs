@@ -288,7 +288,7 @@ fn test_submit_answer_requires_next_indexed_question() {
         client.submit_answer(&player, &2u64, &b(&env, "A2"));
     }));
     assert!(out_of_order.is_err());
-    assert!(panic_text(&out_of_order).contains("Error(Contract, #14)"));
+    assert!(panic_text(&out_of_order).contains("Error(Contract, #16)"));
     assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 0);
 
     assert!(client.submit_answer(&player, &1u64, &b(&env, "A1")));
@@ -297,7 +297,7 @@ fn test_submit_answer_requires_next_indexed_question() {
         client.submit_answer(&player, &1u64, &b(&env, "A1"));
     }));
     assert!(duplicate.is_err());
-    assert!(panic_text(&duplicate).contains("Error(Contract, #14)"));
+    assert!(panic_text(&duplicate).contains("Error(Contract, #16)"));
     assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 1);
     assert_eq!(client.get_player_level(&player), level);
 
@@ -702,9 +702,9 @@ fn test_retire_question_sets_flag() {
 }
 
 /// Submitting to a retired question must fail with the dedicated
-/// `QuestionRetired` (#14) error rather than grading the answer.
+/// `QuestionRetired` (#15) error rather than grading the answer.
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
+#[should_panic(expected = "Error(Contract, #15)")]
 fn test_retired_question_cannot_be_answered() {
     let env = Env::default();
     env.ledger().set_sequence_number(100_000);
@@ -758,7 +758,7 @@ fn test_retired_answer_does_not_change_progress_or_complete_level() {
 
 /// `request_hint` must refuse retired questions instead of returning the hint.
 #[test]
-#[should_panic(expected = "Error(Contract, #14)")]
+#[should_panic(expected = "Error(Contract, #15)")]
 fn test_retired_question_hint_denied() {
     let env = Env::default();
     env.ledger().set_sequence_number(100_000);
@@ -1373,4 +1373,299 @@ fn test_property_index_contains_each_question_exactly_once_after_interleaved_ops
     );
     state[4].1 = Levels::Easy;
     assert_index_invariants(&state);
+}
+
+// ---------------------------------------------------------------------
+// Invariant tests for interleaved admin mutations (issue #468)
+// ---------------------------------------------------------------------
+//
+// The index invariant is formally stated in `lib.rs` (issue #464):
+//   1. `QuestionPerLevelIndex(level)` stores the count `N` of live questions.
+//   2. `QuestionsByLevel(level, i)` for `i in 0..N` holds the i-th live id.
+//   3. Each live id appears in the level's index exactly once.
+//   4. Slots at index `>= N` are cleared.
+//
+// Unlike the property test above, the harness here labels every failure
+// with the admin operation and step number whose application is suspected
+// of breaking the invariant, and the sequence includes `retire_question`
+// and enumeration through `get_question_in_level`.
+
+/// One recorded admin operation, used to label invariant failures.
+#[derive(Clone)]
+enum AdminOp {
+    AddQuestion(u64, Levels),
+    MoveQuestion(u64, Levels, Levels),
+    RetireQuestion(u64),
+    SetQuestionPerLevel(u32),
+}
+
+impl AdminOp {
+    fn describe(&self) -> String {
+        match self {
+            AdminOp::AddQuestion(id, lvl) => format!("add_question({id}, {lvl:?})"),
+            AdminOp::MoveQuestion(id, from, to) => {
+                format!("update_question({id}, {from:?} -> {to:?})")
+            }
+            AdminOp::RetireQuestion(id) => format!("retire_question({id})"),
+            AdminOp::SetQuestionPerLevel(n) => format!("set_question_per_level({n})"),
+        }
+    }
+}
+
+/// Asserts the on-chain index invariant against the expected set of live
+/// `(question_id, level)` pairs. Every panic message names `op` and the
+/// step number, so a failure points at the operation that broke it.
+fn assert_index_invariant(
+    env: &Env,
+    contract_id: &Address,
+    live: &[(u64, Levels)],
+    op: &AdminOp,
+    step: usize,
+) {
+    let op_desc = op.describe();
+    let levels = [
+        Levels::Easy,
+        Levels::Medium,
+        Levels::Hard,
+        Levels::Master,
+    ];
+
+    env.as_contract(contract_id, || {
+        let mut seen_across_levels: std::vec::Vec<u64> = std::vec::Vec::new();
+
+        for lvl in levels {
+            let expected: std::vec::Vec<u64> = live
+                .iter()
+                .filter(|(_, l)| *l == lvl)
+                .map(|(id, _)| *id)
+                .collect();
+
+            // Criterion 2: the stored count equals the number of live entries.
+            let count: u32 = env
+                .storage()
+                .persistent()
+                .get(&crate::DataKey::QuestionPerLevelIndex(lvl.clone()))
+                .unwrap_or(0u32);
+            assert_eq!(
+                count as usize,
+                expected.len(),
+                "after step {step} ({op_desc}): QuestionPerLevelIndex({lvl:?}) is {count}, expected {} live entries",
+                expected.len(),
+            );
+
+            for i in 0..count {
+                let qid: u64 = env
+                    .storage()
+                    .persistent()
+                    .get(&crate::DataKey::QuestionsByLevel(lvl.clone(), i))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "after step {step} ({op_desc}): QuestionsByLevel({lvl:?}, {i}) is missing but index count is {count}"
+                        )
+                    });
+
+                // Criteria 1 and 3: each live id appears at most once across
+                // all level indices, and only in its own level.
+                assert!(
+                    !seen_across_levels.contains(&qid),
+                    "after step {step} ({op_desc}): question {qid} appears more than once across the level indices"
+                );
+                assert!(
+                    expected.contains(&qid),
+                    "after step {step} ({op_desc}): question {qid} found in level {lvl:?} index but is not live there"
+                );
+
+                seen_across_levels.push(qid);
+            }
+
+            // Criterion 4: the first slot past the live window is cleared.
+            assert!(
+                !env.storage()
+                    .persistent()
+                    .has(&crate::DataKey::QuestionsByLevel(lvl.clone(), count)),
+                "after step {step} ({op_desc}): trailing slot QuestionsByLevel({lvl:?}, {count}) is still populated"
+            );
+        }
+
+        // Every live id is reachable through the indices.
+        for (id, lvl) in live {
+            assert!(
+                seen_across_levels.contains(id),
+                "after step {step} ({op_desc}): live question {id} of level {lvl:?} is missing from all level indices"
+            );
+        }
+    });
+}
+
+fn add_named_question(client: &StellarHuntsClient, env: &Env, lvl: &Levels, text: &str) {
+    client.add_question(lvl, &b(env, text), &b(env, "A"), &b(env, "H"));
+}
+
+#[test]
+fn test_index_invariant_holds_after_each_interleaved_admin_operation() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    let mut step = 0usize;
+    let mut check = |live: &[(u64, Levels)], op: &AdminOp| {
+        step += 1;
+        assert_index_invariant(&env, &contract_id, live, op, step);
+    };
+
+    let mut live: std::vec::Vec<(u64, Levels)> = std::vec::Vec::new();
+
+    client.set_question_per_level(&4u32);
+    check(&live, &AdminOp::SetQuestionPerLevel(4));
+
+    // Adds across three levels, checking the invariant after each add.
+    add_named_question(&client, &env, &Levels::Easy, "Q1");
+    live.push((1u64, Levels::Easy));
+    check(&live, &AdminOp::AddQuestion(1, Levels::Easy));
+
+    add_named_question(&client, &env, &Levels::Medium, "Q2");
+    live.push((2u64, Levels::Medium));
+    check(&live, &AdminOp::AddQuestion(2, Levels::Medium));
+
+    add_named_question(&client, &env, &Levels::Easy, "Q3");
+    live.push((3u64, Levels::Easy));
+    check(&live, &AdminOp::AddQuestion(3, Levels::Easy));
+
+    add_named_question(&client, &env, &Levels::Hard, "Q4");
+    live.push((4u64, Levels::Hard));
+    check(&live, &AdminOp::AddQuestion(4, Levels::Hard));
+
+    // Move Q3 from Easy to Medium.
+    client.update_question(
+        &3u64,
+        &b(&env, "Q3-moved"),
+        &b(&env, "A3"),
+        &Levels::Medium,
+        &b(&env, "H3"),
+    );
+    live.iter_mut()
+        .find(|(id, _)| *id == 3)
+        .unwrap()
+        .1 = Levels::Medium;
+    check(&live, &AdminOp::MoveQuestion(3, Levels::Easy, Levels::Medium));
+
+    // Criterion: a move is followed by an enumeration through
+    // `get_question_in_level`, and every level enumerates exactly the
+    // live questions in their index order.
+    assert_eq!(client.get_question_in_level(&Levels::Easy, &0u32), b(&env, "Q1"));
+    assert_eq!(client.get_question_in_level(&Levels::Medium, &0u32), b(&env, "Q2"));
+    assert_eq!(
+        client.get_question_in_level(&Levels::Medium, &1u32),
+        b(&env, "Q3-moved")
+    );
+    assert_eq!(client.get_question_in_level(&Levels::Hard, &0u32), b(&env, "Q4"));
+
+    // Retire Q2: the first Medium slot compacts and Q3-moved shifts down.
+    client.retire_question(&2u64);
+    live.retain(|(id, _)| *id != 2);
+    check(&live, &AdminOp::RetireQuestion(2));
+    assert_eq!(
+        client.get_question_in_level(&Levels::Medium, &0u32),
+        b(&env, "Q3-moved")
+    );
+
+    // Move Q4 from Hard to Easy.
+    client.update_question(
+        &4u64,
+        &b(&env, "Q4-moved"),
+        &b(&env, "A4"),
+        &Levels::Easy,
+        &b(&env, "H4"),
+    );
+    live.iter_mut()
+        .find(|(id, _)| *id == 4)
+        .unwrap()
+        .1 = Levels::Easy;
+    check(&live, &AdminOp::MoveQuestion(4, Levels::Hard, Levels::Easy));
+
+    // `set_question_per_level` is part of the interleaved surface. Lowering
+    // it below current Easy occupancy must not itself mutate any index.
+    client.set_question_per_level(&2u32);
+    check(&live, &AdminOp::SetQuestionPerLevel(2));
+
+    // Retire Q1: Easy drops to a single live question.
+    client.retire_question(&1u64);
+    live.retain(|(id, _)| *id != 1);
+    check(&live, &AdminOp::RetireQuestion(1));
+
+    // Final enumeration: walk each level's full live window through the
+    // public read path.
+    for (lvl, texts) in [
+        (Levels::Easy, std::vec!["Q4-moved"]),
+        (Levels::Medium, std::vec!["Q3-moved"]),
+        (Levels::Hard, std::vec![]),
+    ] {
+        for (i, text) in texts.iter().enumerate() {
+            assert_eq!(
+                client.get_question_in_level(&lvl, &(i as u32)),
+                b(&env, text),
+                "enumeration of {lvl:?} at index {i} diverged after the interleaved sequence"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_index_invariant_when_a_level_is_drained_by_retirements() {
+    let env = Env::default();
+    let (_admin, contract_id, client) = init_with_admin(&env);
+
+    let mut step = 0usize;
+    let mut check = |live: &[(u64, Levels)], op: &AdminOp| {
+        step += 1;
+        assert_index_invariant(&env, &contract_id, live, op, step);
+    };
+
+    let mut live: std::vec::Vec<(u64, Levels)> = std::vec::Vec::new();
+
+    client.set_question_per_level(&3u32);
+    check(&live, &AdminOp::SetQuestionPerLevel(3));
+
+    add_named_question(&client, &env, &Levels::Easy, "Q1");
+    live.push((1u64, Levels::Easy));
+    check(&live, &AdminOp::AddQuestion(1, Levels::Easy));
+
+    add_named_question(&client, &env, &Levels::Easy, "Q2");
+    live.push((2u64, Levels::Easy));
+    check(&live, &AdminOp::AddQuestion(2, Levels::Easy));
+
+    add_named_question(&client, &env, &Levels::Medium, "Q3");
+    live.push((3u64, Levels::Medium));
+    check(&live, &AdminOp::AddQuestion(3, Levels::Medium));
+
+    // Drain Easy entirely, one retirement at a time.
+    client.retire_question(&1u64);
+    live.retain(|(id, _)| *id != 1);
+    check(&live, &AdminOp::RetireQuestion(1));
+
+    client.retire_question(&2u64);
+    live.retain(|(id, _)| *id != 2);
+    check(&live, &AdminOp::RetireQuestion(2));
+
+    // Retiring an unknown id must not disturb the indices.
+    let unknown = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.retire_question(&999u64);
+    }));
+    assert!(unknown.is_err(), "retiring an unknown question must fail");
+    check(&live, &AdminOp::RetireQuestion(999));
+
+    env.as_contract(&contract_id, || {
+        let easy_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(Levels::Easy))
+            .unwrap_or(0u32);
+        assert_eq!(
+            easy_count, 0,
+            "draining a level must leave its index count at zero"
+        );
+    });
+
+    // The remaining Medium question is untouched and still enumerates.
+    assert_eq!(client.get_question_in_level(&Levels::Medium, &0u32), b(&env, "Q3"));
+    check(&live, &AdminOp::RetireQuestion(999));
 }

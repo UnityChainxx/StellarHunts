@@ -116,6 +116,12 @@ pub enum Error {
     ArithmeticOverflow = 12,
     ContractPaused = 13,
     SchemaVersionMismatch = 14,
+    // Appended for the retirement-semantics guard (#447): submitting or
+    // requesting a hint for a retired question, and submitting a question
+    // other than the one the player's level cursor expects. New variants
+    // go at the end so existing discriminants stay stable.
+    QuestionRetired = 15,
+    WrongQuestion = 16,
 }
 
 // ---------------------------------------------------------------------
