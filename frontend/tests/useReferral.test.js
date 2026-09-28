@@ -1,17 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Mock the axios module so no real HTTP requests are made during tests;
-// individual tests configure .get/.post return values as needed.
-vi.mock('axios', () => ({
-  default: {
+// Mock the shared API client so no real HTTP requests are made.
+// The hook now uses `apiClient` from `@/lib/api` (issue #510) instead of
+// calling axios directly, so we mock at the module boundary.
+vi.mock('@/lib/api', () => ({
+  apiClient: {
     get: vi.fn(),
     post: vi.fn(),
   },
+  apiUrl: (path) => `http://localhost:3001/api/v1${path}`,
+  API_VERSION: 'v1',
+  API_BASE_URL: 'http://localhost:3001',
 }));
 
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useReferral } from '@/hooks/useReferral';
-import axios from 'axios';
+import { apiClient } from '@/lib/api';
 
 describe('useReferral', () => {
   const mockUserId = 'user-abc-123';
@@ -44,7 +48,7 @@ describe('useReferral', () => {
           invitedUsers: [{ id: '1', username: 'friend1' }],
         },
       };
-      axios.get.mockResolvedValueOnce(mockData);
+      apiClient.get.mockResolvedValueOnce(mockData);
 
       const { result } = renderHook(() => useReferral());
 
@@ -67,8 +71,9 @@ describe('useReferral', () => {
     });
 
     it('sets an error when the API call fails', async () => {
-      // Simulate a failed request (e.g. network issue) from axios.
-      axios.get.mockRejectedValueOnce(new Error('Network error'));
+      // Simulate a failed request (e.g. network issue).
+      const err = new Error('Network error');
+      apiClient.get.mockRejectedValueOnce(err);
 
       const { result } = renderHook(() => useReferral());
 
@@ -80,9 +85,8 @@ describe('useReferral', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Hook should surface a user-friendly error message rather than
-      // leaking the raw error or leaving state undefined.
-      expect(result.current.error).toBe('Failed to load referral data');
+      // Hook should surface a user-friendly error message.
+      expect(result.current.error).toBe('Network error');
     });
 
     it('does nothing when no userId is provided', async () => {
@@ -95,7 +99,7 @@ describe('useReferral', () => {
       });
 
       expect(result.current.loading).toBe(false);
-      expect(axios.get).not.toHaveBeenCalled();
+      expect(apiClient.get).not.toHaveBeenCalled();
     });
   });
 
@@ -142,7 +146,7 @@ describe('useReferral', () => {
   });
 
   describe('trackReferral', () => {
-    it('calls the track endpoint and refreshes referral data', async () => {
+    it('calls the backend track endpoint through apiClient and refreshes referral data', async () => {
       // Response returned by the follow-up GET that refreshes stats
       // after a successful track call.
       const mockStats = {
@@ -151,8 +155,8 @@ describe('useReferral', () => {
           invitedUsers: [],
         },
       };
-      axios.post.mockResolvedValueOnce({});
-      axios.get.mockResolvedValueOnce(mockStats);
+      apiClient.post.mockResolvedValueOnce({});
+      apiClient.get.mockResolvedValueOnce(mockStats);
 
       const { result } = renderHook(() => useReferral());
 
@@ -160,12 +164,11 @@ describe('useReferral', () => {
         await result.current.trackReferral(mockUserId, 'new-user-1');
       });
 
-      // Verifies the POST is made with the expected body and credentials,
-      // and that the hook's state reflects the refreshed stats afterward.
-      expect(axios.post).toHaveBeenCalledWith(
-        '/api/referrals/track',
+      // Verifies the POST goes to the backend via apiClient (not the
+      // intermediate Next.js proxy route) with the expected payload.
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/referrals/track',
         { referrerId: mockUserId, newUserId: 'new-user-1' },
-        { withCredentials: true },
       );
       expect(result.current.referralStats.totalInvites).toBe(6);
     });

@@ -1,56 +1,40 @@
 import { NextResponse } from 'next/server';
+import axios from 'axios';
+import { apiUrl } from '@/lib/api';
 
+/**
+ * Referral stats proxy route.
+ *
+ * Fetches referral statistics and invited-user list for `userId` from the
+ * backend referral service (`GET /api/v1/referrals/:userId`) and returns the
+ * result to the caller.
+ *
+ * Authentication is forwarded so the backend can enforce ownership. If the
+ * backend returns an error the status code is preserved so the UI can render
+ * a distinct error state.
+ *
+ * Note: `useReferral.js` calls the backend directly via `apiClient`, so this
+ * route is now only used by legacy callers. New code should call the backend
+ * through `apiClient.get("/referrals/:id")` as documented in
+ * `docs/api-conventions.md` (issue #510).
+ */
 export async function GET(request, { params }) {
   const { userId } = params;
 
-  try {
-    // In a real implementation, this would fetch data from your backend
-    // For now, we'll return mock data
-    const mockData = {
-      stats: {
-        totalInvites: 8,
-        activeUsers: 5,
-        totalRewards: 3,
-        totalXPEarned: 250,
-        nextMilestone: "10 invites for Legendary NFT"
-      },
-      invitedUsers: [
-        {
-          id: 1,
-          username: "crypto_explorer",
-          avatar: "/placeholder.svg",
-          joinedDate: "2024-01-15",
-          status: "active",
-          rewardEarned: "Rare NFT",
-          xpBonus: 50
-        },
-        {
-          id: 2,
-          username: "blockchain_master",
-          avatar: "/placeholder.svg",
-          joinedDate: "2024-01-20",
-          status: "active",
-          rewardEarned: "Epic NFT",
-          xpBonus: 100
-        },
-        {
-          id: 3,
-          username: "puzzle_solver",
-          avatar: "/placeholder.svg",
-          joinedDate: "2024-01-25",
-          status: "pending",
-          rewardEarned: null,
-          xpBonus: 0
-        }
-      ]
-    };
+  const authHeader = request.headers.get('authorization');
+  const cookieHeader = request.headers.get('cookie');
 
-    return NextResponse.json(mockData);
+  try {
+    const backendUrl = apiUrl(`/referrals/${userId}`);
+    const headers = {};
+    if (authHeader) headers['authorization'] = authHeader;
+    if (cookieHeader) headers['cookie'] = cookieHeader;
+
+    const response = await axios.get(backendUrl, { headers });
+    return NextResponse.json(response.data, { status: response.status });
   } catch (error) {
-    console.error('Error fetching referral data:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch referral data' },
-      { status: 500 }
-    );
+    const status = error.response?.status || 500;
+    const data = error.response?.data || { error: 'Failed to fetch referral data' };
+    return NextResponse.json(data, { status });
   }
-} 
+}

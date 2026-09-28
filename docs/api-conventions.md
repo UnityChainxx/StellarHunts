@@ -45,6 +45,11 @@ Every browser-to-backend request uses the same URL shape:
 - `backend/src/api-prefix.ts` — the single source of truth for the global
   prefix. `backend/src/main.ts` and `backend/test/api-prefix.e2e-spec.ts`
   both import it, so the runtime and the test cannot disagree.
+- `backend/test/api-contract.e2e-spec.ts` — shared contract test (issue #568):
+  boots a minimal Nest application with the production prefix configuration and
+  asserts the prefix, the `/docs` exclusion, and the error-envelope shape
+  (`{ statusCode, message }`) that `frontend/lib/api.js` `normalizeError`
+  relies on. Run it with `cd backend && npm run test:e2e -- api-contract`.
 - `frontend/tests/apiRoutes.test.js` — asserts every frontend call site
   (stores, services) builds `/api/v1` routes through `apiUrl()`.
 - `backend/test/api-prefix.e2e-spec.ts` — boots a minimal Nest app with the
