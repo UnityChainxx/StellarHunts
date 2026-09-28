@@ -53,12 +53,10 @@ export class AuthController {
     description: 'Bad request - validation failed',
   })
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto | GenericAuthMessageDto> {
-    try {
-      return await this.authService.register(registerDto);
-    } catch (error) {
-      console.error('Registration controller error:', error);
-      throw error;
-    }
+    // No local logging: AuthService is the single place that classifies an
+    // auth failure and writes one correlated entry for it. Logging here as
+    // well produced two lines per failure.
+    return this.authService.register(registerDto);
   }
 
   @Post('login')
@@ -87,12 +85,8 @@ export class AuthController {
     description: 'Unauthorized - invalid credentials',
   })
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    try {
-      return await this.authService.login(loginDto);
-    } catch (error) {
-      console.error('Login controller error:', error);
-      throw error;
-    }
+    // See register(): the service owns auth-failure logging.
+    return this.authService.login(loginDto);
   }
 
   @Get('profile')
