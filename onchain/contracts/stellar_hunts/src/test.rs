@@ -1045,6 +1045,38 @@ fn test_player_progress_v2_default_for_unknown_player() {
     assert_eq!(lp.attempts, 0);
 }
 
+/// For a player with no stored record, `get_player_level_progress` must
+/// return a default whose `player` field is the queried `player`, never the
+/// contract's own address (issue #449).
+#[test]
+fn test_default_level_progress_uses_queried_player() {
+    let env = Env::default();
+    let admin = new_admin(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    client.init(&admin);
+
+    // A player that has never interacted with the contract, so no
+    // `PlayerLevelProgress` record exists for them.
+    let player = user(&env);
+    let level = crate::Levels::Hard;
+
+    let got = client.get_player_level_progress(&player, &level);
+
+    assert_eq!(got.player, player);
+    assert_ne!(
+        got.player, contract_id,
+        "default progress must not carry the contract address"
+    );
+    assert_eq!(got.level, level);
+    assert_eq!(got.last_question_index, 0);
+    assert!(!got.is_completed);
+    assert_eq!(got.attempts, 0);
+    assert!(!got.nft_minted);
+    assert_eq!(got.last_attempt_ledger, 0);
+}
+
 /// The numeric discriminants of `Levels` are persisted in storage and in
 /// event payloads, so they must never be reordered or renumbered.
 #[test]

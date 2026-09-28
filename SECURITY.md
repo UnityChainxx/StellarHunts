@@ -5,7 +5,7 @@ Security checks run in GitHub Actions for every pull request and push to `main`:
 - **CodeQL** analyzes JavaScript and TypeScript for common vulnerabilities.
 - **Gitleaks** scans the repository history checked out by the workflow for accidentally committed secrets.
 - **Dependency review** rejects pull requests that introduce high- or critical-severity vulnerable dependencies.
-- **npm audit** runs at the `high` threshold in the build workflow for the frontend and backend.
+- **npm audit** runs in the build workflow: `--audit-level=critical` is a blocking gate, while `--audit-level=high` is run for reporting.
 
 Run the dependency checks locally with:
 
@@ -17,7 +17,7 @@ If an advisory cannot yet be removed because its upstream package has no compati
 
 ## Dependency audit status
 
-The npm audit gate is set to the `high` threshold (`npm audit --audit-level=high`).
+The CI dependency audit enforces a blocking gate on critical vulnerabilities (`npm audit --audit-level=critical`). The high-severity audit step (`npm audit --audit-level=high`) is executed with `continue-on-error: true` for the frontend workspace due to known residual Next.js toolchain advisories documented below.
 
 ### Backend — clean
 

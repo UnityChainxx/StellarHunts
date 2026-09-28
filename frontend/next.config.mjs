@@ -18,6 +18,8 @@ const nextConfig = {
     })),
   },
   webpack: (config) => {
+    // Module bundler alias resolution: maps '@' and '@/' to rootDir during 'next build' and 'next dev'.
+    // Complements IDE/compiler path definitions in tsconfig.json and jsconfig.json.
     config.resolve.alias['@'] = rootDir;
     config.resolve.alias['@/'] = `${rootDir}/`;
     config.resolve.extensions = ['.js', '.jsx', '.ts', '.tsx', '.json'];

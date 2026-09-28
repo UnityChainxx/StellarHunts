@@ -167,7 +167,8 @@ The module includes proper error handling:
 
 - **404 Not Found**: When content doesn't exist
 - **400 Bad Request**: When validation fails
-- **401 Unauthorized**: When admin authentication is required (placeholder)
+- **401 Unauthorized**: When admin authentication (JWT Bearer token) is missing or invalid
+- **403 Forbidden**: When the authenticated user lacks the required admin role
 - **500 Internal Server Error**: For unexpected server errors
 
 ## Validation
@@ -181,7 +182,7 @@ Input validation is handled using class-validator decorators:
 
 ## Security Considerations
 
-- Admin endpoints are protected with authentication (placeholder implementation)
+- Admin endpoints are protected with authentication (`JwtAuthGuard`) and role-based access control (`RolesGuard` enforcing `AdminRole.ADMIN`)
 - Input validation prevents malicious data
 - SQL injection protection through TypeORM
 - Proper error messages without sensitive information exposure

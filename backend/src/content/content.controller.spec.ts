@@ -1,8 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
+import { JwtAuthGuard } from '../admin/guards/jwt-auth.guard';
+import { RolesGuard } from '../admin/guards/roles.guard';
+import { AdminRole } from '../admin/admin-role.enum';
+import { ROLES_KEY } from '../admin/roles.decorator';
 
 describe('ContentController', () => {
   let controller: ContentController;
@@ -148,6 +155,62 @@ describe('ContentController', () => {
 
       expect(service.removeAdmin).toHaveBeenCalledWith('test-id');
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('Admin route access control', () => {
+    const adminEndpoints = [
+      { name: 'create', getMethod: () => controller.create },
+      { name: 'findAllAdmin', getMethod: () => controller.findAllAdmin },
+      { name: 'findOneAdmin', getMethod: () => controller.findOneAdmin },
+      { name: 'updateAdmin', getMethod: () => controller.updateAdmin },
+      { name: 'removeAdmin', getMethod: () => controller.removeAdmin },
+    ];
+
+    adminEndpoints.forEach(({ name, getMethod }) => {
+      it(`${name} should require JwtAuthGuard and RolesGuard with AdminRole.ADMIN`, () => {
+        const method = getMethod();
+        const guards = Reflect.getMetadata(GUARDS_METADATA, method);
+        expect(guards).toContain(JwtAuthGuard);
+        expect(guards).toContain(RolesGuard);
+
+        const roles = Reflect.getMetadata(ROLES_KEY, method);
+        expect(roles).toEqual([AdminRole.ADMIN]);
+      });
+    });
+
+    it('rejects unauthenticated requests through RolesGuard', () => {
+      const reflector = new Reflector();
+      const rolesGuard = new RolesGuard(reflector);
+
+      const mockExecutionContext = {
+        getHandler: () => controller.create,
+        getClass: () => ContentController,
+        switchToHttp: () => ({
+          getRequest: () => ({ user: undefined }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(() => rolesGuard.canActivate(mockExecutionContext)).toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects requests from users lacking the admin role', () => {
+      const reflector = new Reflector();
+      const rolesGuard = new RolesGuard(reflector);
+
+      const mockExecutionContext = {
+        getHandler: () => controller.create,
+        getClass: () => ContentController,
+        switchToHttp: () => ({
+          getRequest: () => ({ user: { role: 'user' } }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(() => rolesGuard.canActivate(mockExecutionContext)).toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

@@ -3,10 +3,11 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
-import * as Joi from 'joi';
 
 import appConfig from 'config/app.config';
 import databaseConfig from 'config/database.config';
+
+import { validationOptions, validationSchema } from './config/config.validation';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -68,23 +69,17 @@ import { UserReportCardModule } from './user-report-card/user-report-card.module
       envFilePath: ['.env'],
       load: [appConfig, databaseConfig],
       cache: true,
-      validationSchema: Joi.object({
-        NODE_ENV: Joi.string()
-          .valid('development', 'test', 'production')
-          .default('development'),
-        PORT: Joi.number().port().default(3001),
-        JWT_SECRET: Joi.string().required(),
-        JWT_EXPIRES_IN: Joi.string().default('15m'),
-        JWT_REFRESH_EXPIRES_IN: Joi.string().default('30d'),
-        FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
-        DATABASE_HOST: Joi.string().required(),
-        DATABASE_PORT: Joi.number().port().default(5432),
-        DATABASE_USER: Joi.string().required(),
-        DATABASE_PASSWORD: Joi.string().required(),
-        DATABASE_NAME: Joi.string().required(),
-        STELLAR_MODE: Joi.string().valid('mock', 'live').default('live'),
-        STELLAR_NETWORK: Joi.string().valid('testnet', 'pubnet').default('testnet'),
-      }),
+      // The schema and its Joi options live in `config/config.validation.ts`
+      // so that `config-validation.spec.ts` asserts the schema the application
+      // actually loads, instead of a re-declared copy that can drift from it
+      // (issue #492).
+      validationSchema,
+      // `@nestjs/config` v12 validates through the Standard Schema interface,
+      // so Joi's own options are nested under `libraryOptions` rather than
+      // passed at the top level. They are set explicitly (rather than relying
+      // on the package defaults) so the options `config-validation.spec.ts`
+      // exercises are provably the options the application uses.
+      validationOptions: { libraryOptions: { ...validationOptions } },
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
