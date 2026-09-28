@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   ConflictException,
   UnauthorizedException,
   BadRequestException,
@@ -48,6 +49,8 @@ interface TokenPair {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -55,6 +58,37 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly tokenHistoryService: UserTokenHistoryService,
   ) {}
+
+  /**
+   * Records an authentication failure for operators.
+   *
+   * Nothing the caller submitted is logged, and neither is the error message:
+   * driver and database errors routinely quote the offending value in their
+   * text (a Postgres unique violation on `email` embeds the address), so a
+   * message is exactly where a submitted email or password would leak. Only
+   * the error class and a correlation id are recorded, which is enough to
+   * find the matching request in the surrounding request logs.
+   *
+   * `warn` is used for outcomes an untrusted caller can trigger on purpose
+   * (invalid credentials, duplicate identifier) so that credential stuffing
+   * cannot flood the error log; genuinely unexpected failures use `error`.
+   */
+  private logAuthFailure(
+    operation: 'register' | 'login',
+    reason: string,
+    error: unknown,
+    level: 'warn' | 'error' = 'error',
+  ): void {
+    const errorName = error instanceof Error ? error.name : typeof error;
+    const line =
+      `auth_failure operation=${operation} reason=${reason} ` +
+      `correlationId=${crypto.randomUUID()} error=${errorName}`;
+    if (level === 'warn') {
+      this.logger.warn(line);
+    } else {
+      this.logger.error(line);
+    }
+  }
 
   /**
    * Registers a new user.
@@ -112,15 +146,15 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.error('Registration error:', error); // Add logging
-
       if (error.code === "23505") {
         // PostgreSQL unique violation (email/username collision). Same
         // neutral response so attackers cannot infer which identifier is
         // already taken.
+        this.logAuthFailure('register', 'duplicate_identifier', error, 'warn');
         return this.genericRegistrationMessage()
       }
 
+      this.logAuthFailure('register', 'unexpected', error);
       throw new BadRequestException("Registration could not be completed")
     }
   }
@@ -173,12 +207,12 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.error('Login error:', error); // Add logging
-
       if (error instanceof UnauthorizedException) {
+        this.logAuthFailure('login', 'invalid_credentials', error, 'warn');
         throw error;
       }
 
+      this.logAuthFailure('login', 'unexpected', error);
       throw new BadRequestException("Login failed")
     }
   }

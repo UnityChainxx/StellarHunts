@@ -8,12 +8,16 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
 @Entity('users')
 export class User {
+  private readonly logger = new Logger(User.name);
+
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -72,7 +76,12 @@ export class User {
     try {
       return await bcrypt.compare(password, this.password);
     } catch (error) {
-      console.error('Password validation error:', error);
+      // Neither the candidate password nor the stored hash is logged; see
+      // AuthService.logAuthFailure for the same reasoning.
+      this.logger.warn(
+        `password_validation_failed correlationId=${randomUUID()} ` +
+          `error=${error instanceof Error ? error.name : typeof error}`,
+      );
       return false;
     }
   }
