@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "check:config": "node scripts/check-json-keys.js tsconfig.json jsconfig.json",
+    "lint": "npm run check:config && next lint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
