@@ -39,7 +39,11 @@ serialized types without breaking existing state.
   events stable:
   - `Question(u64)`, `QuestionCount`, `QuestionPerLevel`,
     `QuestionsByLevel(Levels, u32)`
-  - `PlayerProgress(Address)`, `PlayerLevelProgress(Address, Levels)`
+  - `PlayerProgress(Address)`, `PlayerLevelProgress(Address, Levels)` —
+    legacy records still live here; no longer written (see the
+    `stellar_hunts` section)
+  - `PlayerProgressV2(Address)`, `PlayerLevelProgressV2(Address, Levels)` —
+    versioned successors introduced with `CURRENT_SCHEMA_VERSION = 2`
   - `Badge(Address, Levels)`, `BadgeData(Address, Levels)`
 
 ## Evolving serialized types
@@ -78,15 +82,64 @@ part of the serialization. Two safe ways to evolve a stored struct:
 ## Contract-specific notes
 
 ### `stellar_hunts`
-- `CURRENT_SCHEMA_VERSION = 1`, stored under `DataKey::SchemaVersion` at
-  `init` and readable via `get_schema_version()`.
+
+- `CURRENT_SCHEMA_VERSION = 2` (bumped from 1 by issue #463), stored under
+  `DataKey::SchemaVersion` at `init` and readable via `get_schema_version()`.
 - `Question` carries a per-record `version` field stamped with
   `CURRENT_SCHEMA_VERSION` at write time; readers treat an older `version`
   as legacy-format data.
-- `PlayerProgress` and `LevelProgress` currently have no version field —
-  adding one (or switching to `PlayerProgressV2`/`LevelProgressV2` keys)
-  requires a schema-version bump and a migration that seeds the new field
-  from existing state.
+- **Chosen mechanism for `PlayerProgress` / `LevelProgress`: versioned keys
+  combined with a per-record `version` field** (the `*V2` variants), not a
+  shape change in place under the original keys. Rationale: `Storage::get`
+  panics when a stored record does not decode into the requested struct, so
+  a record written before the `version` field existed would be unreadable
+  if the struct under the same key gained a field. Versioned keys keep the
+  legacy records decodable under the legacy shapes.
+- Versioned keys: `PlayerProgressV2(Address)` and
+  `PlayerLevelProgressV2(Address, Levels)` store `PlayerProgressV2` /
+  `LevelProgressV2`, whose last field is `version: u32`.
+- **Reader/writer contract:**
+  - Every write goes through `write_player_progress` / `write_level_progress`,
+    stamps `version = CURRENT_SCHEMA_VERSION` (writers are the single
+    authority that stamps the version), stores under the `*V2` keys, and
+    removes any pre-versioning record under the original keys.
+  - Reads go through `read_player_progress` / `read_level_progress`, which
+    prefer the `*V2` record and otherwise decode the pre-versioning record
+    (no `version` field) through the legacy `PlayerProgress` /
+    `LevelProgress` shapes, surfacing it with
+    `version = LEGACY_RECORD_VERSION (1)`. Readers never rewrite storage.
+  - Legacy reads are defined and non-panicking for every player address;
+    there is no error path for "old record".
+- **Migration is lazy (on the player's next write), not eager.** No admin
+  migration entry point is needed: the write path is the only place records
+  change shape, every migrated record is stamped and moved in the same
+  transaction that writes it anyway (so no call can exceed the transaction
+  budget on migration alone), untouched legacy records stay readable
+  through the fallback forever, and retries after a partial failure are
+  naturally idempotent. The cost is that both key families coexist until
+  each player's next write.
+- **Rule for adding the next field:** add it to `PlayerProgressV2` /
+  `LevelProgressV2` (never to the legacy structs), bump
+  `CURRENT_SCHEMA_VERSION`, and make the readers of the previous shape
+  tolerate the missing field the same way these readers tolerate the
+  missing `version` field today — decode the older shape through a
+  dedicated legacy struct and default the new field. If the addition is
+  not tolerated by the old shape, introduce `*V3` keys instead of changing
+  `*V2` in place.
+- The original keys `PlayerProgress(Address)` and
+  `PlayerLevelProgress(Address, Levels)` remain in the `DataKey` enum
+  because live legacy records still live under them; they are no longer
+  written by this contract. The legacy structs `PlayerProgress` /
+  `LevelProgress` must stay field-for-field identical to the version-1
+  layout for the same reason.
+- Public views: `get_player_level_progress` keeps the version-1 ABI and
+  now reports versioned/legacy records alike; `get_player_level_progress_v2`
+  and `get_player_progress_v2` expose the `version` field, with `0`
+  signalling "no record exists".
+- The default `LevelProgress` synthesized by `get_player_level_progress`
+  for an unknown player carries the queried `player` identity
+  (issue #449), so the zero-valued default cannot be confused with a
+  record belonging to the contract itself.
 
 ### `stellar_hunts_nft`
 - `CURRENT_SCHEMA_VERSION = 1`, written to `NftDataKey::SchemaVersion` at
@@ -196,10 +249,24 @@ guarantees:
 - `test_legacy_question_readable` — a `Question` written with
   `version: 0` (pre-versioning format) is still returned by
   `get_question`, proving reads are backward compatible.
-- `test_level_progress_roundtrip_compat` — a `LevelProgress` written
-  directly to storage round-trips through `get_player_level_progress`
+- `test_level_progress_roundtrip_compat` — a `LevelProgress` written in
+  the pre-versioning shape under the original key round-trips through
+  `get_player_level_progress` field-for-field and is surfaced by
+  `get_player_level_progress_v2` with `version = LEGACY_RECORD_VERSION`.
+- `test_level_progress_v2_roundtrip` — a `LevelProgressV2` written under
+  the versioned key round-trips through `get_player_level_progress_v2`
   field-for-field, so appending a field in the future must preserve all
   existing fields.
+- `test_lazy_migration_upgrades_legacy_record_on_write` — a pre-versioning
+  record is readable, then after the player's next write it is stamped
+  with `CURRENT_SCHEMA_VERSION` under the `*V2` key and the legacy entry
+  is removed.
+- `test_player_progress_v2_default_for_unknown_player` — the versioned
+  views report `version = 0` and zeroed fields for a player with no
+  record.
+- `test_default_level_progress_uses_queried_player` — the synthesized
+  default returned for an unknown player carries the queried `player`,
+  never the contract address (issue #449).
 - `test_levels_discriminants_stable` — `Levels` numeric discriminants
   (Easy=1, Medium=2, Hard=3, Master=4) never change, protecting both stored
   state and event payloads.

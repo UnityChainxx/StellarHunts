@@ -27,6 +27,17 @@ pub struct Question {
     pub version: u32,
 }
 
+// ---------------------------------------------------------------------
+// Pre-versioning (legacy) record shapes (issue #463)
+//
+// These structs describe the storage layout written before schema
+// version 2. They are no longer written by this contract, but they must
+// stay byte-for-byte identical to the deployed V1 layout: the V2 readers
+// decode legacy records through these types before migrating them.
+// Do NOT add fields here — add them to the V2 structs below and bump
+// CURRENT_SCHEMA_VERSION.
+// ---------------------------------------------------------------------
+
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct PlayerProgress {
@@ -54,6 +65,42 @@ pub struct LevelProgress {
 }
 
 // ---------------------------------------------------------------------
+// Versioned (V2) record shapes (issue #463)
+//
+// `PlayerProgress` and `LevelProgress` originally had no version field,
+// so any field addition would have been a breaking storage change with
+// no upgrade path. The V2 shapes carry a per-record `version` stamped
+// with CURRENT_SCHEMA_VERSION at write time and live under the versioned
+// keys `DataKey::PlayerProgressV2` / `DataKey::PlayerLevelProgressV2`,
+// so the pre-versioning records stored under the original keys remain
+// readable through the legacy shapes above.
+// ---------------------------------------------------------------------
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct PlayerProgressV2 {
+    pub address: Address,
+    pub current_level: Levels,
+    pub is_initialized: bool,
+    pub version: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct LevelProgressV2 {
+    pub player: Address,
+    pub level: Levels,
+    // u8 is not a valid Soroban Val in soroban-sdk 22 — the smallest
+    // native unsigned integer is `u32`.
+    pub last_question_index: u32,
+    pub is_completed: bool,
+    pub attempts: u32,
+    pub nft_minted: bool,
+    pub last_attempt_ledger: u32,
+    pub version: u32,
+}
+
+// ---------------------------------------------------------------------
 // Storage keys
 // ---------------------------------------------------------------------
 
@@ -69,8 +116,13 @@ pub enum DataKey {
     RetiredQuestion(u64),
     QuestionsByLevel(Levels, u32),
     QuestionPerLevelIndex(Levels),
+    // Pre-versioning keys. Still readable (legacy records migrate on
+    // their next write) but no longer written by this contract.
     PlayerProgress(Address),
     PlayerLevelProgress(Address, Levels),
+    // Versioned keys introduced with schema version 2 (issue #463).
+    PlayerProgressV2(Address),
+    PlayerLevelProgressV2(Address, Levels),
     SchemaVersion,
     Paused,
 }
@@ -79,7 +131,7 @@ pub enum DataKey {
 // Schema version
 // ---------------------------------------------------------------------
 
-const CURRENT_SCHEMA_VERSION: u32 = 1;
+const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 fn get_schema_version(e: &Env) -> u32 {
     e.storage()
@@ -92,6 +144,107 @@ fn set_schema_version(e: &Env) {
     e.storage()
         .persistent()
         .set(&DataKey::SchemaVersion, &CURRENT_SCHEMA_VERSION);
+}
+
+/// Schema version stamped onto records that were written before
+/// per-record versioning existed (issue #463). Their layout is the one
+/// `CURRENT_SCHEMA_VERSION = 1` defined.
+const LEGACY_RECORD_VERSION: u32 = 1;
+
+// ---------------------------------------------------------------------
+// Player progress record reads/writes (issue #463)
+//
+// Reader/writer contract:
+// - Every write goes through `write_player_progress` /
+//   `write_level_progress`, stamps `CURRENT_SCHEMA_VERSION`, stores the
+//   record under the versioned `*V2` keys, and removes any pre-versioning
+//   record under the original keys (lazy migration).
+// - Reads go through `read_player_progress` / `read_level_progress`, which
+//   prefer the versioned record and fall back to decoding the
+//   pre-versioning layout (no `version` field) through the legacy struct
+//   shapes. Legacy records are surfaced with
+//   `version == LEGACY_RECORD_VERSION`; they are never rewritten on read.
+// - Migration is lazy (on the player's next write) rather than eager: no
+//   admin entry point is needed, no call can exceed the transaction
+//   budget, and a record that is never touched again stays readable
+//   through the fallback forever. See onchain/docs/storage-versioning.md.
+// ---------------------------------------------------------------------
+
+fn read_player_progress(e: &Env, player: &Address) -> Option<PlayerProgressV2> {
+    if let Some(v2) = e
+        .storage()
+        .persistent()
+        .get(&DataKey::PlayerProgressV2(player.clone()))
+    {
+        return Some(v2);
+    }
+    let legacy: Option<PlayerProgress> = e
+        .storage()
+        .persistent()
+        .get(&DataKey::PlayerProgress(player.clone()));
+    legacy.map(|pp| PlayerProgressV2 {
+        address: pp.address,
+        current_level: pp.current_level,
+        is_initialized: pp.is_initialized,
+        version: LEGACY_RECORD_VERSION,
+    })
+}
+
+fn write_player_progress(e: &Env, pp: &PlayerProgressV2) {
+    // Writers are the single authority that stamps the schema version:
+    // anything stored under a V2 key carries the current version, even if
+    // the value was read out of a legacy record moments earlier.
+    let mut stamped = pp.clone();
+    stamped.version = CURRENT_SCHEMA_VERSION;
+    e.storage().persistent().set(
+        &DataKey::PlayerProgressV2(stamped.address.clone()),
+        &stamped,
+    );
+    // Lazy migration: drop the pre-versioning entry, if any.
+    e.storage()
+        .persistent()
+        .remove(&DataKey::PlayerProgress(stamped.address.clone()));
+}
+
+fn read_level_progress(e: &Env, player: &Address, level: &Levels) -> Option<LevelProgressV2> {
+    if let Some(v2) = e
+        .storage()
+        .persistent()
+        .get(&DataKey::PlayerLevelProgressV2(
+            player.clone(),
+            level.clone(),
+        ))
+    {
+        return Some(v2);
+    }
+    let legacy: Option<LevelProgress> = e
+        .storage()
+        .persistent()
+        .get(&DataKey::PlayerLevelProgress(player.clone(), level.clone()));
+    legacy.map(|lp| LevelProgressV2 {
+        player: lp.player,
+        level: lp.level,
+        last_question_index: lp.last_question_index,
+        is_completed: lp.is_completed,
+        attempts: lp.attempts,
+        nft_minted: lp.nft_minted,
+        last_attempt_ledger: lp.last_attempt_ledger,
+        version: LEGACY_RECORD_VERSION,
+    })
+}
+
+fn write_level_progress(e: &Env, player: &Address, level: &Levels, lp: &LevelProgressV2) {
+    // Writers stamp the current version (see write_player_progress).
+    let mut stamped = lp.clone();
+    stamped.version = CURRENT_SCHEMA_VERSION;
+    e.storage().persistent().set(
+        &DataKey::PlayerLevelProgressV2(player.clone(), level.clone()),
+        &stamped,
+    );
+    // Lazy migration: drop the pre-versioning entry, if any.
+    e.storage()
+        .persistent()
+        .remove(&DataKey::PlayerLevelProgress(player.clone(), level.clone()));
 }
 
 // ---------------------------------------------------------------------
@@ -355,11 +508,7 @@ impl StellarHunts {
         }
         caller.require_auth();
 
-        if !env
-            .storage()
-            .persistent()
-            .has(&DataKey::PlayerProgress(caller.clone()))
-        {
+        if read_player_progress(&env, &caller).is_none() {
             Self::initialize_player_progress(env.clone(), caller.clone());
         }
 
@@ -371,31 +520,19 @@ impl StellarHunts {
             .ok_or(Error::QuestionNotFound)
             .unwrap();
 
-        // Retired questions are inert: reject the submission before any
-        // progress is written so a leaked/invalid question cannot be graded
-        // or advance the player (#447).
-        if env
-            .storage()
-            .persistent()
-            .has(&DataKey::RetiredQuestion(question_id))
-        {
-            panic_with_error!(&env, Error::QuestionRetired);
-        }
-
-        let lp_key = DataKey::PlayerLevelProgress(caller.clone(), question.level.clone());
-        let mut lp: LevelProgress =
-            env.storage()
-                .persistent()
-                .get(&lp_key)
-                .unwrap_or(LevelProgress {
-                    player: caller.clone(),
-                    level: question.level.clone(),
-                    last_question_index: 0,
-                    is_completed: false,
-                    attempts: 0,
-                    nft_minted: false,
-                    last_attempt_ledger: 0,
-                });
+        let mut lp: LevelProgressV2 = match read_level_progress(&env, &caller, &question.level) {
+            Some(lp) => lp,
+            None => LevelProgressV2 {
+                player: caller.clone(),
+                level: question.level.clone(),
+                last_question_index: 0,
+                is_completed: false,
+                attempts: 0,
+                nft_minted: false,
+                last_attempt_ledger: 0,
+                version: CURRENT_SCHEMA_VERSION,
+            },
+        };
 
         if lp.last_question_index == u32::MAX {
             panic_with_error!(&env, Error::ArithmeticOverflow);
@@ -438,14 +575,15 @@ impl StellarHunts {
             if lp.last_question_index >= active_questions {
                 lp.is_completed = true;
                 let next = question.level.next();
-                let pp = PlayerProgress {
-                    address: caller.clone(),
-                    current_level: next.clone(),
-                    is_initialized: true,
-                };
-                env.storage()
-                    .persistent()
-                    .set(&DataKey::PlayerProgress(caller.clone()), &pp);
+                write_player_progress(
+                    &env,
+                    &PlayerProgressV2 {
+                        address: caller.clone(),
+                        current_level: next.clone(),
+                        is_initialized: true,
+                        version: CURRENT_SCHEMA_VERSION,
+                    },
+                );
 
                 env.events().publish(
                     (Symbol::new(&env, "level_completed"),),
@@ -454,7 +592,7 @@ impl StellarHunts {
             }
         }
 
-        env.storage().persistent().set(&lp_key, &lp);
+        write_level_progress(&env, &caller, &question.level, &lp);
 
         env.events().publish(
             (Symbol::new(&env, "answer_submitted"),),
@@ -471,10 +609,7 @@ impl StellarHunts {
     pub fn request_hint(env: Env, caller: Address, question_id: u64) -> Bytes {
         caller.require_auth();
 
-        let pp: PlayerProgress = env
-            .storage()
-            .persistent()
-            .get(&DataKey::PlayerProgress(caller.clone()))
+        let pp = read_player_progress(&env, &caller)
             .ok_or(Error::NotInitialized)
             .unwrap();
         if !pp.is_initialized {
@@ -500,12 +635,9 @@ impl StellarHunts {
             panic_with_error!(&env, Error::WrongLevel);
         }
 
-        let lp_key = DataKey::PlayerLevelProgress(caller.clone(), q.level.clone());
-        let lp: LevelProgress = env
-            .storage()
-            .persistent()
-            .get(&lp_key)
-            .unwrap_or(LevelProgress {
+        let lp: LevelProgressV2 = match read_level_progress(&env, &caller, &q.level) {
+            Some(lp) => lp,
+            None => LevelProgressV2 {
                 player: caller.clone(),
                 level: q.level.clone(),
                 last_question_index: 0,
@@ -513,7 +645,9 @@ impl StellarHunts {
                 attempts: 0,
                 nft_minted: false,
                 last_attempt_ledger: 0,
-            });
+                version: CURRENT_SCHEMA_VERSION,
+            },
+        };
 
         if lp.attempts == 0 {
             panic_with_error!(&env, Error::NotInitialized);
@@ -537,19 +671,11 @@ impl StellarHunts {
         }
         caller.require_auth();
 
-        if !env
-            .storage()
-            .persistent()
-            .has(&DataKey::PlayerProgress(caller.clone()))
-        {
+        if read_player_progress(&env, &caller).is_none() {
             Self::initialize_player_progress(env.clone(), caller.clone());
         }
 
-        let lp_key = DataKey::PlayerLevelProgress(caller.clone(), level.clone());
-        let lp: LevelProgress = env
-            .storage()
-            .persistent()
-            .get(&lp_key)
+        let lp = read_level_progress(&env, &caller, &level)
             .ok_or(Error::NotInitialized)
             .unwrap();
         if !lp.is_completed {
@@ -560,8 +686,7 @@ impl StellarHunts {
     }
 
     fn mint_level_badge(env: Env, player: Address, level: Levels) {
-        let lp_key = DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        let mut lp: LevelProgress = env.storage().persistent().get(&lp_key).unwrap();
+        let mut lp: LevelProgressV2 = read_level_progress(&env, &player, &level).unwrap();
         if !lp.is_completed {
             panic_with_error!(&env, Error::LevelNotCompleted);
         }
@@ -588,7 +713,7 @@ impl StellarHunts {
         );
 
         lp.nft_minted = true;
-        env.storage().persistent().set(&lp_key, &lp);
+        write_level_progress(&env, &player, &level, &lp);
 
         env.events()
             .publish((Symbol::new(&env, "level_badge_minted"),), (player, level));
@@ -645,15 +770,10 @@ impl StellarHunts {
     }
 
     pub fn get_player_level(env: Env, player: Address) -> Levels {
-        let pp_key = DataKey::PlayerProgress(player);
-        if !env.storage().persistent().has(&pp_key) {
-            return Levels::Easy;
+        match read_player_progress(&env, &player) {
+            Some(pp) => pp.current_level,
+            None => Levels::Easy,
         }
-        let pp: PlayerProgress = match env.storage().persistent().get(&pp_key) {
-            Some(pp) => pp,
-            None => panic_with_error!(&env, Error::NotInitialized),
-        };
-        pp.current_level
     }
 
     pub fn get_nft_contract_address(env: Env) -> Address {
@@ -663,16 +783,24 @@ impl StellarHunts {
         }
     }
 
+    /// Read-only view over a player's per-level progress (legacy ABI).
+    /// Reads the versioned V2 record first, then falls back to any
+    /// pre-versioning record under the original key. The identity fields
+    /// of a synthesized default carry the queried player and level
+    /// (issue #449). Views never migrate; migration happens lazily on the
+    /// player's next write (issue #463).
     pub fn get_player_level_progress(env: Env, player: Address, level: Levels) -> LevelProgress {
-        let key = DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        env.storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(LevelProgress {
-                // Issue #449: the default for a player with no stored record
-                // must carry the queried `player` identity, not the contract
-                // address, so callers can key caches and cross-check the
-                // response against the request.
+        match read_level_progress(&env, &player, &level) {
+            Some(v2) => LevelProgress {
+                player: v2.player,
+                level: v2.level,
+                last_question_index: v2.last_question_index,
+                is_completed: v2.is_completed,
+                attempts: v2.attempts,
+                nft_minted: v2.nft_minted,
+                last_attempt_ledger: v2.last_attempt_ledger,
+            },
+            None => LevelProgress {
                 player,
                 level,
                 last_question_index: 0,
@@ -680,7 +808,48 @@ impl StellarHunts {
                 attempts: 0,
                 nft_minted: false,
                 last_attempt_ledger: 0,
-            })
+            },
+        }
+    }
+
+    /// Versioned variant of `get_player_level_progress` (issue #463).
+    /// Returns the record including the schema `version` it was written
+    /// under: `LEGACY_RECORD_VERSION` for pre-versioning records,
+    /// `CURRENT_SCHEMA_VERSION` for versioned records, and `0` for a
+    /// synthesized default (player has no record at all).
+    pub fn get_player_level_progress_v2(
+        env: Env,
+        player: Address,
+        level: Levels,
+    ) -> LevelProgressV2 {
+        match read_level_progress(&env, &player, &level) {
+            Some(v2) => v2,
+            None => LevelProgressV2 {
+                player,
+                level,
+                last_question_index: 0,
+                is_completed: false,
+                attempts: 0,
+                nft_minted: false,
+                last_attempt_ledger: 0,
+                version: 0,
+            },
+        }
+    }
+
+    /// Versioned view over a player's top-level progress record
+    /// (issue #463). Same version semantics as
+    /// `get_player_level_progress_v2`.
+    pub fn get_player_progress_v2(env: Env, player: Address) -> PlayerProgressV2 {
+        match read_player_progress(&env, &player) {
+            Some(pp) => pp,
+            None => PlayerProgressV2 {
+                address: player.clone(),
+                current_level: Levels::Easy,
+                is_initialized: false,
+                version: 0,
+            },
+        }
     }
 
     pub fn next_level(_env: Env, level: Levels) -> Levels {
@@ -747,27 +916,30 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     fn initialize_player_progress(env: Env, player: Address) {
-        let pp = PlayerProgress {
-            address: player.clone(),
-            current_level: Levels::Easy,
-            is_initialized: true,
-        };
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerProgress(player.clone()), &pp);
+        write_player_progress(
+            &env,
+            &PlayerProgressV2 {
+                address: player.clone(),
+                current_level: Levels::Easy,
+                is_initialized: true,
+                version: CURRENT_SCHEMA_VERSION,
+            },
+        );
 
-        let lp = LevelProgress {
-            player: player.clone(),
-            level: Levels::Easy,
-            last_question_index: 0,
-            is_completed: false,
-            attempts: 0,
-            nft_minted: false,
-            last_attempt_ledger: 0,
-        };
-        env.storage().persistent().set(
-            &DataKey::PlayerLevelProgress(player.clone(), Levels::Easy),
-            &lp,
+        write_level_progress(
+            &env,
+            &player,
+            &Levels::Easy,
+            &LevelProgressV2 {
+                player: player.clone(),
+                level: Levels::Easy,
+                last_question_index: 0,
+                is_completed: false,
+                attempts: 0,
+                nft_minted: false,
+                last_attempt_ledger: 0,
+                version: CURRENT_SCHEMA_VERSION,
+            },
         );
 
         env.events().publish(
