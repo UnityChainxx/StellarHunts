@@ -504,8 +504,8 @@ fn test_claim_level_completion_nft_retry_safe_on_nft_panic() {
     // contract's nft_minted flag as if a previous cross-contract call
     // was interrupted before the storage write.
     env.as_contract(&contract_id, || {
-        let lp_key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        let mut lp: crate::LevelProgress = env.storage().persistent().get(&lp_key).unwrap();
+        let lp_key = crate::DataKey::PlayerLevelProgressV2(player.clone(), level.clone());
+        let mut lp: crate::LevelProgressV2 = env.storage().persistent().get(&lp_key).unwrap();
         lp.nft_minted = false;
         env.storage().persistent().set(&lp_key, &lp);
     });
@@ -841,10 +841,10 @@ fn test_legacy_question_readable() {
     assert_eq!(got.level, crate::Levels::Easy);
 }
 
-/// `LevelProgress` values written to storage must round-trip field-for-field
-/// through the public view. Appending a field in a future schema version
-/// must preserve every existing field (documented in
-/// onchain/docs/storage-versioning.md).
+/// A `LevelProgress` written in the pre-versioning (schema version 1)
+/// shape — under the original `PlayerLevelProgress` key, without a
+/// `version` field — must still be readable by `get_player_level_progress`
+/// and `get_player_level_progress_v2` (issue #463).
 #[test]
 fn test_level_progress_roundtrip_compat() {
     let env = Env::default();
@@ -874,6 +874,7 @@ fn test_level_progress_roundtrip_compat() {
         );
     });
 
+    // Legacy ABI view round-trips every pre-versioning field.
     let got = client.get_player_level_progress(&player, &level);
     assert_eq!(got.player, player);
     assert_eq!(got.level, level);
@@ -882,6 +883,166 @@ fn test_level_progress_roundtrip_compat() {
     assert_eq!(got.attempts, 5);
     assert!(got.nft_minted);
     assert_eq!(got.last_attempt_ledger, 12345);
+
+    // Versioned view surfaces the legacy record with the legacy version.
+    let got_v2 = client.get_player_level_progress_v2(&player, &level);
+    assert_eq!(got_v2.version, crate::LEGACY_RECORD_VERSION);
+    assert_eq!(got_v2.attempts, 5);
+    assert!(got_v2.nft_minted);
+}
+
+/// A `LevelProgressV2` written under the versioned key round-trips
+/// field-for-field through `get_player_level_progress_v2`, mirroring
+/// `test_legacy_question_readable` for the versioned shapes (issue #463).
+#[test]
+fn test_level_progress_v2_roundtrip() {
+    let env = Env::default();
+    let admin = new_admin(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    client.init(&admin);
+
+    let player = user(&env);
+    let level = crate::Levels::Hard;
+
+    let lp = crate::LevelProgressV2 {
+        player: player.clone(),
+        level: level.clone(),
+        last_question_index: 2,
+        is_completed: true,
+        attempts: 7,
+        nft_minted: false,
+        last_attempt_ledger: 999,
+        version: crate::CURRENT_SCHEMA_VERSION,
+    };
+
+    env.as_contract(&contract_id, || {
+        env.storage().persistent().set(
+            &crate::DataKey::PlayerLevelProgressV2(player.clone(), level.clone()),
+            &lp,
+        );
+    });
+
+    let got = client.get_player_level_progress_v2(&player, &level);
+    assert_eq!(got.player, player);
+    assert_eq!(got.level, level);
+    assert_eq!(got.last_question_index, 2);
+    assert!(got.is_completed);
+    assert_eq!(got.attempts, 7);
+    assert!(!got.nft_minted);
+    assert_eq!(got.last_attempt_ledger, 999);
+    assert_eq!(got.version, crate::CURRENT_SCHEMA_VERSION);
+
+    // The legacy view still surfaces the same record.
+    let legacy_view = client.get_player_level_progress(&player, &level);
+    assert_eq!(legacy_view.attempts, 7);
+    assert!(legacy_view.is_completed);
+}
+
+/// Writing a versioned record after touching a pre-versioning record must
+/// stamp `CURRENT_SCHEMA_VERSION`, store it under the `*V2` key, and remove
+/// the legacy entry (lazy migration, issue #463).
+#[test]
+fn test_lazy_migration_upgrades_legacy_record_on_write() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+    assert_eq!(client.get_schema_version(), crate::CURRENT_SCHEMA_VERSION);
+
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&5u32);
+    client.add_question(&level, &b(&env, "Q?"), &b(&env, "A"), &b(&env, "H"));
+
+    // First attempt writes versioned records.
+    assert!(!client.submit_answer(&player, &1u64, &b(&env, "wrong")));
+
+    // Replace the versioned record with a pre-versioning one under the
+    // legacy key, exactly as a version-1 deployment would have left it.
+    env.as_contract(&contract_id, || {
+        let legacy = crate::LevelProgress {
+            player: player.clone(),
+            level: level.clone(),
+            last_question_index: 0,
+            is_completed: false,
+            attempts: 4,
+            nft_minted: false,
+            last_attempt_ledger: 99,
+        };
+        let legacy_key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
+        env.storage().persistent().set(&legacy_key, &legacy);
+        env.storage()
+            .persistent()
+            .remove(&crate::DataKey::PlayerLevelProgressV2(
+                player.clone(),
+                level.clone(),
+            ));
+    });
+
+    // The legacy record is readable before migration.
+    let before = client.get_player_level_progress_v2(&player, &level);
+    assert_eq!(before.version, crate::LEGACY_RECORD_VERSION);
+    assert_eq!(before.attempts, 4);
+
+    // Next write migrates lazily.
+    env.ledger()
+        .set_sequence_number(env.ledger().sequence() + 1);
+    assert!(!client.submit_answer(&player, &1u64, &b(&env, "wrong")));
+
+    env.as_contract(&contract_id, || {
+        // Legacy entry is gone.
+        assert!(!env
+            .storage()
+            .persistent()
+            .has(&crate::DataKey::PlayerLevelProgress(
+                player.clone(),
+                level.clone()
+            )));
+        // Versioned entry carries the current schema version and the
+        // legacy attempt count plus the new attempt.
+        let migrated: crate::LevelProgressV2 = env
+            .storage()
+            .persistent()
+            .get(&crate::DataKey::PlayerLevelProgressV2(
+                player.clone(),
+                level.clone(),
+            ))
+            .unwrap();
+        assert_eq!(migrated.version, crate::CURRENT_SCHEMA_VERSION);
+        assert_eq!(migrated.attempts, 5);
+    });
+
+    // The top-level record is initialized under the versioned key.
+    let pp = client.get_player_progress_v2(&player);
+    assert!(pp.is_initialized);
+    assert_eq!(pp.version, crate::CURRENT_SCHEMA_VERSION);
+    assert_eq!(pp.address, player);
+}
+
+/// The versioned and legacy views agree for a player with no record
+/// (issue #463).
+#[test]
+fn test_player_progress_v2_default_for_unknown_player() {
+    let env = Env::default();
+    let admin = new_admin(&env);
+    let contract_id = env.register_contract(None, StellarHunts);
+    let client = StellarHuntsClient::new(&env, &contract_id);
+    env.mock_all_auths();
+    client.init(&admin);
+
+    let player = user(&env);
+    let pp = client.get_player_progress_v2(&player);
+    assert_eq!(pp.address, player);
+    assert!(!pp.is_initialized);
+    assert_eq!(pp.current_level, crate::Levels::Easy);
+    assert_eq!(pp.version, 0);
+
+    let lp = client.get_player_level_progress_v2(&player, &crate::Levels::Easy);
+    assert_eq!(lp.player, player);
+    assert_eq!(lp.version, 0);
+    assert_eq!(lp.attempts, 0);
 }
 
 /// For a player with no stored record, `get_player_level_progress` must
@@ -1039,8 +1200,8 @@ fn test_submit_answer_attempts_overflow_panics() {
 
     // Push attempts to u32::MAX directly.
     env.as_contract(&contract_id, || {
-        let key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        let mut lp: crate::LevelProgress = env.storage().persistent().get(&key).unwrap();
+        let key = crate::DataKey::PlayerLevelProgressV2(player.clone(), level.clone());
+        let mut lp: crate::LevelProgressV2 = env.storage().persistent().get(&key).unwrap();
         lp.attempts = u32::MAX;
         env.storage().persistent().set(&key, &lp);
     });
@@ -1079,8 +1240,8 @@ fn test_submit_answer_last_question_index_overflow_panics() {
 
     // Push last_question_index to u32::MAX directly.
     env.as_contract(&contract_id, || {
-        let key = crate::DataKey::PlayerLevelProgress(player.clone(), level.clone());
-        let mut lp: crate::LevelProgress = env.storage().persistent().get(&key).unwrap();
+        let key = crate::DataKey::PlayerLevelProgressV2(player.clone(), level.clone());
+        let mut lp: crate::LevelProgressV2 = env.storage().persistent().get(&key).unwrap();
         lp.last_question_index = u32::MAX;
         env.storage().persistent().set(&key, &lp);
     });

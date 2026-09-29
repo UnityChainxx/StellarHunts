@@ -121,7 +121,6 @@ The "Invite Friends" link has been added to the main navigation bar, making it e
 - Smooth animations and transitions
 
 ### Future Enhancements
-- Backend integration for real data
 - Social media sharing integration
 - Advanced analytics and tracking
 - Gamification elements (leaderboards, challenges)

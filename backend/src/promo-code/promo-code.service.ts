@@ -1,13 +1,12 @@
-// src/promo-code/promo-code.service.ts
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PromoCode } from 'src/promo-code/entities/promo-code.entities';
+import { PromoCode } from './promo-code.entity';
 import { PromoCodeRedemption } from './entities/promo-code-redemption.entity';
-import { User } from 'src/auth/entities/user.entity';
+import { User } from '../auth/entities/user.entity';
 import { Repository } from 'typeorm';
 
 @Injectable()

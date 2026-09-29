@@ -5,8 +5,8 @@ import {
   CreateDateColumn,
   Unique,
 } from 'typeorm';
-import { PromoCode } from 'src/promo-code/entities/promo-code.entities';
-import { User } from 'src/auth/entities/user.entity';
+import { PromoCode } from '../promo-code.entity';
+import { User } from '../../auth/entities/user.entity';
 
 @Entity('promo_code_redemptions')
 @Unique(['promoCode', 'user']) // ensures one-time redemption per user
