@@ -240,6 +240,22 @@ cd frontend && npm test -- puzzleReviewService
 
 Tests live in `frontend/tests/` and use `.test.js` (or `.test.jsx`) extensions.
 
+### Backend E2E Tests
+
+The backend e2e specs live in `backend/test/` and run against a real PostgreSQL
+instance (plus Redis). Jest config: `backend/test/jest-e2e.json`.
+
+```bash
+# Run the backend e2e suite (requires PostgreSQL + Redis)
+cd backend && npm run test:e2e
+
+# Or via the Makefile (from the repository root)
+make test-backend-e2e
+
+# Run a single e2e spec by name
+cd backend && npm run test:e2e -- security-headers
+```
+
 ### Onchain Tests
 
 ```bash
@@ -257,6 +273,48 @@ The CI workflow (`.github/workflows/build.yml`) runs automatically on push to `m
 - **Test**: `cargo test --workspace`
 
 All checks must pass before a pull request can be merged.
+
+### Running the full check suite
+
+CI enforces more than the contract checks. The commands below reproduce every
+workflow check locally; each is marked **required** (CI blocks the PR) or
+**advisory** (CI reports it but does not block).
+
+```bash
+# Everything CI runs, in one command (from the repository root)
+make ci
+
+# Backend unit tests (required — .github/workflows/build.yml)
+cd backend && npm test
+
+# Backend e2e suite — backend/test/*.e2e-spec.ts, config backend/test/jest-e2e.json
+# (required; the workflow provisions Postgres + Redis service containers first)
+cd backend && npm run test:e2e
+# same as: make test-backend-e2e
+
+# Onchain contract checks (required — .github/workflows/build.yml)
+cd onchain && cargo fmt --all -- --check
+cd onchain && cargo build --workspace --release
+cd onchain && cargo test --workspace
+
+# Onchain dependency/supply-chain audit (required — .github/workflows/build.yml)
+cd onchain && cargo deny --locked check advisories licenses bans sources
+
+# npm dependency audit in frontend and backend (critical = required, high = advisory)
+cd backend  && npm audit --audit-level=critical
+cd frontend && npm audit --audit-level=high   # advisory; see SECURITY.md
+
+# Secret scanning (advisory — .github/workflows/security.yml)
+gitleaks git --redact --no-banner --exit-code=1 \
+  --report-format sarif --report-path gitleaks.sarif
+```
+
+Security scanning jobs — **CodeQL** (JavaScript/TypeScript analysis),
+**Gitleaks** (secret scanning) and **dependency review** — run from
+`.github/workflows/security.yml` and cannot all be reproduced locally; CodeQL
+needs the GitHub Actions runner. The local equivalents of what can be run are
+the `npm audit` / `cargo deny` commands above. See [SECURITY.md](SECURITY.md)
+for the current advisory-versus-required status of every security gate.
 
 ### One command before you open a PR
 

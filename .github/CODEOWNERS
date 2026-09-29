@@ -4,9 +4,7 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 # for the full specification.
 
-# Default owners for everything in the repo. Replace the placeholder
-# handles below with the GitHub usernames that have write access to
-# this repository.
+# Default owners for everything in the repo.
 *                                       @UnityChainxx @eulami
 
 # Frontend (Next.js / React)
@@ -24,11 +22,13 @@
 /backend/test/                          @UnityChainxx @eulami
 /backend/config/                        @UnityChainxx @eulami
 
-# Onchain (Cairo smart contracts)
-/onchain/                               @UnityChainxx @eulami
-/onchain/src/                           @UnityChainxx @eulami
-/onchain/src/contracts/                 @UnityChainxx @eulami
-/onchain/tests/                         @UnityChainxx @eulami
+# Onchain (Rust / Soroban smart contracts)
+/onchain/                                    @UnityChainxx @eulami
+/onchain/contracts/                          @UnityChainxx @eulami
+/onchain/contracts/stellar_hunts/            @UnityChainxx @eulami
+/onchain/contracts/stellar_hunts_nft/        @UnityChainxx @eulami
+/onchain/contracts/stellar_hunts_receiver/   @UnityChainxx @eulami
+/onchain/contracts/stellar_hunts_types/      @UnityChainxx @eulami
 
 # CI / CD and project-wide tooling
 /.github/                               @UnityChainxx @eulami
