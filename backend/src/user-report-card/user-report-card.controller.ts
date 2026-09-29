@@ -21,7 +21,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { UserReportCardService } from './user-report-card.service';
-import { ReportCardDto, CreateReportCardDto } from './dto/report-card.dto';
+import { ReportCardDto, CreateReportCardBodyDto } from './dto/report-card.dto';
 
 @ApiTags('User Report Cards')
 @Controller('users')
@@ -78,9 +78,9 @@ export class UserReportCardController {
   })
   async createUserReportCard(
     @Param('id') userId: string,
-    @Body() createDto: Partial<CreateReportCardDto> = {},
+    @Body() createDto: CreateReportCardBodyDto = new CreateReportCardBodyDto(),
   ): Promise<ReportCardDto> {
-    const reportCardData: CreateReportCardDto = {
+    const reportCardData = {
       userId,
       ...createDto,
     };

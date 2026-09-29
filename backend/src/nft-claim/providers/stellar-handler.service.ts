@@ -205,23 +205,156 @@ export class StellarHandlerService {
     };
   }
 
-  private async realClaimNFT(claimNFTDto: ClaimNFTDto): Promise<any> {
-    const rpcUrl = this.validateRpcUrl();
-    this.logger.log(`Processing live Stellar NFT claim using RPC at ${rpcUrl}`);
-    // TODO: Wire up `@stellar/stellar-sdk` here. Sketch:
-    //   const server = new StellarSdk.SorobanRpc.Server(rpcUrl);
-    //   const contract = new StellarSdk.Contract(process.env.SOROBAN_NFT_CONTRACT_ID);
-    //   const tx = new StellarSdk.TransactionBuilder(...)
-    //     .addOperation(contract.call('mint_level_badge', ...))
-    //     .setTimeout(30).build();
-    //   const result = await server.sendTransaction(await tx.sign(...));
-    //   return { status: 'success', transactionId: result.hash, ...claimNFTDto };
-    //
-    // For now, simulate random failures so integration tests cover the error paths.
-    const randomError = Math.random();
-    if (randomError < 0.3) {
-      throw new BadRequestException('Invalid NFT claim parameters');
-    } else if (randomError < 0.6) {
+  /**
+   * Parse the on-chain level from the request's `nftId`. Accepts the bare
+   * level (`easy`), prefixed snake/camel forms (`level_easy`, `nft-easy`,
+   * `LevelEasy`), or ids that end in the level (`badge-easy`). Anything
+   * else is a permanent input error.
+   */
+  private parseLevel(rawNftId: string): LevelName {
+    const normalized = (rawNftId || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+    for (const level of Object.keys(LEVEL_CODES)) {
+      if (normalized.endsWith(level)) {
+        return level as LevelName;
+      }
+    }
+    throw new ClaimRejectedError(
+      `nftId "${rawNftId}" does not encode a known level (expected one of: ${Object.keys(LEVEL_CODES).join(', ')})`,
+      'invalid_claim',
+    );
+  }
+
+  /**
+   * Resolve the on-chain recipient. In live mode the mint needs a real
+   * Stellar account id; the caller passes it as `userId` (a `G...`
+   * Ed25519 account id). Any other shape is a permanent input error —
+   * guessing a recipient for an on-chain mint would mint to the wrong
+   * account.
+   */
+  private resolveRecipient(userId: string): string {
+    const candidate = (userId || '').trim();
+    try {
+      Keypair.fromPublicKey(candidate);
+      return candidate;
+    } catch {
+      throw new ClaimRejectedError(
+        'userId must be the recipient\'s Stellar account id (G...) in live mode',
+        'invalid_claim',
+      );
+    }
+  }
+
+  /**
+   * Read and validate the live-mode configuration. A missing or malformed
+   * value is a server-side misconfiguration (retryable 500), while a
+   * structurally invalid claim is a 400 — the two must not be confused.
+   */
+  private loadLiveConfig(): {
+    server: rpc.Server;
+    custodian: Keypair;
+    nftContractId: string;
+    networkPassphrase: string;
+    feeStroops: string;
+  } {
+    const rpcUrl = process.env.SOROBAN_RPC_URL;
+    if (!rpcUrl) {
+      throw new InternalServerErrorException(
+        'SOROBAN_RPC_URL is not configured; cannot submit claims in live mode',
+      );
+    }
+    this.validateRpcUrl();
+
+    const custodianSecret =
+      process.env.STELLAR_CUSTODIAN_SECRET_KEY ||
+      process.env.STELLAR_SECRET_KEY;
+    if (!custodianSecret) {
+      throw new InternalServerErrorException(
+        'STELLAR_CUSTODIAN_SECRET_KEY is not configured; the backend cannot sign mint transactions',
+      );
+    }
+    let custodian: Keypair;
+    try {
+      custodian = Keypair.fromSecret(custodianSecret);
+    } catch {
+      throw new InternalServerErrorException(
+        'STELLAR_CUSTODIAN_SECRET_KEY is not a valid Stellar secret key',
+      );
+    }
+
+    const nftContractId = process.env.SOROBAN_NFT_CONTRACT_ID;
+    if (!nftContractId) {
+      throw new InternalServerErrorException(
+        'SOROBAN_NFT_CONTRACT_ID is not configured; cannot target the NFT contract',
+      );
+    }
+
+    const networkPassphrase =
+      process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
+
+    const feeStroops = (
+      Number(process.env.SOROBAN_TX_FEE_STROOPS) || DEFAULT_TX_FEE_STROOPS
+    ).toString();
+
+    const server = new rpc.Server(rpcUrl, { allowHttp: DEV_RPC_HOSTS.some((h) => rpcUrl.includes(h)) });
+
+    return { server, custodian, nftContractId, networkPassphrase, feeStroops };
+  }
+
+  /**
+   * Build, sign, submit and confirm a real `mint_level_badge` invocation.
+   *
+   * Failure classification (deterministic, issue #486):
+   * - input/config problems before submission: invalid claim -> `BadRequest`
+   *   (permanent), server misconfiguration -> `InternalServerError`.
+   * - submission transport errors (network down, RPC 5xx):
+   *   `InternalServerError` — transient, safe to retry because a duplicate
+   *   resubmission is detected by the RPC (same source account + sequence)
+   *   and resolves to the original transaction.
+   * - `sendTransaction` returning `ERROR`, or a confirmed `FAILED`
+   *   transaction: `ClaimRejectedError` (a `BadRequestException`) — the
+   *   contract or host deterministically rejected this invocation.
+   * - no confirmation before the deadline: a `pending` result, not an
+   *   error — the transaction is still in flight and must not be retried
+   *   into a double mint.
+   */
+  private async realClaimNFT(claimNFTDto: ClaimNFTDto): Promise<NftClaimResult> {
+    this.logger.log('Processing live Stellar NFT claim');
+
+    const level = this.parseLevel(claimNFTDto.nftId);
+    const recipient = this.resolveRecipient(claimNFTDto.userId);
+    const { server, custodian, nftContractId, networkPassphrase, feeStroops } =
+      this.loadLiveConfig();
+
+    const base: NftClaimResult = {
+      status: 'pending',
+      transactionId: '',
+      userId: claimNFTDto.userId,
+      nftId: claimNFTDto.nftId,
+      contractId: nftContractId,
+      level,
+      recipient,
+    };
+
+    // 1. Build and sign the mint invocation.
+    let signedTx: ReturnType<TransactionBuilder['build']>;
+    try {
+      const sourceAccount = await server.getAccount(custodian.publicKey());
+      const operation = new Contract(nftContractId).call(
+        'mint_level_badge',
+        nativeToScVal(custodian.publicKey(), { type: 'address' }),
+        nativeToScVal(recipient, { type: 'address' }),
+        nativeToScVal(LEVEL_CODES[level], { type: 'u32' }),
+      );
+      signedTx = new TransactionBuilder(sourceAccount, {
+        fee: feeStroops,
+        networkPassphrase,
+      })
+        .addOperation(operation)
+        .setTimeout(TX_TIMEOUT_SECONDS)
+        .build();
+      signedTx.sign(custodian);
+    } catch (error) {
+      if (error instanceof ClaimRejectedError) throw error;
       throw new InternalServerErrorException(
         `Failed to build or sign the mint transaction: ${(error as Error).message}`,
       );

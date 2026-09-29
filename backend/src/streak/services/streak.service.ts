@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
 import { Streak } from '../entities/streak.entity';
 import { StreakActivity } from '../entities/streak-activity.entity';
 import type { ActivityType } from '../entities/streak-activity.entity';
@@ -53,6 +53,7 @@ export class StreakService {
     userId: string,
     recordDto: RecordActivityDto,
     config: Partial<StreakCalculationConfig> = {},
+    manager?: EntityManager,
   ): Promise<Streak> {
     // The server clock is the source of truth for "today". Client-supplied
     // dates are only accepted for backfilling past activity — future dates

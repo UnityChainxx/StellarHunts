@@ -12,6 +12,7 @@ import * as crypto from 'crypto';
 import { User } from '../entities/user.entity';
 import { RegisterDto } from '../dto/register.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { GenericAuthMessageDto } from '../dto/generic-auth-message.dto';
 import { LoginDto } from '../dto/login.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserTokenHistoryService } from '../../user-token-history/services/user-token-history.service';
@@ -88,6 +89,18 @@ export class AuthService {
     } else {
       this.logger.error(line);
     }
+  }
+
+
+  /**
+   * Anti-enumeration: the neutral, account-existence-neutral success body
+   * returned for duplicate registrations (see GenericAuthMessageDto).
+   */
+  private genericRegistrationMessage(): GenericAuthMessageDto {
+    return {
+      message:
+        'Registration successful. If an account already exists, please log in.',
+    };
   }
 
   /**

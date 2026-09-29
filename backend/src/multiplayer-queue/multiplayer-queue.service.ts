@@ -13,7 +13,7 @@ import type { JoinQueueDto } from './dto/join-queue.dto';
 import type { QueueStatusDto } from './dto/queue-status.dto';
 import type { MatchResultDto } from './dto/match-result.dto';
 import type { QueueStatsDto } from './dto/queue-stats.dto';
-import { MultiplayerQueueGateway } from './multiplayer-queue.gateway';
+import { MultiplayerGateway } from './multiplayer-queue.gateway';
 
 @Injectable()
 export class MultiplayerQueueService {
@@ -25,7 +25,7 @@ export class MultiplayerQueueService {
     @InjectRepository(Match)
     private readonly matchRepository: Repository<Match>,
     private readonly dataSource: DataSource,
-    private readonly gateway: MultiplayerQueueGateway,
+    private readonly gateway: MultiplayerGateway,
   ) {}
 
   /**

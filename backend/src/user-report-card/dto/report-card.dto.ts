@@ -63,6 +63,21 @@ export class ReportCardDto {
   updatedAt: Date;
 }
 
+// Request-body DTO for POST :id/report-card. The user id comes from the
+// route param and is set by the controller, so the body itself is entirely
+// optional overrides (issue #529).
+export class CreateReportCardBodyDto {
+  @ApiProperty({ description: 'Number of completed puzzles', required: false })
+  @IsOptional()
+  @IsNumber()
+  completedPuzzles?: number;
+
+  @ApiProperty({ description: 'Number of rewards earned', required: false })
+  @IsOptional()
+  @IsNumber()
+  rewardsEarned?: number;
+}
+
 export class CreateReportCardDto {
   @ApiProperty({ description: 'User ID for the report card' })
   @IsString()

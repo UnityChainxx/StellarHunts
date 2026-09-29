@@ -18,6 +18,7 @@ import { AuthService } from '../services/auth.service';
 import { Auth } from '../decorators/auth-decorator';
 import { AuthType } from '../enums/auth-type.enum';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { GenericAuthMessageDto } from '../dto/generic-auth-message.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';

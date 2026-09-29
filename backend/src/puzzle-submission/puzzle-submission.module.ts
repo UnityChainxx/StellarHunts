@@ -10,6 +10,5 @@ import { Puzzle } from '../puzzle/puzzle.entity';
   imports: [TypeOrmModule.forFeature([PuzzleSubmission]), RateLimiterModule],
   providers: [PuzzleSubmissionService],
   controllers: [PuzzleSubmissionController],
-  providers: [PuzzleSubmissionService],
 })
 export class PuzzleSubmissionModule {}

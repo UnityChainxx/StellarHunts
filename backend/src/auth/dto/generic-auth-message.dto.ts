@@ -1,3 +1,5 @@
+// Response-only DTO (issue #529): this shape is never bound as a @Body()
+// request type, so it carries no class-validator decorators by design.
 import { ApiProperty } from "@nestjs/swagger"
 
 // Anti-enumeration response body returned by public auth endpoints when the

@@ -90,7 +90,7 @@ export class AnalyticService {
     const sql = effectiveLimit !== undefined
       ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
          ORDER BY solve_count DESC LIMIT $1 OFFSET $2`
-      : hasOffset
+      : offset !== undefined
         ? `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
            ORDER BY solve_count DESC OFFSET $1`
         : `SELECT puzzle_id, solve_count FROM puzzle_stats_mv
@@ -188,31 +188,6 @@ export class AnalyticService {
       });
     }
     return result;
-  }
-
-  private aggregateFallback(): Array<{ puzzle_id: string; solve_count: number }> {
-    const counts = new Map<string, number>();
-    for (const row of this.fallbackRows) counts.set(row.puzzle_id, (counts.get(row.puzzle_id) ?? 0) + 1);
-    return [...counts].map(([puzzle_id, solve_count]) => ({ puzzle_id, solve_count }));
-  }
-
-  private aggregateFallbackAverage(puzzleId: string): { solve_count: number; total_solve_time: number } {
-    const rows = this.fallbackRows.filter((row) => row.puzzle_id === puzzleId);
-    return { solve_count: rows.length, total_solve_time: rows.reduce((sum, row) => sum + row.solve_time, 0) };
-  }
-
-  private aggregateFallbackForUser(userId: string) {
-    const grouped = new Map<string, typeof this.fallbackRows>();
-    for (const row of this.fallbackRows.filter((item) => item.user_id === userId)) {
-      grouped.set(row.puzzle_id, [...(grouped.get(row.puzzle_id) ?? []), row]);
-    }
-    return [...grouped].map(([puzzle_id, rows]) => ({
-      puzzle_id,
-      solve_count: rows.length,
-      attempts: rows.length,
-      total_solve_time: rows.reduce((sum, row) => sum + row.solve_time, 0),
-      last_solved: rows.reduce((latest, row) => row.solved_at > latest ? row.solved_at : latest, rows[0].solved_at),
-    }));
   }
 
   /**

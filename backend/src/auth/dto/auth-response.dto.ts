@@ -1,3 +1,5 @@
+// Response-only DTO (issue #529): this shape is never bound as a @Body()
+// request type, so it carries no class-validator decorators by design.
 import { ApiProperty } from '@nestjs/swagger';
 
 // Step 1: Create a nested DTO for the user

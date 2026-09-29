@@ -101,6 +101,15 @@ docs(api): document rewards claim endpoint
 - **Formatting**: Run `npm run format` (Prettier) before committing
 - **Modules**: Follow NestJS modular architecture — each feature gets its own module with `controller`, `service`, and `entity` files
 - **DTOs**: Validate all inputs using `class-validator` decorators
+  - Every DTO bound with `@Body()` (a request DTO) must decorate its required
+    fields (`@IsString`, `@IsInt`, `@IsUUID`, …) so the global `ValidationPipe`
+    (`whitelist: true`, `forbidNonWhitelisted: true`) can enforce types and
+    reject unknown properties instead of silently stripping them (issue #529).
+  - Response-only DTOs (shapes returned to clients, never bound as a request
+    body) must start with the marker comment `// Response-only DTO` and carry
+    no validation decorators by design.
+  - `update-*` DTOs should extend their decorated `create-*` base via
+    `PartialType` so the whitelisted properties are inherited.
 - **API docs**: Use Swagger decorators (`@ApiTags`, `@ApiOperation`, `@ApiResponse`) for all endpoints
 
 ### Onchain (Soroban / Rust)
