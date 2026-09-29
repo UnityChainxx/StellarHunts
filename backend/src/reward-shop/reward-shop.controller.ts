@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Logger,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OwnershipGuard } from '../common/guards/ownership.guard';

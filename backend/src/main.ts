@@ -4,9 +4,8 @@ import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { DOCS_ROUTE_EXCLUSIONS, buildApiPrefix } from './api-prefix';
-import { API_DOC_PATH, buildSwaggerConfig } from './swagger';
-import { securityHeadersConfig } from './security-headers';
 import { setupSwagger } from './swagger';
+import { securityHeadersConfig } from './security-headers';
 
 /**
  * Hard limit (ms) we allow the graceful shutdown sequence to take before
@@ -31,7 +30,16 @@ async function bootstrap(): Promise<void> {
     credentials: configService.get<boolean>('appConfig.cors.credentials') ?? true,
   });
   app.use(helmet());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  // forbidNonWhitelisted is the settled posture (issue #529): unknown
+  // properties must be rejected with 400, not silently stripped. The pipe
+  // spec in src/config/global-validation-pipe.spec.ts asserts this mode.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // Respect `appConfig.swagger.enabled` (see backend/config/app.config.ts):
   // the UI is mounted in development but stays off by default in

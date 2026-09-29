@@ -18,6 +18,18 @@ export function buildSwaggerConfig(configService: ConfigService) {
 }
 
 /**
+ * Builds the full OpenAPI document from the application's route/controller
+ * graph without initializing it (no database connection is opened). Used by
+ * `scripts/generate-openapi.ts` to emit `docs/openapi.json` in CI (issue #555).
+ */
+export function buildOpenApiDocument(
+  app: INestApplication,
+  configService: ConfigService,
+): ReturnType<typeof SwaggerModule.createDocument> {
+  return SwaggerModule.createDocument(app, buildSwaggerConfig(configService));
+}
+
+/**
  * Registers the Swagger UI (and its `/docs-json` document endpoint) only
  * when `appConfig.swagger.enabled` is true.
  *

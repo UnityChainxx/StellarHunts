@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io'
 import type { MultiplayerQueueService } from './multiplayer-queue.service'
 import type { JoinQueueDto } from './dto/join-queue.dto'
 import { QueueStatusDto } from './dto/queue-status.dto'
+import { MatchResultDto } from './dto/match-result.dto';
 import { WsRateLimitGuard } from '../common/guards/ws-rate-limit.guard'
 import { WsRateLimit } from '../common/decorators/ws-rate-limit.decorator'
 
@@ -39,6 +40,20 @@ export class MultiplayerGateway
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`Client disconnected from multiplayer: ${client.id}`)
+  }
+
+  /**
+   * Broadcast a newly created match to all connected multiplayer clients so
+   * the matched players leave the queue immediately without polling. Used by
+   * MultiplayerQueueService during matchmaking (see issue #529 workspace
+   * compile fixes; the service has always called this method).
+   */
+  notifyMatchCreated(match: MatchResultDto): void {
+    if (!this.server) {
+      this.logger.warn('Socket server not ready; skipping matchCreated broadcast');
+      return;
+    }
+    this.server.emit('matchCreated', match);
   }
 
   /**
