@@ -3,20 +3,20 @@ import axios from 'axios';
 import { apiUrl } from '@/lib/api';
 
 /**
- * Referral stats proxy route.
+ * Referral stats proxy route — issue #497
  *
- * Fetches referral statistics and invited-user list for `userId` from the
- * backend referral service (`GET /api/v1/referrals/:userId`) and returns the
- * result to the caller.
+ * Proxies `GET /api/v1/referrals/:userId` from the backend referral service.
+ * No hardcoded mock data is returned; the backend is the sole data source.
  *
- * Authentication is forwarded so the backend can enforce ownership. If the
- * backend returns an error the status code is preserved so the UI can render
- * a distinct error state.
+ * If the backend is unreachable or returns an error the status code is
+ * preserved so the UI can render a distinct error state rather than silently
+ * displaying stale data.
  *
- * Note: `useReferral.js` calls the backend directly via `apiClient`, so this
- * route is now only used by legacy callers. New code should call the backend
- * through `apiClient.get("/referrals/:id")` as documented in
- * `docs/api-conventions.md` (issue #510).
+ * Authentication is forwarded so the backend can enforce ownership checks.
+ *
+ * Note: `useReferral.js` now calls the backend directly via `apiClient`, so
+ * this route is kept for legacy compatibility only. New code should go through
+ * `apiClient.get("/referrals/:id")` as documented in `docs/api-conventions.md`.
  */
 export async function GET(request, { params }) {
   const { userId } = params;

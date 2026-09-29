@@ -55,38 +55,25 @@ The referral system encourages users to invite friends to join StellarHunts. Use
 
 ## API Routes & Attribution Flow
 
-All referral data flows through a single path:
+All referral data originates from the backend service (`backend/src/referral/`).
+No hardcoded mock data is served by any route handler (issue #497).
 
-1. **`useReferral` hook** (`frontend/hooks/useReferral.js`) calls the backend
-   directly via `apiClient` from `frontend/lib/api.js`. This ensures the
-   `/api/v1` prefix contract from `docs/api-conventions.md` is always respected
-   and there is no duplicate caching or auth model.
+### `GET /api/v1/referrals/:userId` (backend)
+- The authoritative data source. Returns real referral statistics and invited
+  users from the database.
 
-2. **Backend** (`backend/src/referral/`) is the authoritative data source.
-   It enforces authentication and records `ReferralInvite` rows.
-
-### `GET /api/v1/referrals/:userId`
-- Fetches referral statistics and invited users list. Called by `useReferral`
-  through `apiClient.get("/referrals/:id")`.
-
-### `POST /api/v1/referrals/track`
-- Records referral attribution. Called by `useReferral.trackReferral()` through
-  `apiClient.post("/referrals/track", ...)`.
-- **Authentication**: Gated by the backend JWT guard. Unauthenticated attempts
-  are rejected with `401 Unauthorized`.
-- **Identity Binding**: The backend identifies the invited user strictly from
-  `@CurrentUser('id')`, ignoring any spoofed user IDs in the request body.
-- **Idempotency**: Repeat calls for the same referral pair are idempotent.
+### `POST /api/v1/referrals/track` (backend)
+- Records referral attribution. Authentication is required; unauthenticated
+  attempts return `401`.
 
 ### Next.js route handlers (`frontend/app/api/referrals/`)
 
-`frontend/app/api/referrals/[userId]/route.js` — thin proxy kept for
-backwards compatibility with any existing callers. New code should call the
-backend through `apiClient` directly.
+`GET /api/referrals/[userId]` — thin proxy to the backend. Kept for
+compatibility; prefer calling `apiClient.get("/referrals/:id")` directly.
 
-`frontend/app/api/referrals/track/route.js` — authenticated proxy that
-forwards `POST /api/v1/referrals/track` to the backend, included for clients
-that cannot call the backend directly (e.g., server-side rendering).
+`POST /api/referrals/track` — authenticated proxy forwarding attribution
+writes to the backend. The backend identifies the invited user from the JWT
+principal, not from the request body, preventing spoofed attributions.
 
 ## Reward System
 
