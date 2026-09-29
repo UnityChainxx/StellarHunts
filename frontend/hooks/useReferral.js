@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { apiClient, apiUrl } from "@/lib/api";
 
 /**
- * Hook for managing referral data with consistent loading / error / empty states.
+ * Hook for managing referral data through the shared backend API client.
+ *
+ * This is the single client data path for referral code, stats, and history.
+ * All requests go through `apiClient`/`apiUrl()` so the `/api/v1` contract
+ * defined in `docs/api-conventions.md` is always respected.
+ *
+ * The legacy Next.js route handlers under `frontend/app/api/referrals/[userId]`
+ * have been removed. Attribution writes now reach the backend directly through
+ * `trackReferral()` instead of the intermediate proxy route (issue #510).
  */
 export const useReferral = (userId = null) => {
   const [referralStats, setReferralStats] = useState({
@@ -19,6 +27,10 @@ export const useReferral = (userId = null) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  /**
+   * Fetch referral stats and invited users for `id` from the backend.
+   * Uses `apiClient.get` so the `/api/v1` prefix is always applied.
+   */
   const fetchReferralData = useCallback(async (id) => {
     if (!id) return;
 
@@ -26,9 +38,7 @@ export const useReferral = (userId = null) => {
     setError(null);
 
     try {
-      const response = await axios.get(`/api/referrals/${id}`, {
-        withCredentials: true,
-      });
+      const response = await apiClient.get(`/referrals/${id}`);
 
       const stats = response.data?.stats ?? response.data;
       const users = response.data?.invitedUsers ?? [];
@@ -36,7 +46,7 @@ export const useReferral = (userId = null) => {
       setInvitedUsers(users);
     } catch (err) {
       console.error("Failed to fetch referral data:", err);
-      setError("Failed to load referral data");
+      setError(err?.message ?? "Failed to load referral data");
     } finally {
       setLoading(false);
     }
@@ -53,14 +63,17 @@ export const useReferral = (userId = null) => {
     return `${baseUrl}/ref/${id}`;
   }, []);
 
+  /**
+   * Record a referral attribution by writing directly to the backend.
+   * Uses `apiClient.post` through `apiUrl()` so the `/api/v1` prefix applies.
+   */
   const trackReferral = useCallback(
     async (referrerId, newUserId) => {
       try {
-        const response = await axios.post(
-          "/api/referrals/track",
-          { referrerId, newUserId },
-          { withCredentials: true },
-        );
+        const response = await apiClient.post("/referrals/track", {
+          referrerId,
+          newUserId,
+        });
 
         await fetchReferralData(referrerId);
         return response?.data;

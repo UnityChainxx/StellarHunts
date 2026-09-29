@@ -55,15 +55,38 @@ The referral system encourages users to invite friends to join StellarHunts. Use
 
 ## API Routes & Attribution Flow
 
-### `GET /api/referrals/[userId]`
-- Fetches referral statistics and invited users list for the given user ID.
+All referral data flows through a single path:
 
-### `POST /api/referrals/track`
-- Thin authenticated proxy route connecting client interactions to the backend single-writer service (`POST /api/v1/referrals/track`).
-- **Authentication**: Gated by caller authentication (JWT Bearer token or session cookie). Unauthenticated attempts are rejected with `401 Unauthorized` so that attribution cannot be forged for arbitrary accounts.
-- **Identity Binding**: The backend identifies the invited user strictly from `@CurrentUser('id')`, ignoring any spoofed user IDs in the request body.
-- **Idempotency**: Repeat visits or calls for the same referral pair (referrer and referred user) are idempotent. They return the existing attribution record rather than creating duplicate invite records or raising errors.
-- **Persistence**: Persists a `ReferralInvite` record with `status: registered`, links it to the referrer's active `ReferralCode`, updates invite counters, and reports bonus entitlements.
+1. **`useReferral` hook** (`frontend/hooks/useReferral.js`) calls the backend
+   directly via `apiClient` from `frontend/lib/api.js`. This ensures the
+   `/api/v1` prefix contract from `docs/api-conventions.md` is always respected
+   and there is no duplicate caching or auth model.
+
+2. **Backend** (`backend/src/referral/`) is the authoritative data source.
+   It enforces authentication and records `ReferralInvite` rows.
+
+### `GET /api/v1/referrals/:userId`
+- Fetches referral statistics and invited users list. Called by `useReferral`
+  through `apiClient.get("/referrals/:id")`.
+
+### `POST /api/v1/referrals/track`
+- Records referral attribution. Called by `useReferral.trackReferral()` through
+  `apiClient.post("/referrals/track", ...)`.
+- **Authentication**: Gated by the backend JWT guard. Unauthenticated attempts
+  are rejected with `401 Unauthorized`.
+- **Identity Binding**: The backend identifies the invited user strictly from
+  `@CurrentUser('id')`, ignoring any spoofed user IDs in the request body.
+- **Idempotency**: Repeat calls for the same referral pair are idempotent.
+
+### Next.js route handlers (`frontend/app/api/referrals/`)
+
+`frontend/app/api/referrals/[userId]/route.js` — thin proxy kept for
+backwards compatibility with any existing callers. New code should call the
+backend through `apiClient` directly.
+
+`frontend/app/api/referrals/track/route.js` — authenticated proxy that
+forwards `POST /api/v1/referrals/track` to the backend, included for clients
+that cannot call the backend directly (e.g., server-side rendering).
 
 ## Reward System
 
@@ -111,7 +134,6 @@ The "Invite Friends" link has been added to the main navigation bar, making it e
 - Smooth animations and transitions
 
 ### Future Enhancements
-- Backend integration for real data
 - Social media sharing integration
 - Advanced analytics and tracking
 - Gamification elements (leaderboards, challenges)

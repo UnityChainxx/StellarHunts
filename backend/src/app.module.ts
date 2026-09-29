@@ -36,7 +36,7 @@ import { NFTClaimModule } from './nft-claim/nft-claim.module';
 import { NftMarketplaceStubModule } from './nft-marketplace-stub/nft-marketplace-stub.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { ProgressModule } from './progress/progress.module';
-import { PromoCodeModule } from './promo-code/entities/promo-code.module';
+import { PromoCodeModule } from './promo-code/promo-code.module';
 import { PuzzleAccessLogModule } from './puzzle-access-log/puzzle-access-log.module';
 import { PuzzleCategoryModule } from './puzzle-category/puzzle-category.module';
 import { PuzzleCommentModule } from './puzzle-comment/puzzle-comment.module';
