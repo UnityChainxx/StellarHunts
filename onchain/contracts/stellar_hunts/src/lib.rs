@@ -272,12 +272,12 @@ pub enum Error {
     ArithmeticOverflow = 12,
     ContractPaused = 13,
     SchemaVersionMismatch = 14,
-    /// Returned when an admin tries to set a per-level cap below the number
-    /// of questions already indexed for that level.
-    CapBelowExistingIndex = 15,
-    /// Returned when an admin tries to set a per-level cap of zero (which
-    /// would make the level permanently unreachable).
-    CapWouldMakeLevelUnreachable = 16,
+    // Appended for the retirement-semantics guard (#447): submitting or
+    // requesting a hint for a retired question, and submitting a question
+    // other than the one the player's level cursor expects. New variants
+    // go at the end so existing discriminants stay stable.
+    QuestionRetired = 15,
+    WrongQuestion = 16,
 }
 
 // ---------------------------------------------------------------------
