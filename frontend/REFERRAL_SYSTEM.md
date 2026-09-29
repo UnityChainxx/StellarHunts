@@ -55,15 +55,25 @@ The referral system encourages users to invite friends to join StellarHunts. Use
 
 ## API Routes & Attribution Flow
 
-### `GET /api/referrals/[userId]`
-- Fetches referral statistics and invited users list for the given user ID.
+All referral data originates from the backend service (`backend/src/referral/`).
+No hardcoded mock data is served by any route handler (issue #497).
 
-### `POST /api/referrals/track`
-- Thin authenticated proxy route connecting client interactions to the backend single-writer service (`POST /api/v1/referrals/track`).
-- **Authentication**: Gated by caller authentication (JWT Bearer token or session cookie). Unauthenticated attempts are rejected with `401 Unauthorized` so that attribution cannot be forged for arbitrary accounts.
-- **Identity Binding**: The backend identifies the invited user strictly from `@CurrentUser('id')`, ignoring any spoofed user IDs in the request body.
-- **Idempotency**: Repeat visits or calls for the same referral pair (referrer and referred user) are idempotent. They return the existing attribution record rather than creating duplicate invite records or raising errors.
-- **Persistence**: Persists a `ReferralInvite` record with `status: registered`, links it to the referrer's active `ReferralCode`, updates invite counters, and reports bonus entitlements.
+### `GET /api/v1/referrals/:userId` (backend)
+- The authoritative data source. Returns real referral statistics and invited
+  users from the database.
+
+### `POST /api/v1/referrals/track` (backend)
+- Records referral attribution. Authentication is required; unauthenticated
+  attempts return `401`.
+
+### Next.js route handlers (`frontend/app/api/referrals/`)
+
+`GET /api/referrals/[userId]` — thin proxy to the backend. Kept for
+compatibility; prefer calling `apiClient.get("/referrals/:id")` directly.
+
+`POST /api/referrals/track` — authenticated proxy forwarding attribution
+writes to the backend. The backend identifies the invited user from the JWT
+principal, not from the request body, preventing spoofed attributions.
 
 ## Reward System
 
@@ -111,7 +121,6 @@ The "Invite Friends" link has been added to the main navigation bar, making it e
 - Smooth animations and transitions
 
 ### Future Enhancements
-- Backend integration for real data
 - Social media sharing integration
 - Advanced analytics and tracking
 - Gamification elements (leaderboards, challenges)

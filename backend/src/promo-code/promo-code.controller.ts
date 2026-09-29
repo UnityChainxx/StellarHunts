@@ -1,8 +1,7 @@
-// src/promo-code/promo-code.controller.ts
 import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { RedeemPromoCodeDto } from 'src/promo-code/dto/redeem-promo-code.dto';
+import { RedeemPromoCodeDto } from './dto/redeem-promo-code.dto';
 import { PromoCodeService } from './promo-code.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('promocode')
 export class PromoCodeController {

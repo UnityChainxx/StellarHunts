@@ -39,6 +39,105 @@ cd frontend
 npm run dev           # UI at http://localhost:3000
 ```
 
+## Dependency Policy
+
+This monorepo has **three npm workspaces** (root, `frontend/`, `backend/`) and
+one Rust workspace (`onchain/`). Each workspace owns its own dependencies and
+its own lockfile.
+
+### Workspace ownership
+
+| Workspace | `package.json` | Lockfile |
+|-----------|---------------|----------|
+| Root      | `package.json` | `package-lock.json` |
+| Backend   | `backend/package.json` | `backend/package-lock.json` |
+| Frontend  | `frontend/package.json` | `frontend/package-lock.json` |
+| Onchain   | `onchain/Cargo.toml` (workspace) | `onchain/Cargo.lock` |
+
+All four lockfiles are **committed and authoritative**. A PR that modifies a
+`package.json` must include the regenerated lockfile for that workspace.
+
+> **Known issue — self-referential root dependency:**
+> The root `package.json` carries `"backend": "file:"` in its dependencies,
+> a leftover from an earlier monorepo experiment. This entry is intentionally
+> kept for backwards compatibility with existing tooling scripts that resolve
+> the `backend` package by name; it does not affect `npm install` or CI.
+> The root `package-lock.json` therefore shows a local-path entry for
+> `backend` — this is expected and not a mistake.
+
+### Adding a dependency
+
+Always add dependencies to the specific workspace that uses them. Do **not**
+add application dependencies to the root workspace.
+
+```bash
+# Add a production dependency to the backend
+npm install --workspace backend <package>
+
+# Add a dev dependency to the frontend
+npm install --workspace frontend --save-dev <package>
+
+# Add a dependency to the root (tooling only, e.g. Husky, commitlint)
+npm install --save-dev <package>
+
+# Add a Rust dependency to a specific onchain crate
+# (edit onchain/contracts/<crate>/Cargo.toml, then run:)
+cargo update --manifest-path onchain/Cargo.toml
+```
+
+After installing, verify the correct lockfile was updated:
+
+```bash
+# Confirm only the expected lockfile changed
+git diff --name-only | grep package-lock
+```
+
+### Updating a dependency
+
+```bash
+# Update a single package in a workspace
+npm update --workspace backend <package>
+
+# Update all packages in a workspace (respects semver ranges)
+npm update --workspace frontend
+
+# Check for outdated packages
+npm outdated --workspace backend
+```
+
+### Dependabot grouping
+
+Dependabot opens weekly PRs against **four directories** (`/`, `/frontend`,
+`/backend`, `onchain/`). Related packages are grouped to reduce PR noise:
+
+| Group | Patterns | Workspace |
+|-------|---------|-----------|
+| `nestjs` | `@nestjs/*` | root |
+| `react` | `react`, `react-dom`, `@types/react*` | root |
+| `stellar` | `@stellar/*` | root |
+| `soroban` | `soroban-*` | onchain (Cargo) |
+
+When reviewing a Dependabot PR, check that:
+1. Only the expected lockfile(s) changed.
+2. No new `src/`-absolute imports were introduced.
+3. `npm run build` and `npm test` pass in the affected workspace.
+4. The advisory column in [SECURITY.md](SECURITY.md) is current (for security
+   bumps).
+
+### Reviewer checklist for dependency PRs
+
+- [ ] Dependency is added to the correct workspace.
+- [ ] The correct lockfile(s) are regenerated and committed.
+- [ ] No version ranges are widened without justification.
+- [ ] `npm run build` passes in the affected workspace.
+- [ ] `npm test` passes in the affected workspace.
+- [ ] Security advisories (if any) are noted in the PR description and in
+      `SECURITY.md` if they cannot be resolved immediately.
+- [ ] The self-referential `backend` root entry has not been removed — it is
+      intentional (see note above).
+
+---
+
 ## Branching Strategy
 
 - **`main`** — Stable, production-ready code. All commits must pass CI.

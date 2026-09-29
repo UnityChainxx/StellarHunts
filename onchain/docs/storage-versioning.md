@@ -39,7 +39,11 @@ serialized types without breaking existing state.
   events stable:
   - `Question(u64)`, `QuestionCount`, `QuestionPerLevel`,
     `QuestionsByLevel(Levels, u32)`
-  - `PlayerProgress(Address)`, `PlayerLevelProgress(Address, Levels)`
+  - `PlayerProgress(Address)`, `PlayerLevelProgress(Address, Levels)` —
+    legacy records still live here; no longer written (see the
+    `stellar_hunts` section)
+  - `PlayerProgressV2(Address)`, `PlayerLevelProgressV2(Address, Levels)` —
+    versioned successors introduced with `CURRENT_SCHEMA_VERSION = 2`
   - `Badge(Address, Levels)`, `BadgeData(Address, Levels)`
 
 ## Evolving serialized types
@@ -78,8 +82,9 @@ part of the serialization. Two safe ways to evolve a stored struct:
 ## Contract-specific notes
 
 ### `stellar_hunts`
-- `CURRENT_SCHEMA_VERSION = 1`, stored under `DataKey::SchemaVersion` at
-  `init` and readable via `get_schema_version()`.
+
+- `CURRENT_SCHEMA_VERSION = 2` (bumped from 1 by issue #463), stored under
+  `DataKey::SchemaVersion` at `init` and readable via `get_schema_version()`.
 - `Question` carries a per-record `version` field stamped with
   `CURRENT_SCHEMA_VERSION` at write time; readers treat an older `version`
   as legacy-format data.
@@ -87,6 +92,11 @@ part of the serialization. Two safe ways to evolve a stored struct:
   adding one (or switching to `PlayerProgressV2`/`LevelProgressV2` keys)
   requires a schema-version bump and a migration that seeds the new field
   from existing state.
+- `QuestionCapByLevel(Levels)` (added in issue #467) — stores the per-level
+  question cap for a `Levels` variant. Absence means the global
+  `QuestionPerLevel` value (default 5) governs that level. Setting this key
+  overrides the global cap for that level only. The key is stored in instance
+  storage alongside `QuestionPerLevel`.
 
 ### `stellar_hunts_nft`
 - `CURRENT_SCHEMA_VERSION = 1`, written to `NftDataKey::SchemaVersion` at
@@ -196,10 +206,24 @@ guarantees:
 - `test_legacy_question_readable` — a `Question` written with
   `version: 0` (pre-versioning format) is still returned by
   `get_question`, proving reads are backward compatible.
-- `test_level_progress_roundtrip_compat` — a `LevelProgress` written
-  directly to storage round-trips through `get_player_level_progress`
+- `test_level_progress_roundtrip_compat` — a `LevelProgress` written in
+  the pre-versioning shape under the original key round-trips through
+  `get_player_level_progress` field-for-field and is surfaced by
+  `get_player_level_progress_v2` with `version = LEGACY_RECORD_VERSION`.
+- `test_level_progress_v2_roundtrip` — a `LevelProgressV2` written under
+  the versioned key round-trips through `get_player_level_progress_v2`
   field-for-field, so appending a field in the future must preserve all
   existing fields.
+- `test_lazy_migration_upgrades_legacy_record_on_write` — a pre-versioning
+  record is readable, then after the player's next write it is stamped
+  with `CURRENT_SCHEMA_VERSION` under the `*V2` key and the legacy entry
+  is removed.
+- `test_player_progress_v2_default_for_unknown_player` — the versioned
+  views report `version = 0` and zeroed fields for a player with no
+  record.
+- `test_default_level_progress_uses_queried_player` — the synthesized
+  default returned for an unknown player carries the queried `player`,
+  never the contract address (issue #449).
 - `test_levels_discriminants_stable` — `Levels` numeric discriminants
   (Easy=1, Medium=2, Hard=3, Master=4) never change, protecting both stored
   state and event payloads.
