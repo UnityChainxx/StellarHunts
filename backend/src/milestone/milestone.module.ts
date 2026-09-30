@@ -9,10 +9,14 @@ import { MilestoneAssignmentService } from './services/milestone-assignment.serv
 import { MilestoneService } from './services/milestone.service';
 import { MilestoneController } from './controllers/milestone.controller';
 import { UserMilestoneController } from './controllers/user-milestone.controller';
+import { ApiKeyModule } from '../api-key/api-key.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MilestoneTemplate, UserMilestone, UserProgress]),
+    // Provides ApiKeyService for the APIKeyGuard that protects the
+    // server-to-server `/milestones/trigger/*` routes (issue #482).
+    ApiKeyModule,
   ],
   controllers: [MilestoneController, UserMilestoneController],
   providers: [
