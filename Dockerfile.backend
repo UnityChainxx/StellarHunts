@@ -14,7 +14,7 @@
 # =============================================================================
 
 # ── Stage 1: install all dependencies ────────────────────────────────────────
-FROM node:18-alpine AS deps
+FROM node:26-alpine AS deps
 
 # Install OS-level build tools required by native addons (e.g., bcrypt).
 RUN apk add --no-cache python3 make g++
@@ -29,7 +29,7 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --prefer-offline
 
 # ── Stage 2: build ───────────────────────────────────────────────────────────
-FROM node:18-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /app
 
@@ -46,7 +46,7 @@ RUN npm run build
 RUN npm prune --production
 
 # ── Stage 3: production runner ───────────────────────────────────────────────
-FROM node:18-alpine AS runner
+FROM node:26-alpine AS runner
 
 # Security: run as a non-root user.
 RUN addgroup --system --gid 1001 nodejs \

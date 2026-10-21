@@ -17,7 +17,7 @@
 # =============================================================================
 
 # ── Stage 1: install dependencies ────────────────────────────────────────────
-FROM node:18-alpine AS deps
+FROM node:26-alpine AS deps
 
 RUN apk add --no-cache libc6-compat
 
@@ -29,7 +29,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --prefer-offline
 
 # ── Stage 2: build ───────────────────────────────────────────────────────────
-FROM node:18-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 # ── Stage 3: production runner ───────────────────────────────────────────────
-FROM node:18-alpine AS runner
+FROM node:26-alpine AS runner
 
 # Security: run as a non-root user.
 RUN addgroup --system --gid 1001 nodejs \
