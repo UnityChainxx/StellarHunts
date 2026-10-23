@@ -35,7 +35,7 @@ import { MigrationModule } from './migration/migration.module';
 import { MilestoneModule } from './milestone/milestone.module';
 import { MultiplayerQueueModule } from './multiplayer-queue/multiplayer-queue.module';
 import { NFTClaimModule } from './nft-claim/nft-claim.module';
-import { NftMarketplaceStubModule } from './nft-marketplace-stub/nft-marketplace-stub.module';
+import { NftMarketplaceModule } from './nft-marketplace/nft-marketplace.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { ProgressModule } from './progress/progress.module';
 import { PromoCodeModule } from './promo-code/promo-code.module';
@@ -130,7 +130,7 @@ import { GlobalExceptionFilter } from './common/exceptions/global-exception.filt
     MilestoneModule,
     MultiplayerQueueModule,
     NFTClaimModule,
-    NftMarketplaceStubModule,
+    NftMarketplaceModule,
     ProgressModule,
     PromoCodeModule,
     PuzzleAccessLogModule,

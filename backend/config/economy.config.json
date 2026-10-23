@@ -14,5 +14,8 @@
     "bronzeChest": 250,
     "coinPack": 600,
     "rareSkinCrate": 1200
+  },
+  "marketplace": {
+    "feeBps": 250
   }
 }
