@@ -167,8 +167,30 @@ const securityHeaders = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// PR preview builds (issue #769)
+// ---------------------------------------------------------------------------
+//
+// CI publishes per-PR previews to GitHub Pages (see
+// `.github/workflows/preview.yml`). Pages only serves static files, so the
+// preview build opts into `output: 'export'` via `NEXT_OUTPUT=export`, a
+// sub-path base via `NEXT_PUBLIC_BASE_PATH` (e.g. `/previews/pr-123`), and
+// unoptimised images (the optimiser needs a Node server). Server-only
+// features (`headers()`, the `app/api` route handlers) do not run on Pages —
+// `headers()` is already documented above as a server-only export, and the
+// preview build script relocates `app/api` for the duration of the build.
+// These settings are inert for normal `next build` / `next dev` runs.
+const isStaticPreviewExport = process.env.NEXT_OUTPUT === 'export';
+const previewBasePath = process.env.NEXT_PUBLIC_BASE_PATH || undefined;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Static-export mode only for PR preview builds (issue #769).
+  ...(isStaticPreviewExport ? { output: 'export', trailingSlash: true } : {}),
+
+  // Previews live under https://<owner>.github.io/<repo>/previews/pr-<n>/,
+  // so every asset path must be prefixed with the sub-path.
+  ...(previewBasePath ? { basePath: previewBasePath } : {}),
   // Remote badge images are only optimised for hosts we explicitly trust.
   // The allow-list lives in `lib/images.js` so the runtime check in components
   // and this build-time configuration can never drift apart. Wildcards are
@@ -178,6 +200,8 @@ const nextConfig = {
       protocol: 'https',
       hostname,
     })),
+    // The export build has no image-optimisation server available.
+    unoptimized: isStaticPreviewExport,
   },
 
   // ---------------------------------------------------------------------------

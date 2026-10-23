@@ -1,0 +1,188 @@
+name: PR Preview Deployment
+
+# Issue #769 — publish preview deployments for PRs.
+#
+# Every PR gets a static preview of the frontend published to GitHub Pages
+# under `previews/pr-<number>/`, a sticky PR comment with the preview URL,
+# and full teardown (preview directory + comment) when the PR is closed.
+#
+# The preview is built with **testnet configuration** (acceptance criteria):
+# `NEXT_PUBLIC_STELLAR_NETWORK=testnet` and the backend origin from the
+# `PREVIEW_API_URL` repository variable (defaults to the compose default).
+#
+# One-time setup: repository Settings → Pages → Source must be set to the
+# `gh-pages` branch (root). Until then the comment job still reports the
+# intended URL and the Pages publish fails loudly.
+#
+# Jobs are kept small on purpose: the deploy job is the only one that
+# touches `gh-pages`, so concurrent previews serialise on separate paths and
+# never overwrite each other.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions: read-all
+
+concurrency:
+  # One run per PR at a time; a superseded push cancels the older build.
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PREVIEW_SUBDIR: previews/pr-${{ github.event.pull_request.number }}
+
+jobs:
+  build-preview:
+    name: Build preview (testnet config)
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_STELLAR_NETWORK: testnet
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}/previews/pr-${{ github.event.pull_request.number }}
+      # Testnet backend origin for the preview. Set the `PREVIEW_API_URL`
+      # repository variable to the testnet API base; without it the preview
+      # falls back to the compose default, which is only useful when the
+      # reviewer runs the backend locally.
+      NEXT_PUBLIC_API_URL: ${{ vars.PREVIEW_API_URL || 'http://localhost:3001' }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Static export build
+        working-directory: frontend
+        run: node scripts/build-preview.mjs
+
+      - name: Upload preview bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-pr-${{ github.event.pull_request.number }}
+          path: frontend/out
+          retention-days: 7
+
+  deploy-preview:
+    name: Publish preview
+    needs: build-preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      # Push the preview to the `gh-pages` branch.
+      contents: write
+      # Create/update the sticky PR comment.
+      pull-requests: write
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: gh-pages
+
+      - name: Download preview bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-pr-${{ github.event.pull_request.number }}
+          path: ${{ env.PREVIEW_SUBDIR }}
+
+      - name: Publish preview to gh-pages
+        run: |
+          git config user.name "stellarhunts-preview-bot"
+          git config user.email "actions@github.com"
+          git add -A "$PREVIEW_SUBDIR"
+          if git diff --cached --quiet; then
+            echo "No preview changes to publish."
+          else
+            git commit -m "preview: PR #${{ github.event.pull_request.number }} @ ${{ github.event.pull_request.head.sha }}"
+            git push origin gh-pages
+          fi
+
+      - name: Post preview link on the PR
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcbf3470c9eed # v7.0.1
+        with:
+          script: |
+            const marker = '<!-- preview-link-pr-' + context.issue.number + ' -->';
+            const url =
+              'https://' + context.repo.owner + '.github.io/' +
+              context.repo.repo + '/previews/pr-' + context.issue.number + '/';
+            const body =
+              marker + '\n' +
+              '## 🔍 PR Preview\n' +
+              'Built with **testnet** configuration from commit `' +
+              context.sha.substring(0, 7) + '`.\n\n' +
+              '**Preview URL:** ' + url + '\n\n' +
+              '_The preview is removed automatically when this PR is closed._';
+
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.data.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  teardown-preview:
+    name: Tear down preview
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: gh-pages
+
+      - name: Remove preview directory
+        run: |
+          git config user.name "stellarhunts-preview-bot"
+          git config user.email "actions@github.com"
+          if [ -d "$PREVIEW_SUBDIR" ]; then
+            git rm -r --ignore-unmatch "$PREVIEW_SUBDIR"
+            git commit -m "preview: tear down PR #${{ github.event.pull_request.number }}"
+            git push origin gh-pages
+          else
+            echo "Nothing to remove."
+          fi
+
+      - name: Mark the preview comment as removed
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcbf3470c9eed # v7.0.1
+        with:
+          script: |
+            const marker = '<!-- preview-link-pr-' + context.issue.number + ' -->';
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.data.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: marker + '\n## 🔍 PR Preview\n_Preview removed (PR closed)._',
+              });
+            }
