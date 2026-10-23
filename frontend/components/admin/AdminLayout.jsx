@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuthStore from '../../store/auth/auth-store';
-import { Shield, Users, FileText, Settings, LogOut, Menu, X, Sliders } from 'lucide-react';
+import { Shield, Users, FileText, Settings, LogOut, Menu, X, Sliders, Coins } from 'lucide-react';
 
 const AdminLayout = ({ children }) => {
   const router = useRouter();
@@ -28,6 +28,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Dashboard', href: '/admin', icon: Shield },
     { name: 'Puzzle Review', href: '/admin/puzzle-review', icon: FileText },
     { name: 'Difficulty Tuning', href: '/admin/puzzle-difficulty', icon: Sliders },
+    { name: 'Reward Adjustments', href: '/admin/reward-adjustments', icon: Coins },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];

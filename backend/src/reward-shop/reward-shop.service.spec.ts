@@ -1,14 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { RewardShopService } from './reward-shop.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { economyConfig } from '../../config/economy';
 
 describe('RewardShopService', () => {
   let service: RewardShopService;
+  let auditLogMock: { createLog: jest.Mock };
 
   beforeEach(async () => {
+    auditLogMock = {
+      createLog: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RewardShopService],
+      providers: [
+        RewardShopService,
+        { provide: AuditLogService, useValue: auditLogMock },
+      ],
     }).compile();
 
     service = module.get<RewardShopService>(RewardShopService);
@@ -89,5 +98,67 @@ describe('RewardShopService', () => {
   it('adds points to user', () => {
     service.addPointsToUser('userC', 500);
     expect(service.getUserPoints('userC')).toBe(550);
+  });
+
+  // ── Admin reward adjustment (issue #742) ────────────────────────────
+  describe('adjustUserPoints', () => {
+    it('grants points and writes an audit-log entry with the reason', async () => {
+      const result = await service.adjustUserPoints('userC', 100, 'Goodwill grant', 'admin-1');
+
+      expect(service.getUserPoints('userC')).toBe(150);
+      expect(result).toMatchObject({
+        userId: 'userC',
+        previousPoints: 50,
+        points: 150,
+        appliedAmount: 100,
+        reason: 'Goodwill grant',
+      });
+      expect(auditLogMock.createLog).toHaveBeenCalledWith(
+        'admin-1',
+        'reward_shop.points_adjusted',
+        expect.objectContaining({
+          targetType: 'user',
+          targetId: 'userC',
+          amount: 100,
+          reason: 'Goodwill grant',
+          previousBalance: 50,
+          newBalance: 150,
+        }),
+      );
+    });
+
+    it('revokes points and records the applied delta in the audit log', async () => {
+      const result = await service.adjustUserPoints('userA', -400, 'Fraud reversal', 'admin-1');
+
+      expect(service.getUserPoints('userA')).toBe(600);
+      expect(result.appliedAmount).toBe(-400);
+      expect(auditLogMock.createLog).toHaveBeenCalledWith(
+        'admin-1',
+        'reward_shop.points_adjusted',
+        expect.objectContaining({
+          amount: -400,
+          appliedAmount: -400,
+          previousBalance: 1000,
+          newBalance: 600,
+        }),
+      );
+    });
+
+    it('clamps revocations at zero and records the clamped delta', async () => {
+      const result = await service.adjustUserPoints('userC', -99999, 'Account reset', 'admin-1');
+
+      expect(service.getUserPoints('userC')).toBe(0);
+      expect(result.appliedAmount).toBe(-50);
+      expect(auditLogMock.createLog).toHaveBeenCalledWith(
+        'admin-1',
+        'reward_shop.points_adjusted',
+        expect.objectContaining({
+          amount: -99999,
+          appliedAmount: -50,
+          previousBalance: 50,
+          newBalance: 0,
+        }),
+      );
+    });
   });
 });

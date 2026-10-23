@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { economyConfig } from '../../config/economy';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 export interface ShopItem {
   id: string;
@@ -32,6 +33,10 @@ export interface Purchase {
 export class RewardShopService {
   private readonly logger = new Logger(RewardShopService.name);
 
+  constructor(private readonly auditLogService: AuditLogService) {
+    this.seedData();
+  }
+
   private shopItems = new Map<string, ShopItem>();
 
   private purchases = new Map<string, Purchase>();
@@ -40,9 +45,7 @@ export class RewardShopService {
 
   private userPoints = new Map<string, number>();
 
-  constructor() {
-    this.seedData();
-  }
+
 
   private seedData(): void {
     this.logger.log('Seeding initial reward shop data...');
@@ -262,5 +265,56 @@ export class RewardShopService {
     this.logger.log(
       `Added ${amount} points to user ${userId}. New balance: ${this.userPoints.get(userId)}`,
     );
+  }
+
+  /**
+   * Admin reward adjustment (issue #742).
+   *
+   * Applies a signed point delta to a user's balance and writes an immutable
+   * audit-log entry recording the admin actor, the mandatory reason, and the
+   * before/after balances. Balances are clamped at zero: a revocation larger
+   * than the current balance zeroes it out, and the audit entry records the
+   * delta actually applied.
+   */
+  async adjustUserPoints(
+    userId: string,
+    amount: number,
+    reason: string,
+    adminId: string,
+  ): Promise<{
+    userId: string;
+    previousPoints: number;
+    points: number;
+    appliedAmount: number;
+    reason: string;
+  }> {
+    const previousPoints = this.userPoints.get(userId) || 0;
+    const appliedAmount = Math.sign(amount) * Math.min(Math.abs(amount), previousPoints);
+    const newPoints = previousPoints + appliedAmount;
+
+    this.userPoints.set(userId, newPoints);
+
+    await this.auditLogService.createLog(adminId, 'reward_shop.points_adjusted', {
+      targetType: 'user',
+      targetId: userId,
+      amount,
+      appliedAmount,
+      reason,
+      previousBalance: previousPoints,
+      newBalance: newPoints,
+    });
+
+    this.logger.log(
+      `Admin ${adminId} adjusted points for user ${userId}: ${amount} (${appliedAmount} applied, clamped at zero). ` +
+        `Reason: "${reason}". Balance ${previousPoints} -> ${newPoints}.`,
+    );
+
+    return {
+      userId,
+      previousPoints,
+      points: newPoints,
+      appliedAmount,
+      reason,
+    };
   }
 }

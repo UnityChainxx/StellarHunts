@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useAuthStore from '../../store/auth/auth-store';
 import AdminLayout from '../../components/admin/AdminLayout';
-import { Sliders, FileText, PlusCircle, ShieldCheck } from 'lucide-react';
+import { Sliders, FileText, PlusCircle, ShieldCheck, Coins } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -59,6 +59,19 @@ export default function AdminDashboardPage() {
             <h3 className="mt-4 text-lg font-semibold text-gray-900">Puzzle Review & Moderation</h3>
             <p className="mt-2 text-sm text-gray-500">
               Review and moderate submitted community puzzles, solutions, and hints.
+            </p>
+          </Link>
+
+          <Link
+            href="/admin/reward-adjustments"
+            className="block p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:border-amber-500 hover:shadow-md transition-all group"
+          >
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg w-fit group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <Coins className="h-6 w-6" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">Reward Adjustments</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              Grant or revoke player points with a mandatory reason; every change is audit-logged.
             </p>
           </Link>
 
