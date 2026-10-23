@@ -11,7 +11,8 @@ export default function ConnectWalletPage() {
         <h1 className="text-3xl font-bold tracking-tight">Connect Wallet</h1>
         <p className="text-gray-600">
           Connect your Freighter wallet to submit puzzle answers and claim
-          on-chain NFT rewards.
+          on-chain NFT rewards. No extension? Use the WalletConnect option to
+          pair a mobile wallet via QR code.
         </p>
 
         <div className="flex justify-center">

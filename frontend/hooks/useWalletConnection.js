@@ -9,6 +9,14 @@ import {
 } from "@stellar/freighter-api";
 import { Networks } from "@stellar/stellar-sdk";
 import { findNetworkSwitcher, getNetworkName } from "@/lib/network";
+import {
+  disconnectWalletConnectSession,
+  finalizeWalletConnectPairing,
+  isWalletConnectConfigured,
+  restoreWalletConnectSession,
+  signXdrWithWalletConnect,
+  startWalletConnectPairing,
+} from "@/lib/walletconnect";
 
 /**
  * The Stellar network the app expects to run on for wallet operations.
@@ -24,6 +32,16 @@ export const WALLET_STATUS = {
   CONNECTING: "connecting",
   CONNECTED: "connected",
   ERROR: "error",
+};
+
+/**
+ * Which connection method produced the active session (issue #730).
+ *  - "freighter": the browser extension
+ *  - "walletconnect": a WalletConnect v2 pairing (QR)
+ */
+export const WALLET_TYPE = {
+  FREIGHTER: "freighter",
+  WALLETCONNECT: "walletconnect",
 };
 
 /**
@@ -65,6 +83,10 @@ function detectExtension() {
  *   @prop {boolean} unsupportedNetwork– true when on an unexpected network
  *   @prop {boolean} switchSupported   – wallet exposes a network-switch API
  *   @prop {Function} switchNetwork    – attempt a one-click network switch
+ *   @prop {string}  walletType        – WALLET_TYPE.* for the active session
+ *   @prop {{uri, qrDataUrl}|null} pairing – active WalletConnect pairing (QR)
+ *   @prop {Function} connectWalletConnect – open a WalletConnect pairing (QR)
+ *   @prop {Function} signXdr        – sign an XDR via the active wallet
  *   @prop {string|null} error         – last lifecycle error message
  *   @prop {Function} connect          – request access + populate state
  *   @prop {Function} refresh          – re-read wallet state
@@ -81,9 +103,15 @@ export function useWalletConnection(opts = {}) {
   const [unsupportedNetwork, setUnsupportedNetwork] = useState(false);
   const [switchSupported, setSwitchSupported] = useState(false);
   const [error, setError] = useState(null);
+  const [walletType, setWalletType] = useState(null);
+  const [pairing, setPairing] = useState(null);
 
   const lastAddressRef = useRef(null);
   const destroyedRef = useRef(false);
+  // Which connection method owns the active session; when WalletConnect is
+  // active, Freighter polling must not clobber the session state.
+  const activeWalletRef = useRef(null);
+  const walletConnectTopicRef = useRef(null);
 
   /**
    * Safely sync wallet state from Freighter without throwing.
@@ -92,6 +120,9 @@ export function useWalletConnection(opts = {}) {
    */
   const refresh = useCallback(async () => {
     if (typeof window === "undefined") return;
+    // A WalletConnect session is not reflected by the Freighter API; polling
+    // the extension while a QR session is active would clear the state.
+    if (activeWalletRef.current === WALLET_TYPE.WALLETCONNECT) return;
 
     const installed = detectExtension();
     setIsExtensionInstalled(installed);
@@ -101,6 +132,11 @@ export function useWalletConnection(opts = {}) {
       setConnected(connectedNow);
 
       if (!connectedNow) {
+        if (activeWalletRef.current === WALLET_TYPE.FREIGHTER) {
+          // Freighter reports a disconnect while it owns the session.
+          activeWalletRef.current = null;
+          setWalletType(null);
+        }
         setAddress(null);
         setNetwork(null);
         setStatus(WALLET_STATUS.DISCONNECTED);
@@ -108,6 +144,12 @@ export function useWalletConnection(opts = {}) {
       }
 
       const [pk, net] = await Promise.all([getPublicKey(), getNetwork()]);
+      // The extension owns the active session; WalletConnect restore must
+      // not override it and the polling loop must keep tracking it.
+      if (!activeWalletRef.current) {
+        activeWalletRef.current = WALLET_TYPE.FREIGHTER;
+        setWalletType(WALLET_TYPE.FREIGHTER);
+      }
       setAddress(pk);
       const normalized = net || Networks.PUBLIC;
       setNetwork(normalized);
@@ -169,6 +211,8 @@ export function useWalletConnection(opts = {}) {
     try {
       // requestAccess throws on user rejection or missing extension.
       const pk = await requestAccess();
+      activeWalletRef.current = WALLET_TYPE.FREIGHTER;
+      setWalletType(WALLET_TYPE.FREIGHTER);
       setAddress(pk);
       lastAddressRef.current = pk;
       setConnected(true);
@@ -193,10 +237,113 @@ export function useWalletConnection(opts = {}) {
   }, []);
 
   /**
+   * WalletConnect pairing flow (issue #730).
+   *
+   * Opens a pairing, exposes `{ uri, qrDataUrl }` via the `pairing` state so
+   * the UI can render the QR code, then awaits wallet approval. Resolves
+   * with the connected address, or null when the pairing fails / is declined.
+   */
+  const connectWalletConnect = useCallback(async () => {
+    if (typeof window === "undefined") return null;
+    if (!isWalletConnectConfigured()) {
+      setStatus(WALLET_STATUS.ERROR);
+      setError(
+        "WalletConnect is not configured. Set NEXT_PUBLIC_WC_PROJECT_ID to enable QR pairing."
+      );
+      return null;
+    }
+
+    setStatus(WALLET_STATUS.CONNECTING);
+    setError(null);
+
+    try {
+      const pending = await startWalletConnectPairing(EXPECTED_NETWORK);
+      setPairing({ uri: pending.uri, qrDataUrl: pending.qrDataUrl });
+
+      const { address: wcAddress, chainId, topic } =
+        await finalizeWalletConnectPairing(pending);
+
+      walletConnectTopicRef.current = topic;
+      activeWalletRef.current = WALLET_TYPE.WALLETCONNECT;
+      setPairing(null);
+      setWalletType(WALLET_TYPE.WALLETCONNECT);
+      setAddress(wcAddress);
+      lastAddressRef.current = wcAddress;
+      setNetwork(chainId);
+      setConnected(true);
+      setUnsupportedNetwork(false);
+      setStatus(WALLET_STATUS.CONNECTED);
+      setError(null);
+      return wcAddress;
+    } catch (e) {
+      setPairing(null);
+      setStatus(WALLET_STATUS.ERROR);
+      setError(
+        /reject|cancel|timeout/i.test(e?.message || "")
+          ? "WalletConnect pairing was rejected or timed out."
+          : e?.message || "WalletConnect pairing failed. Please try again."
+      );
+      return null;
+    }
+  }, []);
+
+  /**
+   * Re-attach a persisted WalletConnect session (session persistence, #730).
+   * Runs once on mount, only when no Freighter session is live.
+   */
+  const restoreWalletConnect = useCallback(async () => {
+    if (!isWalletConnectConfigured()) return;
+    try {
+      const restored = await restoreWalletConnectSession();
+      if (!restored?.address || activeWalletRef.current) return;
+      walletConnectTopicRef.current = restored.topic;
+      activeWalletRef.current = WALLET_TYPE.WALLETCONNECT;
+      setWalletType(WALLET_TYPE.WALLETCONNECT);
+      setAddress(restored.address);
+      setNetwork(restored.chainId);
+      setConnected(true);
+      setUnsupportedNetwork(false);
+      setStatus(WALLET_STATUS.CONNECTED);
+    } catch {
+      // No stored session / client unavailable — stay disconnected.
+    }
+  }, []);
+
+  /**
+   * Sign an XDR blob with the active wallet: WalletConnect sessions relay the
+   * request to the remote wallet; Freighter sessions sign locally.
+   */
+  const signXdr = useCallback(
+    async (xdr) => {
+      if (activeWalletRef.current === WALLET_TYPE.WALLETCONNECT) {
+        return signXdrWithWalletConnect(
+          walletConnectTopicRef.current,
+          network,
+          xdr
+        );
+      }
+      const { signTransaction } = await import("@stellar/freighter-api");
+      return signTransaction(xdr, {
+        networkPassphrase: network || EXPECTED_NETWORK,
+      });
+    },
+    [network]
+  );
+
+  /**
    * Clear local wallet state. Freighter has no programmatic disconnect, so
-   * this only resets the app's view of the wallet.
+   * this only resets the app's view of the wallet. WalletConnect sessions
+   * are torn down on both sides.
    */
   const disconnect = useCallback(() => {
+    if (activeWalletRef.current === WALLET_TYPE.WALLETCONNECT) {
+      const topic = walletConnectTopicRef.current;
+      walletConnectTopicRef.current = null;
+      disconnectWalletConnectSession(topic);
+    }
+    activeWalletRef.current = null;
+    setWalletType(null);
+    setPairing(null);
     setConnected(false);
     setAddress(null);
     setNetwork(null);
@@ -211,6 +358,14 @@ export function useWalletConnection(opts = {}) {
     destroyedRef.current = false;
     setSwitchSupported(Boolean(findNetworkSwitcher()));
     refresh();
+
+    // Restore a persisted WalletConnect session (#730) once the initial
+    // Freighter refresh settles; only applies when no extension session won.
+    const restoreTimer = setTimeout(() => {
+      if (!destroyedRef.current && !activeWalletRef.current) {
+        restoreWalletConnect();
+      }
+    }, 0);
 
     // Poll periodically to detect disconnect / unsupported network (Freighter
     // has no reliable change event through the npm API).
@@ -248,6 +403,7 @@ export function useWalletConnection(opts = {}) {
     return () => {
       destroyedRef.current = true;
       clearInterval(poll);
+      clearTimeout(restoreTimer);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
       cleanupListeners();
@@ -264,6 +420,11 @@ export function useWalletConnection(opts = {}) {
     unsupportedNetwork,
     switchSupported,
     switchNetwork,
+    walletType,
+    pairing,
+    walletConnectConfigured: isWalletConnectConfigured(),
+    connectWalletConnect,
+    signXdr,
     error,
     connect,
     refresh,
