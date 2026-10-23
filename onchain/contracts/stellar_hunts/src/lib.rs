@@ -154,6 +154,10 @@ pub enum DataKey {
     Role(Address, Role),
     Event(u64),
     BadgeStake(Address, u64, Levels),
+    RewardToken,
+    DefaultRewardAmount,
+    PuzzleRewardAmount(u64),
+    CompletedPuzzle(Address, u64),
 }
 
 // ---------------------------------------------------------------------
@@ -333,16 +337,14 @@ pub enum Error {
     // requesting a hint for a retired question, and submitting a question
     // other than the one the player's level cursor expects. New variants
     // go at the end so existing discriminants stay stable.
-    QuestionRetired = 15,
-    WrongQuestion = 16,
-    InvalidInput = 17,
-    InputTooLarge = 18,
-    CapWouldMakeLevelUnreachable = 19,
-    CapBelowExistingIndex = 20,
-    HashMismatch = 21,
-    AlreadyCompleted = 22,
-    RewardTransferFailed = 23,
-    MissingRewardToken = 24,
+    InvalidInput = 24,
+    InputTooLarge = 25,
+    CapWouldMakeLevelUnreachable = 26,
+    CapBelowExistingIndex = 27,
+    HashMismatch = 28,
+    AlreadyCompleted = 29,
+    RewardTransferFailed = 30,
+    MissingRewardToken = 31,
 }
 
 // ---------------------------------------------------------------------
@@ -840,6 +842,14 @@ impl StellarHunts {
             panic_with_error!(&env, Error::ArithmeticOverflow);
         }
 
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::RetiredQuestion(question_id))
+        {
+            panic_with_error!(&env, Error::QuestionRetired);
+        }
+
         let expected_question_id: u64 = env
             .storage()
             .persistent()
@@ -848,12 +858,7 @@ impl StellarHunts {
                 lp.last_question_index,
             ))
             .unwrap_or(0u64);
-        if expected_question_id != question_id
-            || env
-                .storage()
-                .persistent()
-                .has(&DataKey::RetiredQuestion(question_id))
-        {
+        if expected_question_id != question_id {
             panic_with_error!(&env, Error::WrongQuestion);
         }
 
@@ -1542,7 +1547,7 @@ impl StellarHunts {
         event_id: u64,
         level: Levels,
     ) -> u32 {
-        let event = match env.storage().persistent().get(&DataKey::Event(event_id)) {
+        let event: HuntEvent = match env.storage().persistent().get(&DataKey::Event(event_id)) {
             Some(e) => e,
             None => return 100,
         };

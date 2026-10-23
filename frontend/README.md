@@ -12,6 +12,7 @@ The frontend for StellarHunts, a gamified blockchain application built on **Stel
 | Zustand | Global state management |
 | TanStack Query | Server state and caching |
 | `@stellar/freighter-api` | Freighter browser-extension wallet integration |
+| `@walletconnect/sign-client` | WalletConnect v2 QR pairing (set `NEXT_PUBLIC_WC_PROJECT_ID`) |
 | `@stellar/stellar-sdk` | Stellar / Soroban transaction building |
 | NextAuth.js | Authentication (OAuth, wallet linking) |
 | Axios | HTTP client |

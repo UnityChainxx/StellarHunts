@@ -54,4 +54,24 @@ describe('RewardShopController', () => {
     controller.addPoints('u1', 100);
     expect(serviceMock.addPointsToUser).toHaveBeenCalledWith('u1', 100);
   });
+
+  it('adjusts points with the acting admin id (issue #742)', async () => {
+    serviceMock.adjustUserPoints = jest
+      .fn()
+      .mockResolvedValue({ userId: 'u1', previousPoints: 500, points: 600, appliedAmount: 100 });
+
+    const res = await controller.adjustPoints(
+      'u1',
+      { amount: 100, reason: 'Incident compensation' },
+      { user: { sub: 'admin-42' } },
+    );
+
+    expect(res.points).toBe(600);
+    expect(serviceMock.adjustUserPoints).toHaveBeenCalledWith(
+      'u1',
+      100,
+      'Incident compensation',
+      'admin-42',
+    );
+  });
 });
