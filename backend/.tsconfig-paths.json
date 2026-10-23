@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@nestjs/*": ["../node_modules/@nestjs/*"],
+      "passport-local": ["../node_modules/passport-local"],
+      "@types/passport-local": ["../node_modules/@types/passport-local"]
+    }
+  }
+}

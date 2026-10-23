@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "commonjs",
+    "target": "ES2021",
+    "strict": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": false,
+    "noEmit": true,
+    "typeRoots": ["node_modules/@types"],
+    "types": ["node","jest"]
+  },
+  "include": ["src/**/*","config/**/*"],
+  "exclude": ["node_modules","dist","test","**/*.spec.ts"]
+}

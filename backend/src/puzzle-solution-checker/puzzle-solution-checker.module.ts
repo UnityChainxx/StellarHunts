@@ -10,7 +10,7 @@ import { PuzzleSolutionCheckerService } from './puzzle-solution-checker.service'
 @Module({
   imports: [
     TypeOrmModule.forFeature([Puzzle, PuzzleAnswerAttempt]),
-    RateLimiterModule.forRoot(),
+    RateLimiterModule,
   ],
   controllers: [PuzzleSolutionCheckerController],
   providers: [PuzzleSolutionCheckerService],
