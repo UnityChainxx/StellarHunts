@@ -25,3 +25,11 @@ prefix wildcards can be supplied through `MAINTENANCE_GUARD_OPTIONS` or the
 maintenance service's `allowedRoutes`. Scheduled start/end timestamps are
 checked directly, so enforcement does not wait for the service's scheduled
 maintenance cron job.
+
+## WebSocket connection auth guard
+
+`src/ws-auth/` adds an opt-in NestJS guard that authenticates WebSocket
+connections with a JWT or an opaque session token, supports live token refresh,
+rate limits handshake attempts per IP, writes structured audit events and
+gracefully closes sockets when their token expires. It is documented in
+[`src/ws-auth/README.md`](src/ws-auth/README.md).

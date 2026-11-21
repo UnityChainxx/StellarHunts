@@ -9,6 +9,10 @@
     "strictPropertyInitialization": false,
     "skipLibCheck": true,
     "types": ["node", "jest"],
+    "typeRoots": [
+      "../../backend/node_modules/@types",
+      "../../node_modules/@types"
+    ],
     "paths": {
       "@nestjs/typeorm": ["../../backend/node_modules/@nestjs/typeorm"]
     }
