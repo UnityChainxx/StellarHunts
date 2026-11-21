@@ -65,6 +65,39 @@ root workspace):
 npx jest --config stellar-extensions/tests/jest.config.js
 ```
 
+## Reward service
+
+`reward/reward.test.ts` exercises the real reward, prize-pool, seasonal
+schedule and time-trial services with in-memory repositories. It covers reward
+distribution and accounting, seasonal multipliers/halvings, top-N prize pool
+payouts, insufficient/empty/locked pools, duplicate claim prevention (pre-check,
+idempotent dedupe retry, unique-index race), time-trial rewards, reward caps
+and the remaining reward-service surface.
+
+| Acceptance criterion | Test group |
+| -------------------- | ---------- |
+| Basic reward distribution | `RewardService` distribution specs |
+| Seasonal reward multiplier | `SeasonalScheduleService` |
+| Prize pool distribution to top N | `PrizePoolService` |
+| Insufficient reward pool handling | `PrizePoolService` pool-state specs |
+| Duplicate reward prevention | `RewardService` duplicate specs |
+| Reward for time-trial mode | `awards a time-trial reward once per completed trial` |
+| Reward cap enforcement | `lets different users claim the same capped reward…` |
+
+Coverage of `backend/src/reward/reward.service.ts` is 100% statements, lines and
+functions (constructor decorator metadata accounts for the remaining branch
+entries).
+
+Run it from the repository root:
+
+```bash
+npx jest --config stellar-extensions/tests/jest.config.js
+```
+
+`@nestjs/typeorm` and `@nestjs/config` v12 are pure ESM and cannot be required
+by Jest, so `tests/support/` provides minimal CommonJS shims for their
+decorator/token surface.
+
 ## Other suites
 
 - `puzzle-solution-checker.spec.ts` — Jest specs for the extension puzzle
