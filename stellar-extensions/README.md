@@ -1,27 +1,12 @@
-# StellarHunts extensions
+# stellar-extensions
 
-Optional, self-contained extensions that build on StellarHunts without modifying
-the core `frontend/`, `backend/`, `onchain/` or `docs/` trees.
+Extensions contributed by program participants. All changes live exclusively inside this directory.
 
-Backend extensions live under `backend/src/<feature>` and share
-`backend/tsconfig.json` plus `backend/jest.config.js`, which resolve their
-dependencies from the main `backend/node_modules`. Each feature folder keeps its
-own tests next to the implementation.
-
-| Folder | Purpose |
-| --- | --- |
-| `backend/src/ws-auth/` | WebSocket connection auth guard: JWT / session token validation, token refresh, per-IP rate limiting, audit logging, expiry disconnect. |
-| `backend/src/puzzle-collaboration/` | Collaborative puzzle sections, comments and locks. |
-| `backend/src/puzzle-difficulty-auto-adjustment/` | Automatic puzzle difficulty analysis. |
-| `backend/src/puzzle-submission-throttle/` | Submission throttling guard and interceptor. |
-| `backend/src/puzzle-version-comparison/` | Puzzle version comparison and history. |
-| `backend/src/maintenance-mode/` | Maintenance-mode HTTP guard. |
-
-## JudeDaniel6 — Issues #931, #945, #953, #969
+## Taylor-Kay — Issues #988, #999, #1002, #1004
 
 | Issue | Description | Path |
 |-------|-------------|------|
-| #931  | Puzzle Tagging System Module | `backend/puzzle-tagging/` |
-| #945  | Game Season Management Module | `backend/game-season/` |
-| #953  | Puzzle Cache Invalidation Service | `backend/puzzle-cache/` |
-| #969  | Puzzle Referral Tracking Contract | `onchain/puzzle-referral/` |
+| #988  | Security Tests for API Endpoints | `tests/security-api.test.ts` |
+| #999  | Script: Generate Puzzle Fixtures from Templates | `scripts/generate-puzzle-fixtures.js` |
+| #1002 | Script: NFT Metadata Generator | `scripts/generate-nft-metadata.js` |
+| #1004 | Tool: Puzzle Difficulty Analyzer | `tools/puzzle-difficulty-analyzer.js` |
