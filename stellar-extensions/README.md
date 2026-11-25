@@ -16,3 +16,12 @@ own tests next to the implementation.
 | `backend/src/puzzle-submission-throttle/` | Submission throttling guard and interceptor. |
 | `backend/src/puzzle-version-comparison/` | Puzzle version comparison and history. |
 | `backend/src/maintenance-mode/` | Maintenance-mode HTTP guard. |
+
+## judithJn — Issues #917, #929, #965, #981
+
+| Issue | Description | Path |
+|-------|-------------|------|
+| #917  | useStreakStatus hook | `frontend/hooks/useStreakStatus.ts` |
+| #929  | Puzzle Hint System Module | `backend/puzzle-hint/` |
+| #965  | Puzzle Reward Escrow Contract | `onchain/puzzle-reward-escrow/` |
+| #981  | Unit Tests for useWalletConnection | `tests/useWalletConnection.test.tsx` |
