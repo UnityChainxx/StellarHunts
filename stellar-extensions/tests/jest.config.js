@@ -22,10 +22,13 @@ module.exports = {
       },
     ],
   },
-  // `@nestjs/typeorm` v12 is pure ESM; the specs only need its decorator/token
-  // surface, so map it to a CommonJS shim.
+  // `@nestjs/typeorm`, `@nestjs/config`, `@nestjs/schedule` and
+  // `@nestjs/mapped-types` v12 are pure ESM; the specs only need their
+  // decorator/token surface, so map them to CommonJS shims.
   moduleNameMapper: {
     "^@nestjs/typeorm$": "<rootDir>/support/nestjs-typeorm.ts",
     "^@nestjs/config$": "<rootDir>/support/nestjs-config.ts",
+    "^@nestjs/schedule$": "<rootDir>/support/nestjs-schedule.ts",
+    "^@nestjs/mapped-types$": "<rootDir>/support/nestjs-mapped-types.ts",
   },
 };
