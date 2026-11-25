@@ -1,12 +1,8 @@
-# StellarHunts extensions
+# stellar-extensions
 
-Optional, self-contained extensions that build on StellarHunts without modifying
-the core `frontend/`, `backend/`, `onchain/` or `docs/` trees.
+Extensions contributed by program participants. All changes live exclusively inside this directory.
 
-Backend extensions live under `backend/src/<feature>` and share
-`backend/tsconfig.json` plus `backend/jest.config.js`, which resolve their
-dependencies from the main `backend/node_modules`. Each feature folder keeps its
-own tests next to the implementation.
+## Taylor-Kay — Issues #988, #999, #1002, #1004
 
 | Folder | Purpose |
 | --- | --- |

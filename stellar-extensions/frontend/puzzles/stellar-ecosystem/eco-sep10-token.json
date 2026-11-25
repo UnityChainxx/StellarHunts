@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "eco-sep10-token",
+  "title": "Name the SEP-10 Session Credential",
+  "description": "The anchor has verified the signed challenge. The wallet now stores a credential that it sends on every subsequent SEP-24 or SEP-38 request.",
+  "difficulty": "medium",
+  "type": "text",
+  "content": {
+    "prompt": "What kind of token does a SEP-10 server return after it verifies the signed challenge? (Answer with the token acronym.)",
+    "initialCode": "Authorization: Bearer <token>"
+  },
+  "solution": "JWT",
+  "solutionType": "plain",
+  "hint": "SEP-10 issues a JSON Web Token whose subject is the authenticated Stellar account. The wallet sends it as `Authorization: Bearer <token>` to the anchor's standardized endpoints. Documentation: https://developers.stellar.org/docs/platforms/anchor-platform/sep-guide/sep10",
+  "reward": {
+    "rewardId": "reward-eco-06",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Session Holder" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "sep-10", "authentication", "jwt"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "A JWT is returned",
+      "validationMode": "exact_match",
+      "input": { "answer": "JWT" },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Refresh tokens belong to other auth systems",
+      "validationMode": "exact_match",
+      "input": { "answer": "refresh token" },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "API keys are not issued by SEP-10",
+      "validationMode": "exact_match",
+      "input": { "answer": "API key" },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://stellarhunts.org/stellar-extensions/stellar-ecosystem-puzzle-template.schema.json",
+  "title": "StellarHunts Stellar Ecosystem Puzzle Template",
+  "description": "Extension of schemas/puzzle-template.schema.json for the Stellar ecosystem puzzle set. Adds the testCases collection required by ecosystem puzzles; every other field keeps the shared template shape and constraints.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "description",
+    "difficulty",
+    "type",
+    "content",
+    "solution",
+    "testCases"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "master"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "number",
+        "math",
+        "multiple_choice",
+        "logic",
+        "code",
+        "image"
+      ]
+    },
+    "content": {
+      "type": "object",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2
+        },
+        "initialCode": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "rust",
+            "javascript",
+            "python",
+            "stellar-cli",
+            "bash"
+          ]
+        },
+        "imageUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "audioUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "additionalProperties": false
+    },
+    "solution": {
+      "type": "string",
+      "minLength": 1
+    },
+    "solutionType": {
+      "type": "string",
+      "enum": [
+        "plain",
+        "sha256",
+        "regex",
+        "numeric_exact"
+      ],
+      "default": "plain"
+    },
+    "hint": {
+      "type": "string",
+      "maxLength": 2048
+    },
+    "reward": {
+      "type": "object",
+      "properties": {
+        "rewardId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "badge",
+            "nft",
+            "token",
+            "points"
+          ]
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "testCases": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "title",
+          "input",
+          "expectedOutput"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "validationMode": {
+            "type": "string",
+            "enum": [
+              "exact_match",
+              "numeric_tolerance",
+              "regex",
+              "custom"
+            ]
+          },
+          "input": {
+            "type": "object"
+          },
+          "expectedOutput": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "multiple_choice"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "content": {
+            "required": [
+              "prompt",
+              "options"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

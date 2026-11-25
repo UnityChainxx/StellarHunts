@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "id": "eco-soroban-rpc",
+  "title": "Choose the Contract Gateway",
+  "description": "The game contract lives on Soroban. A client has to simulate an invocation, assemble the resulting footprint and authorization entries, then submit the transaction for inclusion.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "Which service does a client use to simulate, submit and read Soroban smart contract invocations?",
+    "options": ["Horizon", "Soroban RPC", "Stellar Core", "Anchor Platform"]
+  },
+  "solution": "Soroban RPC",
+  "solutionType": "plain",
+  "hint": "Horizon serves classic ledger and transaction data. Soroban RPC exposes `simulateTransaction`, `sendTransaction` and `getTransaction` for smart contract calls, which is what wallets and games use to prepare invocations. Documentation: https://developers.stellar.org/docs/build/smart-contracts/overview",
+  "reward": {
+    "rewardId": "reward-eco-09",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Invocation Router" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["soroban", "stellar", "rpc", "smart-contracts"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "Soroban RPC handles contract calls",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Horizon serves classic network data",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Stellar Core runs the network",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Anchor Platform implements SEPs",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

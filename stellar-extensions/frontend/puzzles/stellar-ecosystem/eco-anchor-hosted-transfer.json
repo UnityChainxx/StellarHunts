@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "id": "eco-anchor-hosted-transfer",
+  "title": "Pick the Hosted Transfer SEP",
+  "description": "An anchor offers deposit and withdrawal through a webview it hosts, so the anchor collects the player's KYC details on its own site. The wallet only needs to open the right URL and wait for the anchor to report the transfer status.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "Which SEP standard defines the anchor-hosted interactive deposit and withdrawal flow?",
+    "options": ["SEP-6", "SEP-10", "SEP-24", "SEP-38"]
+  },
+  "solution": "SEP-24",
+  "solutionType": "plain",
+  "hint": "SEP-24 is the hosted flow: the anchor's webview collects KYC and the anchor reports status back to the wallet. SEP-6 is the programmatic (non-interactive) alternative, SEP-10 is authentication, and SEP-38 is quoting. Documentation: https://developers.stellar.org/docs/category/anchor-integration",
+  "reward": {
+    "rewardId": "reward-eco-02",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Webview Navigator" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "anchors", "sep-24", "deposits", "withdrawals"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "SEP-24 is the hosted flow",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "SEP-6 is programmatic, not hosted",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "SEP-10 authenticates the account",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "SEP-38 provides quotes",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

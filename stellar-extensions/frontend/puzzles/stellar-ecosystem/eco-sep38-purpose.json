@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "eco-sep38-purpose",
+  "title": "Quote the Exchange",
+  "description": "Before moving value, the wallet wants a price from the anchor: how much off-chain currency buys a given amount of on-ledger USDC today. The anchor exposes a standardized RFQ endpoint for that.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "What does SEP-38 standardize?",
+    "options": [
+      "A quote API for exchanging off-chain assets and Stellar assets",
+      "Hosted deposit and withdrawal through an anchor webview",
+      "Web authentication for Stellar accounts",
+      "Cross-border payment initiation between anchors"
+    ]
+  },
+  "solution": "A quote API for exchanging off-chain assets and Stellar assets",
+  "solutionType": "plain",
+  "hint": "SEP-38 defines indicative and firm quotes between an off-chain asset and an on-chain Stellar asset, including the price and the amounts for each side. Hosted transfers are SEP-24, authentication is SEP-10, and cross-border payments are SEP-31. Documentation: https://developers.stellar.org/docs/build/apps/wallet/sep38",
+  "reward": {
+    "rewardId": "reward-eco-07",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Quote Collector" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "sep-38", "anchors", "quotes", "rfq"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "SEP-38 standardizes quotes",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Hosted transfers are SEP-24",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Web authentication is SEP-10",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Cross-border payments are SEP-31",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

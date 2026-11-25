@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "eco-sep10-challenge",
+  "title": "Answer the SEP-10 Challenge",
+  "description": "The player opens a wallet session with an anchor. The anchor's authentication endpoint responds with a challenge transaction. The wallet must prove control of the account without ever sending the secret key.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "After requesting a SEP-10 challenge, what must the wallet do with the returned transaction?",
+    "options": [
+      "Sign it with the account's private key and submit the signed challenge back to the anchor",
+      "Broadcast it unchanged to Horizon so the network accepts the login",
+      "Pay its fee in USDC before sending it to the anchor",
+      "Deploy a Soroban contract that stores the challenge nonce"
+    ]
+  },
+  "solution": "Sign it with the account's private key and submit the signed challenge back to the anchor",
+  "solutionType": "plain",
+  "hint": "SEP-10 is a challenge/response flow built on a Stellar transaction. The wallet signs the challenge's hash and returns the signed XDR; the anchor verifies the signatures and issues a JWT. The transaction is never submitted to the network. Documentation: https://developers.stellar.org/docs/platforms/anchor-platform/sep-guide/sep10",
+  "reward": {
+    "rewardId": "reward-eco-05",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Challenge Signer" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "sep-10", "authentication", "signatures"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "Sign and return the challenge",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Challenges are not broadcast",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "No USDC fee is involved",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "No contract deployment is needed",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

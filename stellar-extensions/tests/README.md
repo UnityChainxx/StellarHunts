@@ -65,43 +65,41 @@ root workspace):
 npx jest --config stellar-extensions/tests/jest.config.js
 ```
 
-## Reward service
+## Wallet authentication
 
-`reward/reward.test.ts` exercises the real reward, prize-pool, seasonal
-schedule and time-trial services with in-memory repositories. It covers reward
-distribution and accounting, seasonal multipliers/halvings, top-N prize pool
-payouts, insufficient/empty/locked pools, duplicate claim prevention (pre-check,
-idempotent dedupe retry, unique-index race), time-trial rewards, reward caps
-and the remaining reward-service surface.
+`wallet/wallet-auth.integration.test.ts` wires the real backend wallet services
+(`backend/src/wallet/wallet.service.ts` and `wallet-auth.service.ts`) together
+with in-memory repositories and real ed25519 keypairs. It covers the whole
+challenge/signature/session flow without a database or a Nest application:
 
-| Acceptance criterion | Test group |
-| -------------------- | ---------- |
-| Basic reward distribution | `RewardService` distribution specs |
-| Seasonal reward multiplier | `SeasonalScheduleService` |
-| Prize pool distribution to top N | `PrizePoolService` |
-| Insufficient reward pool handling | `PrizePoolService` pool-state specs |
-| Duplicate reward prevention | `RewardService` duplicate specs |
-| Reward for time-trial mode | `awards a time-trial reward once per completed trial` |
-| Reward cap enforcement | `lets different users claim the same capped reward…` |
-
-Coverage of `backend/src/reward/reward.service.ts` is 100% statements, lines and
-functions (constructor decorator metadata accounts for the remaining branch
-entries).
+- challenge generation and validation (including TTL clamping and invalid
+  addresses)
+- signature verification with valid, wrong-key, tampered and malformed
+  signatures
+- replay prevention, including the compare-and-set race on nonce consumption
+- wallet-session token creation, expiry and `lastSeenAt` refresh
+- wallet disconnection via single-session logout, wallet-wide revocation and
+  expired-session pruning
 
 Run it from the repository root:
 
 ```bash
-npx jest --config stellar-extensions/tests/jest.config.js
+npx jest --config stellar-extensions/tests/jest.config.js \
+  stellar-extensions/tests/wallet/wallet-auth.integration.test.ts
 ```
 
-`@nestjs/typeorm` and `@nestjs/config` v12 are pure ESM and cannot be required
-by Jest, so `tests/support/` provides minimal CommonJS shims for their
-decorator/token surface.
+The suite exercises every statement, line and function of
+`wallet-auth.service.ts`. The Jest config maps the backend-only, ESM-only
+`@nestjs/typeorm` package to a decorator stub
+(`tests/stubs/nestjs-typeorm.js`) because the tests construct the services
+directly.
 
 ## Other suites
 
 - `puzzle-solution-checker.spec.ts` — Jest specs for the extension puzzle
   solution checker.
+- `wallet/wallet-auth.integration.test.ts` — wallet challenge, signature and
+  session suite described above.
 - The Jest config matches `*.test.ts` under this directory; the Vitest config
   matches `*.{test,spec}.js`, so the two runners do not pick up each other's
   files.

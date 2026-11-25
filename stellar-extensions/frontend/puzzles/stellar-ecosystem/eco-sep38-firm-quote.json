@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "eco-sep38-firm-quote",
+  "title": "Read the Firm Quote Clock",
+  "description": "The anchor returns a firm SEP-38 quote. Unlike an indicative quote, a firm quote is a commitment the anchor will honor, but only until a stated moment. The wallet must read that field before presenting the price to the player.",
+  "difficulty": "medium",
+  "type": "text",
+  "content": {
+    "prompt": "Which field in a SEP-38 quote response tells the client when the quoted price stops being valid?",
+    "initialCode": "{ \"id\": \"...\", \"price\": \"0.92\", \"sell_amount\": \"100\", \"buy_amount\": \"92\", \"...\": \"...\" }"
+  },
+  "solution": "expires_at",
+  "solutionType": "plain",
+  "hint": "Firm quotes carry an `expires_at` timestamp; after it passes the anchor no longer has to honor the price. `price` and the amount fields describe the exchange, not its lifetime. Documentation: https://developers.stellar.org/docs/build/apps/wallet/sep38",
+  "reward": {
+    "rewardId": "reward-eco-08",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Deadline Reader" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "sep-38", "quotes", "expiry"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "expires_at marks the deadline",
+      "validationMode": "exact_match",
+      "input": { "answer": "expires_at" },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "price is the exchange rate",
+      "validationMode": "exact_match",
+      "input": { "answer": "price" },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "sell_amount is the amount offered",
+      "validationMode": "exact_match",
+      "input": { "answer": "sell_amount" },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

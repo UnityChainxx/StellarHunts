@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "eco-soroban-sac",
+  "title": "Bridge Assets Into Soroban",
+  "description": "A game contract rewards players in on-ledger USDC. The contract cannot use classic payment operations, so it needs the built-in contract that exposes an issued Stellar asset to Soroban.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "What is the Stellar Asset Contract (SAC)?",
+    "options": [
+      "A built-in Soroban contract that exposes an issued Stellar asset to smart contracts",
+      "A SEP that defines hosted anchor deposits",
+      "A Horizon endpoint that finds path payment routes",
+      "A governance contract used to upgrade anchors"
+    ]
+  },
+  "solution": "A built-in Soroban contract that exposes an issued Stellar asset to smart contracts",
+  "solutionType": "plain",
+  "hint": "Each Stellar asset has a reserved SAC instance. Once deployed, contracts can call standard token functions on it and the SAC reads and writes the same trustline balances used by classic Stellar. Documentation: https://developers.stellar.org/docs/tokens/stellar-asset-contract",
+  "reward": {
+    "rewardId": "reward-eco-10",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Asset Bridge" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["soroban", "stellar", "sac", "assets", "smart-contracts"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "The SAC is the asset bridge",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Hosted deposits are SEP-24",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Path finding is a Horizon endpoint",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "The SAC is not a governance contract",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

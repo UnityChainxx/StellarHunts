@@ -5,5 +5,9 @@
     "rootDir": "../..",
     "types": ["node", "jest"]
   },
-  "include": ["./**/*.ts", "../../backend/src/referral/**/*.ts"]
+  "include": [
+    "./**/*.ts",
+    "../../backend/src/referral/**/*.ts",
+    "../../backend/src/wallet/**/*.ts"
+  ]
 }

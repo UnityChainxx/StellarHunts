@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "id": "eco-path-payment-strict-send",
+  "title": "Fix the Amount Sent",
+  "description": "A merchant must receive at least a quoted amount of EURC, but the player only wants to spend a fixed amount of USDC. The wallet has to pick the operation whose source amount cannot move.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "Which Stellar operation fixes the amount of the asset sent while the received amount varies with the conversion path?",
+    "options": [
+      "Path Payment Strict Send",
+      "Path Payment Strict Receive",
+      "Manage Sell Offer",
+      "Change Trust"
+    ]
+  },
+  "solution": "Path Payment Strict Send",
+  "solutionType": "plain",
+  "hint": "Strict Send debits exactly the send amount and returns whatever the path yields above the destination minimum. Strict Receive is the mirror image: the received amount is fixed and the sent amount varies. Documentation: https://developers.stellar.org/docs/build/guides/transactions/path-payments",
+  "reward": {
+    "rewardId": "reward-eco-03",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Send Amount Sentinel" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "path-payments", "sdex", "liquidity"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "Strict Send fixes the source amount",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Strict Receive fixes the destination amount",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Sell offers are not path payments",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Change Trust only manages trustlines",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

@@ -8,6 +8,11 @@ module.exports = {
   rootDir: __dirname,
   testEnvironment: "node",
   testMatch: ["<rootDir>/**/*.test.ts"],
+  // `@nestjs/typeorm` is a backend-only, ESM-only dependency. The wallet
+  // services only use its decorators, so extension tests resolve it to a stub.
+  moduleNameMapper: {
+    "^@nestjs/typeorm$": "<rootDir>/stubs/nestjs-typeorm.js",
+  },
   transform: {
     "^.+\\.ts$": [
       "ts-jest",

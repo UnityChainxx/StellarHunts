@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "eco-path-payment-hops",
+  "title": "Count the Conversions",
+  "description": "A path payment sends USDC and asks the destination to receive EURC. The wallet supplies an intermediate path of XLM and BTC, so the payment crosses four assets before it lands.",
+  "difficulty": "medium",
+  "type": "number",
+  "content": {
+    "prompt": "A path payment sends USDC, the destination receives EURC, and the path is [XLM, BTC]. How many asset conversions happen along the route?",
+    "initialCode": "USDC -> ? -> ? -> EURC"
+  },
+  "solution": "3",
+  "solutionType": "numeric_exact",
+  "hint": "The path lists only the intermediate assets, not the source or destination asset. Count the hops from the send asset through every path entry to the destination asset. Documentation: https://developers.stellar.org/docs/build/guides/transactions/path-payments",
+  "reward": {
+    "rewardId": "reward-eco-04",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Hop Counter" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "path-payments", "multi-hop", "liquidity"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "Three conversions",
+      "description": "USDC -> XLM -> BTC -> EURC.",
+      "validationMode": "numeric_tolerance",
+      "input": { "answer": "3" },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Two conversions ignores the intermediate BTC stop",
+      "validationMode": "numeric_tolerance",
+      "input": { "answer": "2" },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "Four conversions double-counts one leg",
+      "validationMode": "numeric_tolerance",
+      "input": { "answer": "4" },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "id": "eco-anchor-role",
+  "title": "Identify the Anchor",
+  "description": "A player wants to turn on-ledger USDC into a bank deposit. The wallet hands the request to an anchor. Before signing, the player has to know which part of the Stellar ecosystem actually performs that conversion.",
+  "difficulty": "medium",
+  "type": "multiple_choice",
+  "content": {
+    "prompt": "What is the primary role of an anchor in the Stellar ecosystem?",
+    "options": [
+      "On and off ramp between Stellar assets and off-chain value",
+      "Validate and close ledgers for the network",
+      "Mint the native XLM asset on demand",
+      "Store NFT metadata for Soroban contracts"
+    ]
+  },
+  "solution": "On and off ramp between Stellar assets and off-chain value",
+  "solutionType": "plain",
+  "hint": "Anchors bridge Stellar and traditional finance: they accept deposits and pay out withdrawals in currencies or assets that live outside the ledger. Validators and the protocol itself do different jobs. Documentation: https://developers.stellar.org/docs/learn/fundamentals/anchors",
+  "reward": {
+    "rewardId": "reward-eco-01",
+    "type": "points",
+    "metadata": { "points": 100, "badgeName": "Ramp Ranger" }
+  },
+  "author": "StellarHunts Core",
+  "tags": ["stellar", "anchors", "sep", "on-off-ramp"],
+  "isActive": true,
+  "testCases": [
+    {
+      "title": "Anchors are on and off ramps",
+      "description": "The service converts between Stellar assets and off-chain value.",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 0 },
+      "expectedOutput": { "correct": true }
+    },
+    {
+      "title": "Validators secure the network",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 1 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "The protocol controls XLM issuance",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 2 },
+      "expectedOutput": { "correct": false }
+    },
+    {
+      "title": "NFT metadata lives elsewhere",
+      "validationMode": "exact_match",
+      "input": { "selectedIndex": 3 },
+      "expectedOutput": { "correct": false }
+    }
+  ]
+}
