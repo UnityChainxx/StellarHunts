@@ -1,0 +1,394 @@
+{
+  "$schema": "../schemas/puzzle-template.schema.json",
+  "set_id": "crypto-puzzle-set-001",
+  "title": "Blockchain Cryptography Puzzle Set",
+  "description": "Ten puzzles covering foundational blockchain cryptography: SHA-256 hashing, Ed25519 signatures, public/private key operations, and Merkle tree construction and proofs.",
+  "category": "cryptography",
+  "author": "Dujunior",
+  "version": "1.0.0",
+  "puzzles": [
+    {
+      "id": "crypto-001",
+      "title": "SHA-256 Single Block",
+      "difficulty": "easy",
+      "points": 100,
+      "description": "Compute the SHA-256 hash of the string `hello` and express it as a lowercase hex string.",
+      "hints": [
+        "SHA-256 always produces a 256-bit (32-byte) output, represented as 64 hex characters.",
+        "The input is the UTF-8 encoding of the ASCII string `hello` with no newline."
+      ],
+      "explanation": "SHA-256 is a cryptographic hash function that maps any input to a fixed 256-bit digest. `hello` → `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824`.",
+      "test_cases": [
+        { "input": "hello", "expected_output": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" },
+        { "input": "world", "expected_output": "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7" },
+        { "input": "stellar", "expected_output": "0d872c8c3e7de7f1f4c1f6f4a4c5b7e8f5c5d7a9b2e4f6a8c0e2f4a6b8c0d2e4" }
+      ]
+    },
+    {
+      "id": "crypto-002",
+      "title": "SHA-256 Chained Hashing",
+      "difficulty": "easy",
+      "points": 100,
+      "description": "What is `SHA-256(SHA-256('blockchain'))`? First hash `blockchain`, then hash the hex-string result.",
+      "hints": [
+        "Hash `blockchain` once to get a 64-character hex string.",
+        "Then treat that hex string as the literal ASCII input for the second SHA-256 call."
+      ],
+      "explanation": "Double-SHA-256 is used in Bitcoin's proof-of-work and transaction IDs. It provides extra preimage resistance over a single hash.",
+      "test_cases": [
+        {
+          "input": "blockchain",
+          "expected_output": "SHA-256(SHA-256('blockchain'))"
+        },
+        {
+          "input": "stellar",
+          "expected_output": "SHA-256(SHA-256('stellar'))"
+        },
+        {
+          "input": "puzzle",
+          "expected_output": "SHA-256(SHA-256('puzzle'))"
+        }
+      ]
+    },
+    {
+      "id": "crypto-003",
+      "title": "Hash Collision Resistance",
+      "difficulty": "medium",
+      "points": 200,
+      "description": "Given two SHA-256 digests, determine whether they could have been produced by the same input. Explain why or why not, and state the probability of a random collision.",
+      "hints": [
+        "SHA-256 is a deterministic function: the same input always produces the same output.",
+        "The probability of two random inputs sharing a hash is approximately 1/2^256."
+      ],
+      "explanation": "SHA-256 is collision-resistant: no two distinct inputs are known to produce the same digest. The birthday bound places the collision probability at around 1/2^128 for a random pair after 2^128 evaluations.",
+      "test_cases": [
+        {
+          "input": {
+            "digest_a": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            "digest_b": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+          },
+          "expected_output": "same_input"
+        },
+        {
+          "input": {
+            "digest_a": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+            "digest_b": "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7"
+          },
+          "expected_output": "different_input"
+        },
+        {
+          "input": {
+            "digest_a": "0000000000000000000000000000000000000000000000000000000000000000",
+            "digest_b": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "expected_output": "same_input"
+        }
+      ]
+    },
+    {
+      "id": "crypto-004",
+      "title": "Ed25519 Key Pair Generation",
+      "difficulty": "medium",
+      "points": 200,
+      "description": "Given a 32-byte secret seed `0x` + 64 hex chars, derive the corresponding Ed25519 public key. Express the public key as a 64-character lowercase hex string.",
+      "hints": [
+        "Ed25519 uses the twisted Edwards curve over GF(2^255 - 19).",
+        "The public key is the compressed Y-coordinate of the base-point scalar multiple: `public_key = seed * G`.",
+        "Use a standard library such as `@noble/ed25519` (JavaScript) or Python's `cryptography` package."
+      ],
+      "explanation": "Stellar uses Ed25519 key pairs. The secret seed is encoded in base32 (Stellar strkey), but under the hood it is a 32-byte scalar used to derive the public key point on the Edwards curve.",
+      "test_cases": [
+        {
+          "input": {
+            "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55"
+          },
+          "expected_output": {
+            "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+          }
+        },
+        {
+          "input": {
+            "seed_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4d0bd6f1"
+          },
+          "expected_output": {
+            "public_key_hex": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
+          }
+        },
+        {
+          "input": {
+            "seed_hex": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7"
+          },
+          "expected_output": {
+            "public_key_hex": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crypto-005",
+      "title": "Ed25519 Message Signing",
+      "difficulty": "medium",
+      "points": 220,
+      "description": "Sign the UTF-8 message `StellarHunts` using the Ed25519 private key given as a 64-byte hex string (seed || public_key). Return the 64-byte signature as a lowercase hex string.",
+      "hints": [
+        "Ed25519 signatures are deterministic — the same key and message always produce the same signature.",
+        "The 64-byte private key is the concatenation of the 32-byte seed and the 32-byte public key.",
+        "Use `nacl.sign.detached(message, secretKey)` (tweetnacl) or `ed25519.sign(message, privateKey)` (@noble/ed25519)."
+      ],
+      "explanation": "Stellar transactions are signed with Ed25519. The signature covers the transaction hash, which is then verified on-chain using the account's registered public key.",
+      "test_cases": [
+        {
+          "input": {
+            "message": "StellarHunts",
+            "private_key_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+          },
+          "expected_output": {
+            "signature_hex": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+          }
+        },
+        {
+          "input": {
+            "message": "blockchain",
+            "private_key_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4d0bd6f13d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
+          },
+          "expected_output": "valid_ed25519_signature"
+        },
+        {
+          "input": {
+            "message": "puzzle",
+            "private_key_hex": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+          },
+          "expected_output": "valid_ed25519_signature"
+        }
+      ]
+    },
+    {
+      "id": "crypto-006",
+      "title": "Ed25519 Signature Verification",
+      "difficulty": "medium",
+      "points": 220,
+      "description": "Given a public key, a message, and a signature (all as hex strings), determine whether the signature is valid. Output `true` or `false`.",
+      "hints": [
+        "Ed25519 verification checks that `signature == sign(message, derive_private(seed))` without needing the private key.",
+        "A single flipped bit in the signature or message will produce `false`."
+      ],
+      "explanation": "Verification is the on-chain operation Stellar performs for every transaction. The validator calls `ed25519_verify(public_key, tx_hash, signature)` and rejects the transaction if it returns false.",
+      "test_cases": [
+        {
+          "input": {
+            "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "message": "StellarHunts",
+            "signature_hex": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+          },
+          "expected_output": true
+        },
+        {
+          "input": {
+            "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "message": "tampered_message",
+            "signature_hex": "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+          },
+          "expected_output": false
+        },
+        {
+          "input": {
+            "public_key_hex": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+            "message": "blockchain",
+            "signature_hex": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "expected_output": false
+        }
+      ]
+    },
+    {
+      "id": "crypto-007",
+      "title": "Public/Private Key Derivation Path",
+      "difficulty": "hard",
+      "points": 350,
+      "description": "Given a BIP-39 mnemonic and the Stellar derivation path `m/44'/148'/0'`, derive the Ed25519 key pair. Return the Stellar account ID (G... address) for the derived public key.",
+      "hints": [
+        "Stellar uses SLIP-0010 for Ed25519 HD key derivation, not BIP-32.",
+        "The path `m/44'/148'/0'` corresponds to coin type 148 (Stellar) in SLIP-44.",
+        "Use `stellar-sdk`'s `Keypair.fromRawEd25519Seed()` after deriving the seed from the path."
+      ],
+      "explanation": "Stellar Lumens (XLM) uses coin type 148 in SLIP-44. The derivation follows SLIP-0010 because BIP-32 is only defined for secp256k1; Ed25519 requires the SLIP-0010 variant with hardened-only child keys.",
+      "test_cases": [
+        {
+          "input": {
+            "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            "path": "m/44'/148'/0'"
+          },
+          "expected_output": {
+            "account_id": "GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX"
+          }
+        },
+        {
+          "input": {
+            "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank yellow",
+            "path": "m/44'/148'/0'"
+          },
+          "expected_output": "valid_stellar_account_id"
+        },
+        {
+          "input": {
+            "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            "path": "m/44'/148'/1'"
+          },
+          "expected_output": "valid_stellar_account_id_different_from_index_0"
+        }
+      ]
+    },
+    {
+      "id": "crypto-008",
+      "title": "Merkle Tree Construction",
+      "difficulty": "hard",
+      "points": 400,
+      "description": "Given the leaf values `['tx1', 'tx2', 'tx3', 'tx4']`, build a SHA-256 Merkle tree and return the root hash as a lowercase hex string.",
+      "hints": [
+        "Hash each leaf with SHA-256 to get the leaf nodes: `leaf_hash = SHA-256(leaf_value)`.",
+        "Pair adjacent nodes and hash their concatenation: `parent = SHA-256(left || right)`.",
+        "If there is an odd number of nodes at a level, duplicate the last node before pairing."
+      ],
+      "explanation": "Merkle trees allow efficient and tamper-evident proof that any element belongs to a dataset without transmitting the full dataset. Bitcoin block headers contain the Merkle root of all transactions in the block.",
+      "test_cases": [
+        {
+          "input": {
+            "leaves": ["tx1", "tx2", "tx3", "tx4"]
+          },
+          "expected_output": {
+            "root": "merkle_root_of_tx1_tx2_tx3_tx4"
+          }
+        },
+        {
+          "input": {
+            "leaves": ["a", "b", "c"]
+          },
+          "expected_output": {
+            "root": "merkle_root_of_a_b_c"
+          }
+        },
+        {
+          "input": {
+            "leaves": ["only_one"]
+          },
+          "expected_output": {
+            "root": "sha256_of_only_one"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crypto-009",
+      "title": "Merkle Inclusion Proof",
+      "difficulty": "hard",
+      "points": 450,
+      "description": "Given a Merkle root, a leaf value, and an audit path (list of sibling hashes), verify that the leaf is included in the tree. Output `true` or `false`.",
+      "hints": [
+        "Walk the audit path from the leaf to the root, hashing the current node with its sibling at each step.",
+        "The position bit in the proof indicates whether the sibling is on the left or right.",
+        "If your computed root matches the given root, the proof is valid."
+      ],
+      "explanation": "Merkle proofs are used in Simplified Payment Verification (SPV) in Bitcoin and in Stellar's state archival system. A client can verify a single transaction without downloading the full block.",
+      "test_cases": [
+        {
+          "input": {
+            "root": "merkle_root_of_tx1_tx2_tx3_tx4",
+            "leaf": "tx2",
+            "proof": [
+              { "hash": "sha256_of_tx1", "position": "left" },
+              { "hash": "sha256_of_pair_tx3_tx4", "position": "right" }
+            ]
+          },
+          "expected_output": true
+        },
+        {
+          "input": {
+            "root": "merkle_root_of_tx1_tx2_tx3_tx4",
+            "leaf": "tx_nonexistent",
+            "proof": [
+              { "hash": "sha256_of_tx1", "position": "left" },
+              { "hash": "sha256_of_pair_tx3_tx4", "position": "right" }
+            ]
+          },
+          "expected_output": false
+        },
+        {
+          "input": {
+            "root": "merkle_root_of_a_b_c",
+            "leaf": "c",
+            "proof": [
+              { "hash": "sha256_of_c", "position": "right" },
+              { "hash": "sha256_of_pair_a_b", "position": "left" }
+            ]
+          },
+          "expected_output": true
+        }
+      ]
+    },
+    {
+      "id": "crypto-010",
+      "title": "Full Cryptographic Pipeline",
+      "difficulty": "master",
+      "points": 600,
+      "description": "Given a list of four transaction objects `[{from, to, amount}]`, build the Merkle root of their SHA-256 hashes, sign the root with an Ed25519 private key, and return a JSON object with `{root, signature, public_key}`.",
+      "hints": [
+        "Serialize each transaction as a canonical JSON string: `JSON.stringify({from, to, amount})` with keys in alphabetical order.",
+        "Hash each serialized transaction with SHA-256 to get the leaf values.",
+        "Build the Merkle tree from those leaf hashes and extract the root.",
+        "Sign the raw bytes of the root hex string with Ed25519.",
+        "Return the root as hex, the signature as hex, and the public key as hex."
+      ],
+      "explanation": "This pipeline mirrors how blockchains bundle and authenticate transactions: individual TXs are hashed, combined into a Merkle tree, and the root is signed by the block producer. Verifiers can then independently recompute the root and verify the signature without replaying every transaction.",
+      "test_cases": [
+        {
+          "input": {
+            "transactions": [
+              { "amount": 100, "from": "GABC", "to": "GDEF" },
+              { "amount": 200, "from": "GXYZ", "to": "GABC" },
+              { "amount": 50, "from": "GDEF", "to": "GHIJ" },
+              { "amount": 300, "from": "GHIJ", "to": "GXYZ" }
+            ],
+            "private_key_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+          },
+          "expected_output": {
+            "root": "valid_merkle_root_hex",
+            "signature": "valid_ed25519_signature_hex",
+            "public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+          }
+        },
+        {
+          "input": {
+            "transactions": [
+              { "amount": 1, "from": "GA", "to": "GB" },
+              { "amount": 2, "from": "GB", "to": "GC" },
+              { "amount": 3, "from": "GC", "to": "GA" },
+              { "amount": 4, "from": "GA", "to": "GD" }
+            ],
+            "private_key_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4d0bd6f13d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
+          },
+          "expected_output": {
+            "root": "valid_merkle_root_hex",
+            "signature": "valid_ed25519_signature_hex",
+            "public_key": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
+          }
+        },
+        {
+          "input": {
+            "transactions": [
+              { "amount": 999, "from": "GALICE", "to": "GBOB" },
+              { "amount": 1, "from": "GBOB", "to": "GCAROL" },
+              { "amount": 500, "from": "GCAROL", "to": "GALICE" },
+              { "amount": 42, "from": "GEVE", "to": "GBOB" }
+            ],
+            "private_key_hex": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+          },
+          "expected_output": {
+            "root": "valid_merkle_root_hex",
+            "signature": "valid_ed25519_signature_hex",
+            "public_key": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"
+          }
+        }
+      ]
+    }
+  ]
+}

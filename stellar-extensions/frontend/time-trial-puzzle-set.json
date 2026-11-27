@@ -1,0 +1,356 @@
+{
+  "$schema": "../schemas/puzzle-template.schema.json",
+  "set_id": "time-trial-puzzle-set-001",
+  "title": "Time-Trial Challenge Puzzle Set",
+  "description": "Ten speed-solving puzzles designed for quick comprehension, calculation, and pattern recognition. Puzzles have tight time limits and progress from easy to master difficulty.",
+  "category": "time-trial",
+  "author": "Dujunior",
+  "version": "1.0.0",
+  "puzzles": [
+    {
+      "id": "tt-001",
+      "title": "Binary to Decimal Sprint",
+      "difficulty": "easy",
+      "points": 50,
+      "time_limit": 30,
+      "description": "Convert the binary number `10110101` to its decimal equivalent. Enter only the integer.",
+      "hints": [
+        "Read the bits from right to left: each position is a power of 2."
+      ],
+      "explanation": "`10110101` = 128 + 32 + 16 + 4 + 1 = 181.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 30,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": "10110101", "expected_output": "181" },
+        { "input": "11111111", "expected_output": "255" },
+        { "input": "00000001", "expected_output": "1" },
+        { "input": "10000000", "expected_output": "128" },
+        { "input": "01010101", "expected_output": "85" }
+      ]
+    },
+    {
+      "id": "tt-002",
+      "title": "Hex to Decimal Sprint",
+      "difficulty": "easy",
+      "points": 50,
+      "time_limit": 30,
+      "description": "Convert the hexadecimal number `0xAF` to its decimal equivalent.",
+      "hints": [
+        "A = 10, B = 11, … F = 15.",
+        "0xAF = 10 × 16 + 15."
+      ],
+      "explanation": "`0xAF` = 10 × 16 + 15 = 175.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 30,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": "0xAF", "expected_output": "175" },
+        { "input": "0xFF", "expected_output": "255" },
+        { "input": "0x10", "expected_output": "16" },
+        { "input": "0x1A", "expected_output": "26" },
+        { "input": "0xC0", "expected_output": "192" }
+      ]
+    },
+    {
+      "id": "tt-003",
+      "title": "Bitwise AND Speed Round",
+      "difficulty": "easy",
+      "points": 75,
+      "time_limit": 45,
+      "description": "What is the result of `0b10111010 AND 0b11001100` in decimal?",
+      "hints": [
+        "AND each bit pair: 1 AND 1 = 1, all others = 0.",
+        "Convert the resulting binary to decimal."
+      ],
+      "explanation": "`10111010 AND 11001100` = `10001000` = 136.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 45,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": { "a": "0b10111010", "b": "0b11001100" }, "expected_output": "136" },
+        { "input": { "a": "0b11110000", "b": "0b00001111" }, "expected_output": "0" },
+        { "input": { "a": "0b11111111", "b": "0b10101010" }, "expected_output": "170" },
+        { "input": { "a": "0b01010101", "b": "0b11111111" }, "expected_output": "85" },
+        { "input": { "a": "0b11001100", "b": "0b11001100" }, "expected_output": "204" }
+      ]
+    },
+    {
+      "id": "tt-004",
+      "title": "Powers of Two Sequence",
+      "difficulty": "easy",
+      "points": 75,
+      "time_limit": 45,
+      "description": "What is the next number in the sequence: 1, 2, 4, 8, 16, 32, 64, ___?",
+      "hints": [
+        "Each term doubles the previous one."
+      ],
+      "explanation": "Powers of 2: 2^7 = 128.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 45,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": [1, 2, 4, 8, 16, 32, 64], "expected_output": "128" },
+        { "input": [1, 2, 4, 8, 16, 32, 64, 128], "expected_output": "256" },
+        { "input": [4, 8, 16, 32], "expected_output": "64" },
+        { "input": [256, 512, 1024], "expected_output": "2048" },
+        { "input": [1], "expected_output": "2" }
+      ]
+    },
+    {
+      "id": "tt-005",
+      "title": "XOR Cipher Decode",
+      "difficulty": "medium",
+      "points": 150,
+      "time_limit": 60,
+      "description": "A message byte `0x4D` was XOR-encrypted with key byte `0x1F`. What is the original plaintext byte in hex?",
+      "hints": [
+        "XOR is its own inverse: `plaintext = ciphertext XOR key`.",
+        "Perform `0x4D XOR 0x1F` bit by bit."
+      ],
+      "explanation": "`0x4D XOR 0x1F` = `0x52`. In binary: `01001101 XOR 00011111` = `01010010` = `0x52`.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 60,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": { "ciphertext_hex": "4D", "key_hex": "1F" }, "expected_output": "52" },
+        { "input": { "ciphertext_hex": "FF", "key_hex": "AA" }, "expected_output": "55" },
+        { "input": { "ciphertext_hex": "00", "key_hex": "00" }, "expected_output": "00" },
+        { "input": { "ciphertext_hex": "AB", "key_hex": "CD" }, "expected_output": "66" },
+        { "input": { "ciphertext_hex": "7E", "key_hex": "3A" }, "expected_output": "44" }
+      ]
+    },
+    {
+      "id": "tt-006",
+      "title": "Modular Arithmetic Blitz",
+      "difficulty": "medium",
+      "points": 150,
+      "time_limit": 60,
+      "description": "Compute `(2^10) mod 1000` without a calculator. What is the result?",
+      "hints": [
+        "2^10 = 1024.",
+        "`1024 mod 1000` is the remainder when 1024 is divided by 1000."
+      ],
+      "explanation": "`2^10 = 1024`. `1024 mod 1000 = 24`.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 60,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        { "input": { "base": 2, "exponent": 10, "modulus": 1000 }, "expected_output": "24" },
+        { "input": { "base": 3, "exponent": 5, "modulus": 100 }, "expected_output": "43" },
+        { "input": { "base": 7, "exponent": 3, "modulus": 50 }, "expected_output": "43" },
+        { "input": { "base": 2, "exponent": 8, "modulus": 255 }, "expected_output": "1" },
+        { "input": { "base": 5, "exponent": 4, "modulus": 13 }, "expected_output": "9" }
+      ]
+    },
+    {
+      "id": "tt-007",
+      "title": "Hash Prefix Identification",
+      "difficulty": "medium",
+      "points": 200,
+      "time_limit": 60,
+      "description": "Given the hash `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824`, how many leading zero bits does it have?",
+      "hints": [
+        "Convert the first hex character to binary.",
+        "`2` in binary is `0010` — that gives you the leading zero count for the first nibble."
+      ],
+      "explanation": "`2` = `0010`. The first nibble has two leading zero bits: `00`. So the hash starts with two leading zero bits.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 60,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        {
+          "input": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "expected_output": "2"
+        },
+        {
+          "input": "0000000000000000000000000000000000000000000000000000000000000001",
+          "expected_output": "255"
+        },
+        {
+          "input": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "expected_output": "0"
+        },
+        {
+          "input": "0f00000000000000000000000000000000000000000000000000000000000000",
+          "expected_output": "4"
+        },
+        {
+          "input": "8000000000000000000000000000000000000000000000000000000000000000",
+          "expected_output": "0"
+        }
+      ]
+    },
+    {
+      "id": "tt-008",
+      "title": "Public Key Prefix Match",
+      "difficulty": "hard",
+      "points": 300,
+      "time_limit": 90,
+      "description": "A Stellar public key starts with `G`. Given the base32-decoded bytes (first 32 bytes given as hex), which of the following Stellar account IDs is the correct encoding?\n\nBytes (hex): `d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a`\n\nOptions:\n- A) `GAWLOW7MZ4YGBLPSVKNKITVKXTT4DCKQS2YH7LQNFGFKAOGTUVJQVNXC`\n- B) `GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX`\n- C) `GD75VQOWYBZUEZPYXRGNEDQPVR2BTSRPBXDIHCIJJXUKADLVQJGAPB5T`",
+      "hints": [
+        "Stellar account IDs are base32-encoded with a 2-byte version prefix (0x30 60) and a 2-byte checksum appended.",
+        "Encode: `version_bytes || public_key_bytes || checksum`, then base32 without padding.",
+        "Only one of the three options decodes back to the given 32 bytes."
+      ],
+      "explanation": "Stellar strkey encoding: prepend `0x60 0x48` (version byte for `G` accounts), append CRC-16 checksum, base32 encode. The correct option decodes back to `d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a`.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 90,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        {
+          "input": {
+            "public_key_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "options": [
+              "GAWLOW7MZ4YGBLPSVKNKITVKXTT4DCKQS2YH7LQNFGFKAOGTUVJQVNXC",
+              "GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX",
+              "GD75VQOWYBZUEZPYXRGNEDQPVR2BTSRPBXDIHCIJJXUKADLVQJGAPB5T"
+            ]
+          },
+          "expected_output": "GD75VQOWYBZUEZPYXRGNEDQPVR2BTSRPBXDIHCIJJXUKADLVQJGAPB5T"
+        },
+        {
+          "input": {
+            "public_key_hex": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+            "options": [
+              "GA3CJJKIBY7BHHUNPX4FOMUXQDGLW6ER5YXPVTZD7EXNVV5CZDPWQTG",
+              "GDVZGSXOVRPZQO5IPTM6LVQEFLVEXQFHFVXQBMCQ2BXTZZRQV5JNBFB",
+              "GCOS2UJFQRH33QXPZXUQCBKGK7WLQQDZNZRZSXG5UXZTPXFKQJLFKH5"
+            ]
+          },
+          "expected_output": "valid_stellar_account_id"
+        },
+        {
+          "input": {
+            "public_key_hex": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+            "options": [
+              "GBPKSMXPCF4XNLWTJBJ3TZ4G3GX3JJ2G4FLHBIJPKNBLZ47WZO4B2QV",
+              "GAXO4UZQJIXQJXKADLVQJGAPB5TGAWLOW7MZ4YGBLPSVKNKITVKXTT4",
+              "GDYKSQGRJXH5CCHQCZMBH3V7JKBVZPXBVDUPZGVXRMLSMR6QLKVVT23"
+            ]
+          },
+          "expected_output": "valid_stellar_account_id"
+        }
+      ]
+    },
+    {
+      "id": "tt-009",
+      "title": "CRC-16 Checksum Calculation",
+      "difficulty": "hard",
+      "points": 350,
+      "time_limit": 90,
+      "description": "Stellar strkey encoding appends a CRC-16/XModem checksum over the version byte and the payload. Given the input bytes `[0x60, 0x48, 0xd7, 0x5a]` (truncated for speed), compute the CRC-16/XModem value and express it as a 4-character uppercase hex string (big-endian).",
+      "hints": [
+        "CRC-16/XModem uses polynomial `0x1021`, initial value `0x0000`, no input/output reflection.",
+        "Process each byte: shift the CRC left by 8, XOR with the byte, then process 8 bits.",
+        "For each bit: if the MSB is set, shift left and XOR with `0x1021`; otherwise just shift left."
+      ],
+      "explanation": "CRC-16/XModem is used by Stellar strkey to protect against transcription errors. The 2-byte checksum is appended before base32 encoding so that a single character change in the account ID is detectable.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 90,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        {
+          "input": { "bytes_hex": "604848d75a" },
+          "expected_output": "valid_crc16_hex"
+        },
+        {
+          "input": { "bytes_hex": "0000" },
+          "expected_output": "0000"
+        },
+        {
+          "input": { "bytes_hex": "FFFF" },
+          "expected_output": "valid_crc16_hex"
+        },
+        {
+          "input": { "bytes_hex": "313233343536373839" },
+          "expected_output": "31C3"
+        },
+        {
+          "input": { "bytes_hex": "48656C6C6F" },
+          "expected_output": "valid_crc16_hex"
+        }
+      ]
+    },
+    {
+      "id": "tt-010",
+      "title": "Full-Speed Cryptographic Relay",
+      "difficulty": "master",
+      "points": 500,
+      "time_limit": 90,
+      "description": "Given the decimal number 255, perform the following chain in under 90 seconds:\n1. Convert 255 to 8-bit binary.\n2. XOR the result with `11001100`.\n3. Convert the XOR result to decimal.\n4. Compute that decimal mod 7.\n5. Return only the final mod result.",
+      "hints": [
+        "255 in binary is `11111111`.",
+        "`11111111 XOR 11001100 = 00110011`.",
+        "`00110011` in decimal is 51.",
+        "51 mod 7 = 2."
+      ],
+      "explanation": "Chain: 255 → `11111111` → XOR `11001100` → `00110011` → 51 → 51 mod 7 → **2**. This tests rapid multi-step mental arithmetic under time pressure.",
+      "time_trial_metadata": {
+        "time_limit_seconds": 90,
+        "scoring_model": "full_points_if_within_time_limit",
+        "partial_credit": false
+      },
+      "test_cases": [
+        {
+          "input": {
+            "start_decimal": 255,
+            "xor_mask_binary": "11001100",
+            "modulus": 7
+          },
+          "expected_output": "2"
+        },
+        {
+          "input": {
+            "start_decimal": 170,
+            "xor_mask_binary": "11110000",
+            "modulus": 5
+          },
+          "expected_output": "0"
+        },
+        {
+          "input": {
+            "start_decimal": 85,
+            "xor_mask_binary": "10101010",
+            "modulus": 3
+          },
+          "expected_output": "2"
+        },
+        {
+          "input": {
+            "start_decimal": 128,
+            "xor_mask_binary": "01111111",
+            "modulus": 11
+          },
+          "expected_output": "3"
+        },
+        {
+          "input": {
+            "start_decimal": 200,
+            "xor_mask_binary": "00110011",
+            "modulus": 13
+          },
+          "expected_output": "valid_mod_result"
+        }
+      ]
+    }
+  ]
+}
